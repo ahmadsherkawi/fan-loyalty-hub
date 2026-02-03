@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users } from 'lucide-react';
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User } from 'lucide-react';
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from '@/types/database';
 
 // Preview data
@@ -249,14 +249,24 @@ export default function FanHome() {
       >
         <div className="container py-4 flex items-center justify-between">
           <Logo />
-          <Button 
-            variant="ghost" 
-            onClick={handleSignOut} 
-            className="text-primary-foreground hover:bg-white/10"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            {isPreviewMode ? 'Exit' : 'Sign Out'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate(isPreviewMode ? '/fan/profile?preview=fan' : '/fan/profile')}
+              className="text-primary-foreground hover:bg-white/10"
+            >
+              <User className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={handleSignOut} 
+              className="text-primary-foreground hover:bg-white/10"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {isPreviewMode ? 'Exit' : 'Sign Out'}
+            </Button>
+          </div>
         </div>
         
         {/* Points Banner */}
