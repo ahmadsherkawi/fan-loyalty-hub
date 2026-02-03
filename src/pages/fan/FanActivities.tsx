@@ -9,6 +9,7 @@ import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { ManualProofModal } from '@/components/ui/ManualProofModal';
 import { QRScannerModal } from '@/components/ui/QRScannerModal';
+import { LocationCheckinModal } from '@/components/ui/LocationCheckinModal';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod, ActivityFrequency } from '@/types/database';
@@ -133,6 +134,10 @@ export default function FanActivities() {
   // QR scanner state
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [processingQR, setProcessingQR] = useState(false);
+  
+  // Location check-in state
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [processingLocation, setProcessingLocation] = useState(false);
 
   useEffect(() => { 
     if (isPreviewMode) {
@@ -186,6 +191,13 @@ export default function FanActivities() {
     if (activity.verification_method === 'qr_scan') {
       setSelectedActivity(activity);
       setQrScannerOpen(true);
+      return;
+    }
+    
+    // Location check-in activities open the location modal
+    if (activity.verification_method === 'location_checkin') {
+      setSelectedActivity(activity);
+      setLocationModalOpen(true);
       return;
     }
     
@@ -291,6 +303,44 @@ export default function FanActivities() {
       toast({ title: 'Error', description: 'Failed to complete activity', variant: 'destructive' }); 
     } finally {
       setProcessingQR(false);
+    }
+  };
+
+  const handleLocationSuccess = async () => {
+    if (!selectedActivity || !membership || !profile) return;
+    
+    if (isPreviewMode) {
+      toast({ 
+        title: 'Check-in Successful!', 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}! (simulated in preview)` 
+      });
+      setLocationModalOpen(false);
+      return;
+    }
+    
+    setProcessingLocation(true);
+    try {
+      await supabase.from('activity_completions').insert({ 
+        activity_id: selectedActivity.id, 
+        fan_id: profile.id, 
+        membership_id: membership.id, 
+        points_earned: selectedActivity.points_awarded,
+        metadata: { verification: 'location_checkin' }
+      });
+      await supabase.rpc('award_points', { 
+        p_membership_id: membership.id, 
+        p_points: selectedActivity.points_awarded 
+      });
+      toast({ 
+        title: 'Check-in Successful!', 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}!` 
+      });
+      setLocationModalOpen(false);
+      fetchData();
+    } catch (e) { 
+      toast({ title: 'Error', description: 'Failed to complete check-in', variant: 'destructive' }); 
+    } finally {
+      setProcessingLocation(false);
     }
   };
 
@@ -456,6 +506,20 @@ export default function FanActivities() {
         pointsCurrencyName={program?.points_currency_name || 'Points'}
         onSuccess={handleQRSuccess}
         isLoading={processingQR}
+      />
+
+      {/* Location Check-in Modal */}
+      <LocationCheckinModal
+        open={locationModalOpen}
+        onOpenChange={setLocationModalOpen}
+        activityName={selectedActivity?.name || ''}
+        targetLat={selectedActivity?.location_lat ?? null}
+        targetLng={selectedActivity?.location_lng ?? null}
+        radiusMeters={selectedActivity?.location_radius_meters || 500}
+        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsCurrencyName={program?.points_currency_name || 'Points'}
+        onSuccess={handleLocationSuccess}
+        isLoading={processingLocation}
       />
     </div>
   );
