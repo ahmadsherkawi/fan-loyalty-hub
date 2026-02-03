@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { QRCodeDisplay } from '@/components/ui/QRCodeDisplay';
+import { VenueMapPreview } from '@/components/ui/VenueMapPreview';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -608,6 +609,21 @@ export default function ActivityBuilder() {
                         Fans must be within this distance to check in (50-5000m)
                       </p>
                     </div>
+                    
+                    {/* Map Preview */}
+                    {locationLat && locationLng && !isNaN(parseFloat(locationLat)) && !isNaN(parseFloat(locationLng)) && (
+                      <div className="space-y-2">
+                        <Label className="text-xs">Map Preview</Label>
+                        <VenueMapPreview
+                          lat={parseFloat(locationLat)}
+                          lng={parseFloat(locationLng)}
+                          radiusMeters={parseInt(locationRadius) || 500}
+                        />
+                        <p className="text-xs text-muted-foreground text-center">
+                          The green circle shows the check-in area
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
