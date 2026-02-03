@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/ui/Logo';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X } from 'lucide-react';
 
 type Step = 'club' | 'program' | 'verification';
 
@@ -28,6 +28,10 @@ export default function ClubOnboarding() {
   const [city, setCity] = useState('');
   const [stadiumName, setStadiumName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#1a7a4c');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Program form state
   const [programName, setProgramName] = useState('');
@@ -72,11 +76,75 @@ export default function ClubOnboarding() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please upload an image file (PNG, JPG, etc.)',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Logo must be less than 2MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadLogo = async (clubId: string): Promise<string | null> => {
+    if (!logoFile) return null;
+    
+    setIsUploadingLogo(true);
+    try {
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${clubId}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('club-logos')
+        .upload(fileName, logoFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('club-logos')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Logo upload error:', error);
+      return null;
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const handleCreateClub = async () => {
     if (!profile) return;
     setIsSubmitting(true);
 
     try {
+      // Create club first
       const { data: club, error } = await supabase
         .from('clubs')
         .insert({
@@ -91,6 +159,17 @@ export default function ClubOnboarding() {
         .single();
 
       if (error) throw error;
+
+      // Upload logo if provided
+      if (logoFile) {
+        const logoUrl = await uploadLogo(club.id);
+        if (logoUrl) {
+          await supabase
+            .from('clubs')
+            .update({ logo_url: logoUrl })
+            .eq('id', club.id);
+        }
+      }
 
       setClubId(club.id);
       setStep('program');
@@ -273,6 +352,57 @@ export default function ClubOnboarding() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Club Logo Upload */}
+                <div className="space-y-2">
+                  <Label>Club Logo</Label>
+                  <div className="flex items-center gap-4">
+                    {logoPreview ? (
+                      <div className="relative">
+                        <img 
+                          src={logoPreview} 
+                          alt="Club logo preview" 
+                          className="w-20 h-20 rounded-lg object-cover border"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/90"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="hidden"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {logoFile ? 'Change Logo' : 'Upload Logo'}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG or JPG, max 2MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="clubName">Club Name *</Label>
                   <Input
@@ -337,13 +467,13 @@ export default function ClubOnboarding() {
 
                 <Button
                   onClick={handleCreateClub}
-                  disabled={!clubName || !country || !city || isSubmitting}
+                  disabled={!clubName || !country || !city || isSubmitting || isUploadingLogo}
                   className="w-full gradient-stadium"
                 >
-                  {isSubmitting ? (
+                  {(isSubmitting || isUploadingLogo) ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  Continue to Program Setup
+                  {isUploadingLogo ? 'Uploading Logo...' : 'Continue to Program Setup'}
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </CardContent>

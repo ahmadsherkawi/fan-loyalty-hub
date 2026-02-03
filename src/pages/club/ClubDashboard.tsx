@@ -271,14 +271,22 @@ export default function ClubDashboard() {
             <Logo />
             {club && (
               <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: club.primary_color }}
-                >
-                  <span className="text-sm font-bold text-white">
-                    {club.name.charAt(0)}
-                  </span>
-                </div>
+                {club.logo_url ? (
+                  <img 
+                    src={club.logo_url} 
+                    alt={`${club.name} logo`}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: club.primary_color || '#1a7a4c' }}
+                  >
+                    <span className="text-sm font-bold text-white">
+                      {club.name.charAt(0)}
+                    </span>
+                  </div>
+                )}
                 <span className="font-semibold text-foreground">{club.name}</span>
               </div>
             )}
