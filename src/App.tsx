@@ -18,6 +18,7 @@ import ClaimReview from "./pages/club/ClaimReview";
 import FanHome from "./pages/fan/FanHome";
 import FanActivities from "./pages/fan/FanActivities";
 import FanRewards from "./pages/fan/FanRewards";
+import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import JoinClub from "./pages/fan/JoinClub";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/fan/home" element={<FanHome />} />
               <Route path="/fan/activities" element={<FanActivities />} />
               <Route path="/fan/rewards" element={<FanRewards />} />
+              <Route path="/fan/leaderboard" element={<FanLeaderboardPage />} />
               <Route path="/fan/join" element={<JoinClub />} />
               
               {/* Catch-all */}
