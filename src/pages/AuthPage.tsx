@@ -1,4 +1,4 @@
-import { useState, forwardRef } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ const signInSchema = z.object({
   password: z.string().min(1, 'Please enter your password'),
 });
 
-const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
+export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { signUp, signIn } = useAuth();
@@ -162,10 +162,9 @@ const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
     }
   };
 
-  // Show email confirmation screen after signup
   if (showConfirmationMessage) {
     return (
-      <div ref={ref} className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col">
         <div className="p-6">
           <Button
             variant="ghost"
@@ -234,7 +233,7 @@ const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
   }
 
   return (
-    <div ref={ref} className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="p-6">
         <Button
@@ -403,8 +402,4 @@ const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </div>
   );
-});
-
-AuthPage.displayName = 'AuthPage';
-
-export default AuthPage;
+}
