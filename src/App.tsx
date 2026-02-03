@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import AuthPage from "./pages/AuthPage";
 import ExplorePage from "./pages/ExplorePage";
+import PreviewHub from "./pages/PreviewHub";
 import ClubOnboarding from "./pages/club/ClubOnboarding";
 import ClubDashboard from "./pages/club/ClubDashboard";
 import ActivityBuilder from "./pages/club/ActivityBuilder";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/preview" element={<PreviewHub />} />
             
             {/* Club Admin Routes */}
             <Route path="/club/onboarding" element={<ClubOnboarding />} />

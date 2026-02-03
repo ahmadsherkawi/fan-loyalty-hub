@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/ui/Logo';
+import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -22,14 +23,21 @@ import {
   Code,
   Loader2,
   Trash2,
-  Edit
+  Edit,
+  HelpCircle
 } from 'lucide-react';
 import { Reward, RedemptionMethod, LoyaltyProgram } from '@/types/database';
 
 const redemptionLabels: Record<RedemptionMethod, string> = {
-  voucher: 'Voucher Code',
+  voucher: 'Digital Voucher',
   manual_fulfillment: 'Manual Fulfillment',
   code_display: 'Code Display',
+};
+
+const redemptionDescriptions: Record<RedemptionMethod, string> = {
+  voucher: 'Fan receives a digital voucher code to use at your shop or venue',
+  manual_fulfillment: 'You manually fulfill the reward (e.g., physical item, experience)',
+  code_display: 'Fan sees a code on screen to show at point of redemption',
 };
 
 const redemptionIcons: Record<RedemptionMethod, React.ReactNode> = {
@@ -40,8 +48,11 @@ const redemptionIcons: Record<RedemptionMethod, React.ReactNode> = {
 
 export default function RewardsBuilder() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, loading } = useAuth();
   const { toast } = useToast();
+
+  const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
@@ -60,18 +71,29 @@ export default function RewardsBuilder() {
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth?role=club_admin');
-    } else if (!loading && profile?.role !== 'club_admin') {
-      navigate('/fan/home');
+    if (isPreviewMode) {
+      setProgram({
+        id: 'preview-program',
+        club_id: 'preview-club',
+        name: 'Demo Rewards',
+        description: null,
+        points_currency_name: 'Points',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setRewards([]);
+      setDataLoading(false);
+    } else {
+      if (!loading && !user) {
+        navigate('/auth?role=club_admin');
+      } else if (!loading && profile?.role !== 'club_admin') {
+        navigate('/fan/home');
+      } else if (!loading && profile) {
+        fetchData();
+      }
     }
-  }, [user, profile, loading, navigate]);
-
-  useEffect(() => {
-    if (profile) {
-      fetchData();
-    }
-  }, [profile]);
+  }, [user, profile, loading, navigate, isPreviewMode]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -96,7 +118,7 @@ export default function RewardsBuilder() {
         .limit(1);
 
       if (!programs || programs.length === 0) {
-        navigate('/club/onboarding');
+        navigate('/club/dashboard');
         return;
       }
 
@@ -149,6 +171,36 @@ export default function RewardsBuilder() {
         description: 'Points cost must be a positive number.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (isPreviewMode) {
+      // Simulate reward creation
+      const newReward: Reward = {
+        id: `preview-${Date.now()}`,
+        program_id: program.id,
+        name,
+        description: description || null,
+        points_cost: cost,
+        quantity_limit: quantityLimit ? parseInt(quantityLimit) : null,
+        quantity_redeemed: 0,
+        redemption_method: redemptionMethod,
+        voucher_code: voucherCode || null,
+        is_active: isActive,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (editingReward) {
+        setRewards(rewards.map(r => r.id === editingReward.id ? newReward : r));
+        toast({ title: 'Reward Updated' });
+      } else {
+        setRewards([newReward, ...rewards]);
+        toast({ title: 'Reward Created', description: 'Your new reward is ready for fans.' });
+      }
+      
+      setIsDialogOpen(false);
+      resetForm();
       return;
     }
 
@@ -209,6 +261,12 @@ export default function RewardsBuilder() {
   const handleDelete = async (rewardId: string) => {
     if (!confirm('Are you sure you want to delete this reward?')) return;
 
+    if (isPreviewMode) {
+      setRewards(rewards.filter(r => r.id !== rewardId));
+      toast({ title: 'Reward Deleted' });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('rewards')
@@ -232,7 +290,7 @@ export default function RewardsBuilder() {
     }
   };
 
-  if (loading || dataLoading) {
+  if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -242,10 +300,15 @@ export default function RewardsBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+      
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/club/dashboard')}>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(isPreviewMode ? '/club/dashboard?preview=club_admin' : '/club/dashboard')}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -259,7 +322,7 @@ export default function RewardsBuilder() {
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
               <Gift className="h-8 w-8 text-primary" />
-              Rewards Builder
+              Rewards Manager
             </h1>
             <p className="text-muted-foreground">
               Create rewards fans can redeem with their {program?.points_currency_name || 'points'}
@@ -273,16 +336,16 @@ export default function RewardsBuilder() {
             <DialogTrigger asChild>
               <Button className="gradient-stadium">
                 <Plus className="h-4 w-4 mr-2" />
-                New Reward
+                Add Reward
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingReward ? 'Edit Reward' : 'Create New Reward'}
                 </DialogTitle>
                 <DialogDescription>
-                  Set up a reward that fans can redeem with their points
+                  Set up a reward that fans can redeem with their {program?.points_currency_name || 'points'}
                 </DialogDescription>
               </DialogHeader>
 
@@ -293,7 +356,7 @@ export default function RewardsBuilder() {
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Signed Jersey"
+                    placeholder="e.g., Signed Jersey"
                   />
                 </div>
 
@@ -321,7 +384,10 @@ export default function RewardsBuilder() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="quantityLimit">Quantity Limit</Label>
+                    <Label htmlFor="quantityLimit" className="flex items-center gap-1">
+                      Quantity Limit
+                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                    </Label>
                     <Input
                       id="quantityLimit"
                       type="number"
@@ -334,7 +400,10 @@ export default function RewardsBuilder() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Redemption Method *</Label>
+                  <Label className="flex items-center gap-1">
+                    Redemption Method *
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </Label>
                   <Select value={redemptionMethod} onValueChange={(v) => setRedemptionMethod(v as RedemptionMethod)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -350,6 +419,9 @@ export default function RewardsBuilder() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                    {redemptionDescriptions[redemptionMethod]}
+                  </p>
                 </div>
 
                 {(redemptionMethod === 'voucher' || redemptionMethod === 'code_display') && (
@@ -359,7 +431,7 @@ export default function RewardsBuilder() {
                       id="voucherCode"
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value)}
-                      placeholder="REWARD2024"
+                      placeholder="e.g., REWARD2024"
                     />
                   </div>
                 )}
@@ -393,10 +465,11 @@ export default function RewardsBuilder() {
             <CardContent className="py-12 text-center">
               <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                No Rewards Yet
+                You Haven't Created Any Rewards Yet
               </h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first reward to incentivize fans
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                Rewards give fans something to work towards. 
+                Create your first reward to incentivize engagement.
               </p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -434,11 +507,11 @@ export default function RewardsBuilder() {
 
                   <h3 className="font-semibold text-foreground mb-1">{reward.name}</h3>
                   {reward.description && (
-                    <p className="text-sm text-muted-foreground mb-3">{reward.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{reward.description}</p>
                   )}
 
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="points-display">{reward.points_cost}</span>
+                    <span className="text-xl font-bold text-primary">{reward.points_cost}</span>
                     <span className="text-sm text-muted-foreground">{program?.points_currency_name}</span>
                   </div>
 
@@ -450,6 +523,9 @@ export default function RewardsBuilder() {
                       <Badge variant="secondary">
                         {reward.quantity_redeemed}/{reward.quantity_limit} redeemed
                       </Badge>
+                    )}
+                    {!reward.is_active && (
+                      <Badge variant="secondary">Inactive</Badge>
                     )}
                   </div>
                 </CardContent>

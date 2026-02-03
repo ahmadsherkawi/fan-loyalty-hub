@@ -1,23 +1,27 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/ui/Logo';
+import { PreviewBanner } from '@/components/ui/PreviewBanner';
+import { useToast } from '@/hooks/use-toast';
 import { 
-  LayoutDashboard, 
   Zap, 
   Gift, 
   FileCheck, 
   Users, 
   Trophy,
   LogOut,
-  Shield,
   AlertCircle,
   Loader2,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-react';
 import { Club, LoyaltyProgram, ClubVerification } from '@/types/database';
 
@@ -29,9 +33,30 @@ interface DashboardStats {
   totalPointsIssued: number;
 }
 
+// Preview data
+const PREVIEW_CLUB: Club = {
+  id: 'preview-club-admin',
+  admin_id: 'preview-admin',
+  name: 'Demo Football Club',
+  logo_url: null,
+  primary_color: '#1a7a4c',
+  country: 'United Kingdom',
+  city: 'London',
+  stadium_name: 'Demo Stadium',
+  season_start: null,
+  season_end: null,
+  status: 'verified',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export default function ClubDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, signOut, loading } = useAuth();
+  const { toast } = useToast();
+
+  const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
   const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
@@ -44,20 +69,28 @@ export default function ClubDashboard() {
     totalPointsIssued: 0,
   });
   const [dataLoading, setDataLoading] = useState(true);
+  
+  // Create program dialog
+  const [isCreateProgramOpen, setIsCreateProgramOpen] = useState(false);
+  const [programName, setProgramName] = useState('');
+  const [pointsCurrencyName, setPointsCurrencyName] = useState('Points');
+  const [isCreatingProgram, setIsCreatingProgram] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth?role=club_admin');
-    } else if (!loading && profile?.role !== 'club_admin') {
-      navigate('/fan/home');
+    if (isPreviewMode) {
+      setClub(PREVIEW_CLUB);
+      setProgram(null); // Start without a program to show the create flow
+      setDataLoading(false);
+    } else {
+      if (!loading && !user) {
+        navigate('/auth?role=club_admin');
+      } else if (!loading && profile?.role !== 'club_admin') {
+        navigate('/fan/home');
+      } else if (!loading && profile) {
+        fetchClubData();
+      }
     }
-  }, [user, profile, loading, navigate]);
-
-  useEffect(() => {
-    if (profile) {
-      fetchClubData();
-    }
-  }, [profile]);
+  }, [user, profile, loading, navigate, isPreviewMode]);
 
   const fetchClubData = async () => {
     if (!profile) return;
@@ -102,6 +135,8 @@ export default function ClubDashboard() {
       }
 
       // Fetch stats
+      const programId = programs?.[0]?.id || '';
+      
       const { count: fansCount } = await supabase
         .from('fan_memberships')
         .select('*', { count: 'exact', head: true })
@@ -110,26 +145,26 @@ export default function ClubDashboard() {
       const { count: activitiesCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
-        .eq('program_id', programs?.[0]?.id || '')
+        .eq('program_id', programId)
         .eq('is_active', true);
 
       const { count: rewardsCount } = await supabase
         .from('rewards')
         .select('*', { count: 'exact', head: true })
-        .eq('program_id', programs?.[0]?.id || '')
+        .eq('program_id', programId)
         .eq('is_active', true);
 
       const { count: claimsCount } = await supabase
         .from('manual_claims')
         .select('*, activities!inner(program_id)', { count: 'exact', head: true })
-        .eq('activities.program_id', programs?.[0]?.id || '')
+        .eq('activities.program_id', programId)
         .eq('status', 'pending');
 
       // Calculate total points issued
       const { data: completions } = await supabase
         .from('activity_completions')
         .select('points_earned, activities!inner(program_id)')
-        .eq('activities.program_id', programs?.[0]?.id || '');
+        .eq('activities.program_id', programId);
 
       const totalPoints = completions?.reduce((sum, c) => sum + c.points_earned, 0) || 0;
 
@@ -147,12 +182,72 @@ export default function ClubDashboard() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+  const handleCreateProgram = async () => {
+    if (!club) return;
+    
+    if (isPreviewMode) {
+      // Simulate program creation
+      setProgram({
+        id: 'preview-program',
+        club_id: club.id,
+        name: programName,
+        description: null,
+        points_currency_name: pointsCurrencyName,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setIsCreateProgramOpen(false);
+      setProgramName('');
+      toast({
+        title: 'Loyalty Program Created!',
+        description: 'You can now create activities and rewards.',
+      });
+      return;
+    }
+    
+    setIsCreatingProgram(true);
+    try {
+      const { data, error } = await supabase
+        .from('loyalty_programs')
+        .insert({
+          club_id: club.id,
+          name: programName,
+          points_currency_name: pointsCurrencyName,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setProgram(data as LoyaltyProgram);
+      setIsCreateProgramOpen(false);
+      setProgramName('');
+      toast({
+        title: 'Loyalty Program Created!',
+        description: 'You can now create activities and rewards.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create program',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingProgram(false);
+    }
   };
 
-  if (loading || dataLoading) {
+  const handleSignOut = async () => {
+    if (isPreviewMode) {
+      navigate('/preview');
+    } else {
+      await signOut();
+      navigate('/');
+    }
+  };
+
+  if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -160,10 +255,10 @@ export default function ClubDashboard() {
     );
   }
 
-  const isVerified = club?.status === 'verified' || club?.status === 'official';
-
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+      
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
@@ -175,55 +270,20 @@ export default function ClubDashboard() {
                   className="w-8 h-8 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: club.primary_color }}
                 >
-                  <span className="text-sm font-bold text-primary-foreground">
+                  <span className="text-sm font-bold text-white">
                     {club.name.charAt(0)}
                   </span>
                 </div>
                 <span className="font-semibold text-foreground">{club.name}</span>
-                <Badge className={isVerified ? 'badge-verified' : 'badge-unverified'}>
-                  {isVerified ? (
-                    <>
-                      <Shield className="h-3 w-3 mr-1" />
-                      Verified
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Unverified
-                    </>
-                  )}
-                </Badge>
               </div>
             )}
           </div>
           <Button variant="ghost" onClick={handleSignOut}>
             <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+            {isPreviewMode ? 'Exit' : 'Sign Out'}
           </Button>
         </div>
       </header>
-
-      {/* Unverified Warning */}
-      {!isVerified && (
-        <div className="bg-warning/10 border-b border-warning/20">
-          <div className="container py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-warning">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-medium">
-                Your club is unverified. Verify to publish and engage fans.
-              </span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-warning text-warning hover:bg-warning/10"
-              onClick={() => navigate('/club/onboarding')}
-            >
-              Complete Verification
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
       <main className="container py-8">
@@ -236,25 +296,71 @@ export default function ClubDashboard() {
               Manage your loyalty program
             </p>
           </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/club/activities')}
-              disabled={!program}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              Activities
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/club/rewards')}
-              disabled={!program}
-            >
-              <Gift className="h-4 w-4 mr-2" />
-              Rewards
-            </Button>
-          </div>
         </div>
+
+        {/* No Program State */}
+        {!program && (
+          <Card className="mb-8 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Create Your Loyalty Program
+              </CardTitle>
+              <CardDescription>
+                Set up your loyalty program to start engaging fans with activities and rewards.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Dialog open={isCreateProgramOpen} onOpenChange={setIsCreateProgramOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-stadium">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Loyalty Program
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Loyalty Program</DialogTitle>
+                    <DialogDescription>
+                      Set up your fan loyalty program. You can customize these settings later.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="programName">Program Name *</Label>
+                      <Input
+                        id="programName"
+                        value={programName}
+                        onChange={(e) => setProgramName(e.target.value)}
+                        placeholder="e.g., Super Fans Rewards"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pointsCurrency">Points Currency Name</Label>
+                      <Input
+                        id="pointsCurrency"
+                        value={pointsCurrencyName}
+                        onChange={(e) => setPointsCurrencyName(e.target.value)}
+                        placeholder="Points, Stars, Coins..."
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Example: "You earned 100 {pointsCurrencyName}!"
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleCreateProgram}
+                      disabled={!programName || isCreatingProgram}
+                      className="w-full gradient-stadium"
+                    >
+                      {isCreatingProgram && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      Create Program
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -331,62 +437,101 @@ export default function ClubDashboard() {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="card-hover cursor-pointer" onClick={() => navigate('/club/activities')}>
+          <Card 
+            className={`card-hover ${!program ? 'opacity-60' : 'cursor-pointer'}`}
+            onClick={() => program && navigate(isPreviewMode ? '/club/activities?preview=club_admin' : '/club/activities')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
-                Activity Builder
+                Activities Manager
               </CardTitle>
               <CardDescription>
-                Create and manage fan activities with various verification methods
+                Create activities for fans to earn {program?.points_currency_name || 'points'}. 
+                Define how fans complete them (QR, GPS, in-app, or manual proof).
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" disabled={!program}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Activity
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="card-hover cursor-pointer" onClick={() => navigate('/club/rewards')}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gift className="h-5 w-5 text-primary" />
-                Rewards Builder
-              </CardTitle>
-              <CardDescription>
-                Set up exclusive rewards for your loyal fans
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" disabled={!program}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Reward
-              </Button>
+              {!program ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Create a loyalty program first
+                </p>
+              ) : stats.activeActivities === 0 ? (
+                <Button className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Activity
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full">
+                  Manage Activities ({stats.activeActivities})
+                </Button>
+              )}
             </CardContent>
           </Card>
 
           <Card 
-            className={`card-hover cursor-pointer ${stats.pendingClaims > 0 ? 'border-warning' : ''}`}
-            onClick={() => navigate('/club/claims')}
+            className={`card-hover ${!program ? 'opacity-60' : 'cursor-pointer'}`}
+            onClick={() => program && navigate(isPreviewMode ? '/club/rewards?preview=club_admin' : '/club/rewards')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-primary" />
+                Rewards Manager
+              </CardTitle>
+              <CardDescription>
+                Set up rewards fans can redeem with their {program?.points_currency_name || 'points'}. 
+                Choose vouchers, manual fulfillment, or code display.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!program ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Create a loyalty program first
+                </p>
+              ) : stats.activeRewards === 0 ? (
+                <Button className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Reward
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full">
+                  Manage Rewards ({stats.activeRewards})
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card 
+            className={`card-hover ${!program ? 'opacity-60' : stats.pendingClaims > 0 ? 'border-warning cursor-pointer' : 'cursor-pointer'}`}
+            onClick={() => program && navigate(isPreviewMode ? '/club/claims?preview=club_admin' : '/club/claims')}
           >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileCheck className={`h-5 w-5 ${stats.pendingClaims > 0 ? 'text-warning' : 'text-primary'}`} />
                 Review Claims
                 {stats.pendingClaims > 0 && (
-                  <Badge className="badge-unverified ml-2">{stats.pendingClaims}</Badge>
+                  <Badge variant="destructive" className="ml-2">{stats.pendingClaims}</Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                Approve or reject manual proof submissions from fans
+                Review and approve manual proof submissions from fans for activities.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full" disabled={!program}>
-                View Claims
-              </Button>
+              {!program ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Create a loyalty program first
+                </p>
+              ) : stats.pendingClaims === 0 ? (
+                <p className="text-sm text-muted-foreground">No pending claims</p>
+              ) : (
+                <Button variant="outline" className="w-full">
+                  Review {stats.pendingClaims} Claims
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

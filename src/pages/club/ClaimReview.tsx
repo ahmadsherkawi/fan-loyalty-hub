@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Logo } from '@/components/ui/Logo';
+import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -26,8 +27,11 @@ interface ClaimWithDetails extends ManualClaim {
 
 export default function ClaimReview() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, loading } = useAuth();
   const { toast } = useToast();
+
+  const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [claims, setClaims] = useState<ClaimWithDetails[]>([]);
@@ -36,18 +40,29 @@ export default function ClaimReview() {
   const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth?role=club_admin');
-    } else if (!loading && profile?.role !== 'club_admin') {
-      navigate('/fan/home');
+    if (isPreviewMode) {
+      setProgram({
+        id: 'preview-program',
+        club_id: 'preview-club',
+        name: 'Demo Rewards',
+        description: null,
+        points_currency_name: 'Points',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setClaims([]);
+      setDataLoading(false);
+    } else {
+      if (!loading && !user) {
+        navigate('/auth?role=club_admin');
+      } else if (!loading && profile?.role !== 'club_admin') {
+        navigate('/fan/home');
+      } else if (!loading && profile) {
+        fetchData();
+      }
     }
-  }, [user, profile, loading, navigate]);
-
-  useEffect(() => {
-    if (profile) {
-      fetchData();
-    }
-  }, [profile]);
+  }, [user, profile, loading, navigate, isPreviewMode]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -72,7 +87,7 @@ export default function ClaimReview() {
         .limit(1);
 
       if (!programs || programs.length === 0) {
-        navigate('/club/onboarding');
+        navigate('/club/dashboard');
         return;
       }
 
@@ -107,6 +122,11 @@ export default function ClaimReview() {
   };
 
   const handleApprove = async (claim: ClaimWithDetails) => {
+    if (isPreviewMode) {
+      toast({ title: 'Preview Mode', description: 'Approval is simulated in preview mode.' });
+      return;
+    }
+
     setProcessingId(claim.id);
 
     try {
@@ -161,6 +181,11 @@ export default function ClaimReview() {
   };
 
   const handleReject = async (claim: ClaimWithDetails) => {
+    if (isPreviewMode) {
+      toast({ title: 'Preview Mode', description: 'Rejection is simulated in preview mode.' });
+      return;
+    }
+
     if (!rejectionReason) {
       toast({
         title: 'Rejection Reason Required',
@@ -204,7 +229,7 @@ export default function ClaimReview() {
     }
   };
 
-  if (loading || dataLoading) {
+  if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -217,10 +242,15 @@ export default function ClaimReview() {
 
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+      
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/club/dashboard')}>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(isPreviewMode ? '/club/dashboard?preview=club_admin' : '/club/dashboard')}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -252,10 +282,12 @@ export default function ClaimReview() {
               <CardContent className="py-8 text-center">
                 <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">
-                  All Caught Up!
+                  {isPreviewMode ? 'No Pending Claims' : 'All Caught Up!'}
                 </h3>
                 <p className="text-muted-foreground">
-                  No pending claims to review.
+                  {isPreviewMode 
+                    ? 'When fans submit proof for activities, they will appear here for your review.'
+                    : 'No pending claims to review.'}
                 </p>
               </CardContent>
             </Card>
