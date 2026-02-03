@@ -308,7 +308,7 @@ export default function ClubVerification() {
             Club Verification
           </h1>
           <p className="text-muted-foreground">
-            Verification protects fans and clubs. Only verified clubs can publish loyalty programs.
+            Verification builds trust with fans. Once verified, your club can publish its loyalty program and start engaging supporters.
           </p>
         </div>
 
@@ -334,25 +334,30 @@ export default function ClubVerification() {
 
         {/* Progress Card */}
         {!isAlreadyVerified && (
-          <Card className="mb-6">
+          <Card className={`mb-6 ${criteriaCount >= 2 ? 'border-primary bg-primary/5' : ''}`}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Verification Progress</span>
                 <Badge variant={criteriaCount >= 2 ? 'default' : 'secondary'}>
-                  {criteriaCount} of 3 completed
+                  {criteriaCount >= 2 ? 'Ready to verify' : `${criteriaCount} of 3 completed`}
                 </Badge>
               </CardTitle>
               <CardDescription>
-                Complete at least 2 of 3 verification steps to verify your club.
+                Complete any 2 of the 3 steps below to verify your club.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Progress value={(criteriaCount / 3) * 100} className="mb-2" />
-              <p className="text-sm text-muted-foreground">
-                {criteriaCount >= 2 
-                  ? '✓ Ready to verify!' 
-                  : `Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? 's' : ''} to verify`}
-              </p>
+              <Progress value={(criteriaCount / 3) * 100} className="mb-3" />
+              {criteriaCount >= 2 ? (
+                <p className="text-sm text-primary font-medium flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  You're ready! Click below to verify your club and go live.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {`Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? 's' : ''} to unlock verification`}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -488,15 +493,25 @@ export default function ClubVerification() {
             <Button
               onClick={handleSubmit}
               disabled={!canSubmit || submitting}
-              className="w-full gradient-stadium"
+              className={`w-full ${canSubmit ? 'gradient-stadium' : ''}`}
+              variant={canSubmit ? 'default' : 'secondary'}
               size="lg"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              {canSubmit ? 'Submit for Verification' : 'Complete at least 2 steps to verify'}
+              {canSubmit ? (
+                <>
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Verify My Club
+                </>
+              ) : (
+                `Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? 's' : ''} to verify`
+              )}
             </Button>
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              Verification is instant once you meet the requirements.
-            </p>
+            {canSubmit && (
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                Verification is instant. Your club will be visible to fans right away.
+              </p>
+            )}
           </div>
         )}
 

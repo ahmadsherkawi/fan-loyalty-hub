@@ -306,7 +306,7 @@ export default function JoinClub() {
               <p className="text-muted-foreground">
                 {search || selectedCountry !== 'all' 
                   ? 'Try adjusting your search or filters.'
-                  : 'No verified clubs are available yet.'}
+                  : 'No clubs are available yet. Check back soon!'}
               </p>
             </CardContent>
           </Card>
