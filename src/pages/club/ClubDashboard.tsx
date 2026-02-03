@@ -305,7 +305,7 @@ export default function ClubDashboard() {
         {club && (
           <Card className={`mb-6 ${club.status === 'verified' || club.status === 'official' ? 'border-primary bg-primary/5' : 'border-warning bg-warning/5'}`}>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                   <div className={`h-12 w-12 rounded-full flex items-center justify-center ${club.status === 'verified' || club.status === 'official' ? 'bg-primary/20' : 'bg-warning/20'}`}>
                     {club.status === 'verified' || club.status === 'official' ? (
@@ -317,16 +317,16 @@ export default function ClubDashboard() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-foreground">
-                        {club.status === 'verified' || club.status === 'official' ? 'Club Verified' : 'Verification Required'}
+                        {club.status === 'verified' || club.status === 'official' ? 'Club Verified' : 'Verification Needed'}
                       </h3>
                       <Badge variant={club.status === 'verified' || club.status === 'official' ? 'default' : 'secondary'}>
                         {club.status === 'official' ? 'Official' : club.status === 'verified' ? 'Verified' : 'Unverified'}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground max-w-md">
                       {club.status === 'verified' || club.status === 'official' 
-                        ? 'Your club can publish loyalty programs and accept fans.' 
-                        : 'Verify your club to publish your loyalty program and become visible to fans.'}
+                        ? 'Your loyalty program is live. Fans can now discover and join your club.' 
+                        : 'Verify your club to go live and let fans find you.'}
                     </p>
                   </div>
                 </div>
@@ -336,7 +336,7 @@ export default function ClubDashboard() {
                     className="gradient-stadium"
                   >
                     <ShieldCheck className="h-4 w-4 mr-2" />
-                    Verify Club
+                    Verify Now
                   </Button>
                 )}
               </div>
@@ -586,25 +586,25 @@ export default function ClubDashboard() {
         {program && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between flex-wrap gap-2">
                 <span>Program Details</span>
                 {club?.status === 'unverified' ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span>
                         <Button disabled variant="secondary" size="sm">
-                          Publish Program
+                          Go Live
                         </Button>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Verification required to publish your loyalty program.</p>
+                      <p>Verify your club first to publish your loyalty program.</p>
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Badge variant="default" className="ml-2">
+                  <Badge variant="default" className="bg-primary">
                     <ShieldCheck className="h-3 w-3 mr-1" />
-                    Published
+                    Live
                   </Badge>
                 )}
               </CardTitle>
@@ -626,16 +626,16 @@ export default function ClubDashboard() {
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Fan Visibility</p>
+                  <p className="text-sm text-muted-foreground">Fan Discovery</p>
                   {club?.status === 'unverified' ? (
                     <p className="text-sm text-warning flex items-center gap-1">
                       <AlertCircle className="h-4 w-4" />
-                      Hidden (verify to show)
+                      Hidden until verified
                     </p>
                   ) : (
                     <p className="text-sm text-primary flex items-center gap-1">
                       <ShieldCheck className="h-4 w-4" />
-                      Visible to fans
+                      Fans can find you
                     </p>
                   )}
                 </div>
