@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Profile, UserRole, ClubStatus } from '@/types/database';
 
+interface EnrolledClubInfo {
+  id: string;
+  name: string;
+}
+
 interface PreviewModeContextType {
   isPreviewMode: boolean;
   previewProfile: Profile | null;
@@ -13,6 +18,9 @@ interface PreviewModeContextType {
   addPreviewPoints: (points: number) => void;
   completedPreviewActivities: string[];
   markActivityCompleted: (activityId: string) => void;
+  // Enrolled club tracking for preview mode
+  previewEnrolledClub: EnrolledClubInfo | null;
+  setPreviewEnrolledClub: (club: EnrolledClubInfo) => void;
 }
 
 const PreviewModeContext = createContext<PreviewModeContextType | undefined>(undefined);
@@ -25,6 +33,9 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
   // Preview mode points tracking
   const [previewPointsBalance, setPreviewPointsBalance] = useState(0);
   const [completedPreviewActivities, setCompletedPreviewActivities] = useState<string[]>([]);
+  
+  // Enrolled club tracking for preview mode
+  const [previewEnrolledClub, setPreviewEnrolledClubState] = useState<EnrolledClubInfo | null>(null);
 
   // Check URL params for preview mode on mount
   useEffect(() => {
@@ -55,7 +66,12 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
     setPreviewClubStatus('unverified');
     setPreviewPointsBalance(0);
     setCompletedPreviewActivities([]);
+    setPreviewEnrolledClubState(null);
   };
+
+  const setPreviewEnrolledClub = useCallback((club: EnrolledClubInfo) => {
+    setPreviewEnrolledClubState(club);
+  }, []);
 
   const setPreviewClubVerified = () => {
     setPreviewClubStatus('verified');
@@ -84,6 +100,8 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
         addPreviewPoints,
         completedPreviewActivities,
         markActivityCompleted,
+        previewEnrolledClub,
+        setPreviewEnrolledClub,
       }}
     >
       {children}
