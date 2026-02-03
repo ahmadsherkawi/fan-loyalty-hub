@@ -29,7 +29,8 @@ import {
   Loader2,
   Trash2,
   Edit,
-  HelpCircle
+  HelpCircle,
+  Calendar
 } from 'lucide-react';
 import { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from '@/types/database';
 
@@ -100,6 +101,11 @@ export default function ActivityBuilder() {
   
   // In-app activity configuration (poll/quiz)
   const [inAppConfig, setInAppConfig] = useState<InAppConfig | null>(null);
+  
+  // Time window configuration
+  const [hasTimeWindow, setHasTimeWindow] = useState(false);
+  const [timeWindowStart, setTimeWindowStart] = useState('');
+  const [timeWindowEnd, setTimeWindowEnd] = useState('');
 
   useEffect(() => {
     if (isPreviewMode) {
@@ -184,6 +190,9 @@ export default function ActivityBuilder() {
     setLocationLng('');
     setLocationRadius('500');
     setInAppConfig(null);
+    setHasTimeWindow(false);
+    setTimeWindowStart('');
+    setTimeWindowEnd('');
   };
 
   const openEditDialog = (activity: Activity) => {
@@ -198,6 +207,13 @@ export default function ActivityBuilder() {
     setLocationLng(activity.location_lng?.toString() || '');
     setLocationRadius(activity.location_radius_meters?.toString() || '500');
     setInAppConfig(activity.in_app_config || null);
+    
+    // Time window
+    const hasWindow = !!(activity.time_window_start || activity.time_window_end);
+    setHasTimeWindow(hasWindow);
+    setTimeWindowStart(activity.time_window_start ? new Date(activity.time_window_start).toISOString().slice(0, 16) : '');
+    setTimeWindowEnd(activity.time_window_end ? new Date(activity.time_window_end).toISOString().slice(0, 16) : '');
+    
     setIsDialogOpen(true);
   };
 
@@ -308,6 +324,26 @@ export default function ActivityBuilder() {
       }
     }
 
+    // Validate time window
+    if (hasTimeWindow) {
+      if (!timeWindowStart || !timeWindowEnd) {
+        toast({
+          title: 'Time Window Required',
+          description: 'Please set both start and end times for the time window.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (new Date(timeWindowStart) >= new Date(timeWindowEnd)) {
+        toast({
+          title: 'Invalid Time Window',
+          description: 'End time must be after start time.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     // Parse location values
     const parsedLat = verificationMethod === 'location_checkin' ? parseFloat(locationLat) : null;
     const parsedLng = verificationMethod === 'location_checkin' ? parseFloat(locationLng) : null;
@@ -320,6 +356,10 @@ export default function ActivityBuilder() {
           options: inAppConfig.options.filter(o => o.text.trim()),
         }
       : null;
+
+    // Parse time window
+    const parsedTimeWindowStart = hasTimeWindow && timeWindowStart ? new Date(timeWindowStart).toISOString() : null;
+    const parsedTimeWindowEnd = hasTimeWindow && timeWindowEnd ? new Date(timeWindowEnd).toISOString() : null;
 
     if (isPreviewMode) {
       // Simulate activity creation
@@ -335,8 +375,8 @@ export default function ActivityBuilder() {
         location_lat: parsedLat,
         location_lng: parsedLng,
         location_radius_meters: parsedRadius,
-        time_window_start: null,
-        time_window_end: null,
+        time_window_start: parsedTimeWindowStart,
+        time_window_end: parsedTimeWindowEnd,
         in_app_config: parsedInAppConfig,
         is_active: isActive,
         created_at: new Date().toISOString(),
@@ -371,6 +411,8 @@ export default function ActivityBuilder() {
         location_lat: parsedLat,
         location_lng: parsedLng,
         location_radius_meters: parsedRadius,
+        time_window_start: parsedTimeWindowStart,
+        time_window_end: parsedTimeWindowEnd,
         in_app_config: (parsedInAppConfig as unknown) as Json,
       };
 
@@ -681,6 +723,62 @@ export default function ActivityBuilder() {
                   />
                 )}
 
+                {/* Time Window Configuration */}
+                <div className="space-y-3 p-4 border border-muted rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="hasTimeWindow" className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      Time-Based Availability
+                    </Label>
+                    <Switch
+                      id="hasTimeWindow"
+                      checked={hasTimeWindow}
+                      onCheckedChange={setHasTimeWindow}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Restrict this activity to specific dates and times (e.g., match days only)
+                  </p>
+                  
+                  {hasTimeWindow && (
+                    <div className="space-y-3 pt-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="timeWindowStart" className="text-xs">
+                            Available From *
+                          </Label>
+                          <Input
+                            id="timeWindowStart"
+                            type="datetime-local"
+                            value={timeWindowStart}
+                            onChange={(e) => setTimeWindowStart(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="timeWindowEnd" className="text-xs">
+                            Available Until *
+                          </Label>
+                          <Input
+                            id="timeWindowEnd"
+                            type="datetime-local"
+                            value={timeWindowEnd}
+                            onChange={(e) => setTimeWindowEnd(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                      {timeWindowStart && timeWindowEnd && new Date(timeWindowStart) < new Date(timeWindowEnd) && (
+                        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                          ⏰ Activity will be available from{' '}
+                          <span className="font-medium">{new Date(timeWindowStart).toLocaleString()}</span> to{' '}
+                          <span className="font-medium">{new Date(timeWindowEnd).toLocaleString()}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between">
                   <Label htmlFor="isActive">Active</Label>
                   <Switch
@@ -750,6 +848,12 @@ export default function ActivityBuilder() {
                           </Badge>
                           {!activity.is_active && (
                             <Badge variant="secondary">Inactive</Badge>
+                          )}
+                          {(activity.time_window_start || activity.time_window_end) && (
+                            <Badge variant="outline" className="gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Timed
+                            </Badge>
                           )}
                         </div>
                       </div>
