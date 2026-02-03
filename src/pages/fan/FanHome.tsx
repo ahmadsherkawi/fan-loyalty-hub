@@ -63,6 +63,7 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 500,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -81,6 +82,7 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 100,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -190,7 +192,7 @@ export default function FanHome() {
       .eq('program_id', m.program_id)
       .eq('is_active', true)
       .limit(3);
-    setActivities((acts || []) as Activity[]);
+    setActivities((acts || []) as unknown as Activity[]);
     
     // Fetch rewards (limited)
     const { data: rews } = await supabase
