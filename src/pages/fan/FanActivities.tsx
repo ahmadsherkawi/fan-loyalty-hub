@@ -12,7 +12,7 @@ import { QRScannerModal } from '@/components/ui/QRScannerModal';
 import { LocationCheckinModal } from '@/components/ui/LocationCheckinModal';
 import { PollQuizParticipation, InAppConfig } from '@/components/ui/PollQuizParticipation';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock, CalendarClock } from 'lucide-react';
 import { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod, ActivityFrequency } from '@/types/database';
 
 // Preview data
@@ -48,8 +48,9 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_lat: null,
     location_lng: null,
     location_radius_meters: 100,
-    time_window_start: null,
-    time_window_end: null,
+    // Time window: currently active (ends in 2 hours)
+    time_window_start: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    time_window_end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -126,6 +127,26 @@ const PREVIEW_ACTIVITIES: Activity[] = [
         { id: 'opt4', text: 'Garnacho' },
       ],
     },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'preview-activity-6',
+    program_id: 'preview-program-1',
+    name: 'Next Week Special',
+    description: 'This activity will be available during next week\'s match',
+    points_awarded: 200,
+    frequency: 'once_ever',
+    verification_method: 'qr_scan',
+    qr_code_data: 'future-qr-data',
+    location_lat: null,
+    location_lng: null,
+    location_radius_meters: 100,
+    // Time window: starts tomorrow
+    time_window_start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    time_window_end: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -223,6 +244,38 @@ export default function FanActivities() {
 
   const isCompleted = (activityId: string) => completions.some(c => c.activity_id === activityId);
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
+
+  // Check if activity is within its time window
+  const getTimeWindowStatus = (activity: Activity): { available: boolean; message: string | null } => {
+    if (!activity.time_window_start && !activity.time_window_end) {
+      return { available: true, message: null };
+    }
+    
+    const now = new Date();
+    const start = activity.time_window_start ? new Date(activity.time_window_start) : null;
+    const end = activity.time_window_end ? new Date(activity.time_window_end) : null;
+    
+    if (start && now < start) {
+      return { 
+        available: false, 
+        message: `Available from ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+      };
+    }
+    
+    if (end && now > end) {
+      return { available: false, message: 'This activity has ended' };
+    }
+    
+    // Activity is currently available within window
+    if (end) {
+      return { 
+        available: true, 
+        message: `Ends ${end.toLocaleDateString()} at ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+      };
+    }
+    
+    return { available: true, message: null };
+  };
 
   const handleComplete = async (activity: Activity) => {
     // Manual proof activities open the modal instead
@@ -513,6 +566,8 @@ export default function FanActivities() {
               const Icon = icons[activity.verification_method];
               const completed = isCompleted(activity.id);
               const pending = hasPendingClaim(activity.id);
+              const timeStatus = getTimeWindowStatus(activity);
+              const isUnavailable = !timeStatus.available;
               
               return (
                 <Card 
@@ -520,6 +575,7 @@ export default function FanActivities() {
                   className={
                     completed ? 'border-success/50 bg-success/5' : 
                     pending ? 'border-warning/50 bg-warning/5' : 
+                    isUnavailable ? 'opacity-60' :
                     'card-hover'
                   }
                 >
@@ -529,11 +585,13 @@ export default function FanActivities() {
                         <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
                           completed ? 'bg-success/20' : 
                           pending ? 'bg-warning/20' : 
+                          isUnavailable ? 'bg-muted' :
                           'bg-primary/10'
                         }`}>
                           <Icon className={`h-6 w-6 ${
                             completed ? 'text-success' : 
                             pending ? 'text-warning' : 
+                            isUnavailable ? 'text-muted-foreground' :
                             'text-primary'
                           }`} />
                         </div>
@@ -552,6 +610,15 @@ export default function FanActivities() {
                               <Clock className="h-3 w-3 mr-1" />
                               {frequencyLabels[activity.frequency]}
                             </Badge>
+                            {timeStatus.message && (
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${isUnavailable ? 'border-muted-foreground/50 text-muted-foreground' : 'border-primary/50 text-primary'}`}
+                              >
+                                <CalendarClock className="h-3 w-3 mr-1" />
+                                {timeStatus.message}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -565,6 +632,11 @@ export default function FanActivities() {
                         <Badge variant="outline" className="border-warning text-warning shrink-0">
                           <Clock className="h-3 w-3 mr-1" />
                           Pending Review
+                        </Badge>
+                      ) : isUnavailable ? (
+                        <Badge variant="outline" className="border-muted-foreground/50 text-muted-foreground shrink-0">
+                          <CalendarClock className="h-3 w-3 mr-1" />
+                          Unavailable
                         </Badge>
                       ) : (
                         <Button 
