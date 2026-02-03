@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight } from 'lucide-react';
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users } from 'lucide-react';
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from '@/types/database';
 
 // Preview data
@@ -279,6 +279,17 @@ export default function FanHome() {
               Complete activities to earn your first points!
             </p>
           )}
+          
+          {/* Leaderboard Quick Link */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(isPreviewMode ? '/fan/leaderboard?preview=fan' : '/fan/leaderboard')}
+            className="mt-4 text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            View Leaderboard
+          </Button>
         </div>
       </header>
 
