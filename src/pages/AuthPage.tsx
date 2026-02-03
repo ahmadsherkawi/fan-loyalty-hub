@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Logo } from '@/components/ui/Logo';
 import { useToast } from '@/hooks/use-toast';
 import { UserRole } from '@/types/database';
-import { Building2, Users, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, Users, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
 
 const signUpSchema = z.object({
@@ -24,7 +24,7 @@ const signInSchema = z.object({
   password: z.string().min(1, 'Please enter your password'),
 });
 
-export default function AuthPage() {
+const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { signUp, signIn } = useAuth();
@@ -34,6 +34,8 @@ export default function AuthPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signup');
+  const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   // Sign up form state
   const [signUpEmail, setSignUpEmail] = useState('');
@@ -69,10 +71,10 @@ export default function AuthPage() {
       const { error } = await signUp(signUpEmail, signUpPassword, signUpRole, signUpName);
 
       if (error) {
-        if (error.message.includes('already registered')) {
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
           toast({
             title: 'Account Exists',
-            description: 'This email is already registered. Please sign in instead.',
+            description: 'This email is already registered. Please sign in instead, or check your email for the verification link.',
             variant: 'destructive',
           });
           setActiveTab('signin');
@@ -85,10 +87,9 @@ export default function AuthPage() {
           });
         }
       } else {
-        toast({
-          title: 'Check Your Email',
-          description: 'We sent you a confirmation link. Please verify your email to continue.',
-        });
+        // Show confirmation message screen
+        setRegisteredEmail(signUpEmail);
+        setShowConfirmationMessage(true);
       }
     } catch (err) {
       toast({
@@ -126,14 +127,14 @@ export default function AuthPage() {
       if (error) {
         if (error.message.includes('Invalid login credentials')) {
           toast({
-            title: 'Invalid Credentials',
-            description: 'Please check your email and password.',
+            title: 'Sign In Failed',
+            description: 'Invalid email or password. If you just signed up, please verify your email first by clicking the link we sent you.',
             variant: 'destructive',
           });
         } else if (error.message.includes('Email not confirmed')) {
           toast({
             title: 'Email Not Verified',
-            description: 'Please check your inbox and verify your email first.',
+            description: 'Please check your inbox (and spam folder) and click the verification link to activate your account.',
             variant: 'destructive',
           });
         } else {
@@ -161,8 +162,79 @@ export default function AuthPage() {
     }
   };
 
+  // Show email confirmation screen after signup
+  if (showConfirmationMessage) {
+    return (
+      <div ref={ref} className="min-h-screen bg-background flex flex-col">
+        <div className="p-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center px-4 pb-12">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mail className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <CardTitle className="text-2xl font-display">
+                Check Your Email
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                We've sent a verification link to:
+              </CardDescription>
+              <p className="font-medium text-foreground mt-1">{registeredEmail}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Click the link in the email to verify your account
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Check your spam folder if you don't see it
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    The link expires in 24 hours
+                  </p>
+                </div>
+              </div>
+              
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setShowConfirmationMessage(false);
+                  setActiveTab('signin');
+                  setSignInEmail(registeredEmail);
+                }}
+              >
+                Already verified? Sign In
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div ref={ref} className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="p-6">
         <Button
@@ -319,6 +391,10 @@ export default function AuthPage() {
                       'Sign In'
                     )}
                   </Button>
+                  
+                  <p className="text-xs text-center text-muted-foreground mt-4">
+                    Just signed up? Check your email for the verification link before signing in.
+                  </p>
                 </form>
               </TabsContent>
             </Tabs>
@@ -327,4 +403,8 @@ export default function AuthPage() {
       </div>
     </div>
   );
-}
+});
+
+AuthPage.displayName = 'AuthPage';
+
+export default AuthPage;
