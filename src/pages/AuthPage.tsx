@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,32 @@ const signInSchema = z.object({
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signUp, signIn } = useAuth();
+  const { signUp, signIn, user, profile, loading } = useAuth();
   const { toast } = useToast();
 
   const defaultRole = (searchParams.get('role') as UserRole) || 'fan';
 
   const [isLoading, setIsLoading] = useState(false);
+  const [waitingForProfile, setWaitingForProfile] = useState(false);
+
+  // Redirect authenticated users based on their role
+  useEffect(() => {
+    if (!loading && user && profile) {
+      if (profile.role === 'club_admin') {
+        navigate('/club/dashboard');
+      } else {
+        navigate('/fan/home');
+      }
+    }
+  }, [user, profile, loading, navigate]);
+
+  // Handle waiting for profile after sign in
+  useEffect(() => {
+    if (waitingForProfile && !loading && user && profile) {
+      // Profile loaded, redirect will happen via the above effect
+      setWaitingForProfile(false);
+    }
+  }, [waitingForProfile, loading, user, profile]);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signup');
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
@@ -145,11 +165,12 @@ export default function AuthPage() {
           });
         }
       } else {
+        // Wait for profile to load before redirecting
+        setWaitingForProfile(true);
         toast({
           title: 'Welcome Back!',
           description: 'Successfully signed in.',
         });
-        navigate('/');
       }
     } catch (err) {
       toast({
@@ -161,6 +182,16 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  // Show loading while waiting for profile after sign in
+  if (waitingForProfile || (user && !profile && !loading)) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Signing you in...</p>
+      </div>
+    );
+  }
 
   if (showConfirmationMessage) {
     return (
