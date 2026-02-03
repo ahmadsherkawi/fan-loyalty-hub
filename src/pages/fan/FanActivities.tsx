@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
+import { ManualProofModal } from '@/components/ui/ManualProofModal';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod, ActivityFrequency } from '@/types/database';
@@ -121,6 +122,12 @@ export default function FanActivities() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [completions, setCompletions] = useState<ActivityCompletion[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  
+  // Manual proof submission state
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [submittingProof, setSubmittingProof] = useState(false);
+  const [pendingClaims, setPendingClaims] = useState<string[]>([]);
 
   useEffect(() => { 
     if (isPreviewMode) {
@@ -147,12 +154,29 @@ export default function FanActivities() {
     setActivities((acts || []) as Activity[]);
     const { data: comps } = await supabase.from('activity_completions').select('*').eq('fan_id', profile.id);
     setCompletions((comps || []) as ActivityCompletion[]);
+    
+    // Fetch pending manual claims
+    const { data: claims } = await supabase
+      .from('manual_claims')
+      .select('activity_id')
+      .eq('fan_id', profile.id)
+      .eq('status', 'pending');
+    setPendingClaims((claims || []).map(c => c.activity_id));
+    
     setDataLoading(false);
   };
 
   const isCompleted = (activityId: string) => completions.some(c => c.activity_id === activityId);
+  const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
   const handleComplete = async (activity: Activity) => {
+    // Manual proof activities open the modal instead
+    if (activity.verification_method === 'manual_proof') {
+      setSelectedActivity(activity);
+      setProofModalOpen(true);
+      return;
+    }
+    
     if (isPreviewMode) {
       toast({ 
         title: 'Preview Mode', 
@@ -180,6 +204,43 @@ export default function FanActivities() {
       fetchData();
     } catch (e) { 
       toast({ title: 'Error', description: 'Failed to complete activity', variant: 'destructive' }); 
+    }
+  };
+
+  const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
+    if (!selectedActivity || !membership || !profile) return;
+    
+    if (isPreviewMode) {
+      toast({ 
+        title: 'Proof Submitted!', 
+        description: 'In preview mode, your proof would be sent to the club admin for review.' 
+      });
+      setProofModalOpen(false);
+      return;
+    }
+    
+    setSubmittingProof(true);
+    try {
+      const { error } = await supabase.from('manual_claims').insert({
+        activity_id: selectedActivity.id,
+        fan_id: profile.id,
+        membership_id: membership.id,
+        proof_description: proofDescription,
+        proof_url: proofUrl,
+      });
+      
+      if (error) throw error;
+      
+      toast({ 
+        title: 'Proof Submitted!', 
+        description: 'The club admin will review your submission. You\'ll earn points once approved.' 
+      });
+      setProofModalOpen(false);
+      fetchData();
+    } catch (e) { 
+      toast({ title: 'Error', description: 'Failed to submit proof', variant: 'destructive' }); 
+    } finally {
+      setSubmittingProof(false);
     }
   };
 
@@ -253,19 +314,30 @@ export default function FanActivities() {
             {activities.map(activity => {
               const Icon = icons[activity.verification_method];
               const completed = isCompleted(activity.id);
+              const pending = hasPendingClaim(activity.id);
               
               return (
                 <Card 
                   key={activity.id} 
-                  className={completed ? 'border-success/50 bg-success/5' : 'card-hover'}
+                  className={
+                    completed ? 'border-success/50 bg-success/5' : 
+                    pending ? 'border-warning/50 bg-warning/5' : 
+                    'card-hover'
+                  }
                 >
                   <CardContent className="py-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
                         <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
-                          completed ? 'bg-success/20' : 'bg-primary/10'
+                          completed ? 'bg-success/20' : 
+                          pending ? 'bg-warning/20' : 
+                          'bg-primary/10'
                         }`}>
-                          <Icon className={`h-6 w-6 ${completed ? 'text-success' : 'text-primary'}`} />
+                          <Icon className={`h-6 w-6 ${
+                            completed ? 'text-success' : 
+                            pending ? 'text-warning' : 
+                            'text-primary'
+                          }`} />
                         </div>
                         <div className="flex-1">
                           <h3 className="font-semibold">{activity.name}</h3>
@@ -291,10 +363,14 @@ export default function FanActivities() {
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Done
                         </Badge>
+                      ) : pending ? (
+                        <Badge variant="outline" className="border-warning text-warning shrink-0">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pending Review
+                        </Badge>
                       ) : (
                         <Button 
                           onClick={() => handleComplete(activity)} 
-                          disabled={activity.verification_method === 'manual_proof'}
                           className="shrink-0"
                         >
                           {ctaLabels[activity.verification_method]}
@@ -308,6 +384,17 @@ export default function FanActivities() {
           </div>
         )}
       </main>
+
+      {/* Manual Proof Submission Modal */}
+      <ManualProofModal
+        open={proofModalOpen}
+        onOpenChange={setProofModalOpen}
+        activityName={selectedActivity?.name || ''}
+        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsCurrencyName={program?.points_currency_name || 'Points'}
+        onSubmit={handleSubmitProof}
+        isLoading={submittingProof}
+      />
     </div>
   );
 }
