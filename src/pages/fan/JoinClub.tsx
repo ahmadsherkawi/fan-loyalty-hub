@@ -156,6 +156,7 @@ export default function JoinClub() {
   const [joining, setJoining] = useState<string | null>(null);
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
+  const [enrolledClub, setEnrolledClub] = useState<ClubWithProgram | null>(null);
 
   useEffect(() => { 
     if (isPreviewMode) {
@@ -164,11 +165,20 @@ export default function JoinClub() {
       const verifiedClubs = allPreviewClubs.filter(c => c.status === 'verified' || c.status === 'official');
       setClubs(verifiedClubs);
       setDataLoading(false);
+      
+      // Check if fan is already enrolled in preview mode (from URL param)
+      const enrolledClubId = searchParams.get('club');
+      if (enrolledClubId) {
+        const enrolled = allPreviewClubs.find(c => c.id === enrolledClubId);
+        if (enrolled) {
+          setEnrolledClub(enrolled);
+        }
+      }
     } else if (!loading && profile) { 
       checkMembership(); 
       fetchClubs(); 
     } 
-  }, [profile, loading, isPreviewMode]);
+  }, [profile, loading, isPreviewMode, searchParams]);
 
   const checkMembership = async () => {
     if (!profile) return;
@@ -379,6 +389,8 @@ export default function JoinClub() {
         clubName={selectedClub?.name || ''}
         onConfirm={handleConfirmJoin}
         isLoading={!!joining}
+        isAlreadyEnrolled={!!enrolledClub && selectedClub?.id !== enrolledClub.id}
+        currentClubName={enrolledClub?.name}
       />
     </div>
   );
