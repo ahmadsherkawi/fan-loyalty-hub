@@ -33,7 +33,6 @@ export default function AuthPage() {
   const defaultRole = (searchParams.get('role') as UserRole) || 'fan';
 
   const [isLoading, setIsLoading] = useState(false);
-  const [waitingForProfile, setWaitingForProfile] = useState(false);
 
   // Redirect authenticated users based on their role
   useEffect(() => {
@@ -45,14 +44,6 @@ export default function AuthPage() {
       }
     }
   }, [user, profile, loading, navigate]);
-
-  // Handle waiting for profile after sign in
-  useEffect(() => {
-    if (waitingForProfile && !loading && user && profile) {
-      // Profile loaded, redirect will happen via the above effect
-      setWaitingForProfile(false);
-    }
-  }, [waitingForProfile, loading, user, profile]);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signup');
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
@@ -166,7 +157,7 @@ export default function AuthPage() {
         }
       } else {
         // Wait for profile to load before redirecting
-        setWaitingForProfile(true);
+        // Profile will load via AuthContext, redirect handled by useEffect
         toast({
           title: 'Welcome Back!',
           description: 'Successfully signed in.',
@@ -183,8 +174,8 @@ export default function AuthPage() {
     }
   };
 
-  // Show loading while waiting for profile after sign in
-  if (waitingForProfile || (user && !profile && !loading)) {
+  // Show loading state while auth context is loading or user exists but profile not yet loaded
+  if (loading || (user && !profile)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
