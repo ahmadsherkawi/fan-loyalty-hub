@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { QRCodeDisplay } from '@/components/ui/QRCodeDisplay';
 import { VenueMapPreview } from '@/components/ui/VenueMapPreview';
+import { PollQuizBuilder, InAppConfig } from '@/components/ui/PollQuizBuilder';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -95,6 +97,9 @@ export default function ActivityBuilder() {
   const [locationLng, setLocationLng] = useState('');
   const [locationRadius, setLocationRadius] = useState('500');
   const [isLocating, setIsLocating] = useState(false);
+  
+  // In-app activity configuration (poll/quiz)
+  const [inAppConfig, setInAppConfig] = useState<InAppConfig | null>(null);
 
   useEffect(() => {
     if (isPreviewMode) {
@@ -159,7 +164,7 @@ export default function ActivityBuilder() {
         .eq('program_id', programs[0].id)
         .order('created_at', { ascending: false });
 
-      setActivities((activitiesData || []) as Activity[]);
+      setActivities((activitiesData || []) as unknown as Activity[]);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -178,6 +183,7 @@ export default function ActivityBuilder() {
     setLocationLat('');
     setLocationLng('');
     setLocationRadius('500');
+    setInAppConfig(null);
   };
 
   const openEditDialog = (activity: Activity) => {
@@ -191,6 +197,7 @@ export default function ActivityBuilder() {
     setLocationLat(activity.location_lat?.toString() || '');
     setLocationLng(activity.location_lng?.toString() || '');
     setLocationRadius(activity.location_radius_meters?.toString() || '500');
+    setInAppConfig(activity.in_app_config || null);
     setIsDialogOpen(true);
   };
 
@@ -272,10 +279,47 @@ export default function ActivityBuilder() {
       }
     }
 
+    // Validate in_app_completion activities
+    if (verificationMethod === 'in_app_completion') {
+      if (!inAppConfig || !inAppConfig.question.trim()) {
+        toast({
+          title: 'Question Required',
+          description: 'Please enter a question for the poll or quiz.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const filledOptions = inAppConfig.options.filter(o => o.text.trim());
+      if (filledOptions.length < 2) {
+        toast({
+          title: 'Options Required',
+          description: 'Please provide at least 2 answer options.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (inAppConfig.type === 'quiz' && !inAppConfig.options.some(o => o.isCorrect)) {
+        toast({
+          title: 'Correct Answer Required',
+          description: 'Please select the correct answer for the quiz.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     // Parse location values
     const parsedLat = verificationMethod === 'location_checkin' ? parseFloat(locationLat) : null;
     const parsedLng = verificationMethod === 'location_checkin' ? parseFloat(locationLng) : null;
     const parsedRadius = verificationMethod === 'location_checkin' ? parseInt(locationRadius) : 100;
+
+    // Parse in_app_config - only include for in_app_completion, filter empty options
+    const parsedInAppConfig = verificationMethod === 'in_app_completion' && inAppConfig 
+      ? {
+          ...inAppConfig,
+          options: inAppConfig.options.filter(o => o.text.trim()),
+        }
+      : null;
 
     if (isPreviewMode) {
       // Simulate activity creation
@@ -293,6 +337,7 @@ export default function ActivityBuilder() {
         location_radius_meters: parsedRadius,
         time_window_start: null,
         time_window_end: null,
+        in_app_config: parsedInAppConfig,
         is_active: isActive,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -326,6 +371,7 @@ export default function ActivityBuilder() {
         location_lat: parsedLat,
         location_lng: parsedLng,
         location_radius_meters: parsedRadius,
+        in_app_config: (parsedInAppConfig as unknown) as Json,
       };
 
       if (editingActivity) {
@@ -625,6 +671,14 @@ export default function ActivityBuilder() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* In-App Activity Configuration (Poll/Quiz) */}
+                {verificationMethod === 'in_app_completion' && (
+                  <PollQuizBuilder
+                    value={inAppConfig}
+                    onChange={setInAppConfig}
+                  />
                 )}
 
                 <div className="flex items-center justify-between">

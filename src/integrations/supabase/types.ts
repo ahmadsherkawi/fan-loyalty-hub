@@ -20,6 +20,7 @@ export type Database = {
           description: string | null
           frequency: Database["public"]["Enums"]["activity_frequency"]
           id: string
+          in_app_config: Json | null
           is_active: boolean | null
           location_lat: number | null
           location_lng: number | null
@@ -38,6 +39,7 @@ export type Database = {
           description?: string | null
           frequency: Database["public"]["Enums"]["activity_frequency"]
           id?: string
+          in_app_config?: Json | null
           is_active?: boolean | null
           location_lat?: number | null
           location_lng?: number | null
@@ -56,6 +58,7 @@ export type Database = {
           description?: string | null
           frequency?: Database["public"]["Enums"]["activity_frequency"]
           id?: string
+          in_app_config?: Json | null
           is_active?: boolean | null
           location_lat?: number | null
           location_lng?: number | null

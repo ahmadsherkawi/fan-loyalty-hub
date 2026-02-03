@@ -55,6 +55,21 @@ export interface LoyaltyProgram {
   updated_at: string;
 }
 
+// In-app activity configuration types
+export type InAppActivityType = 'poll' | 'quiz';
+
+export interface InAppOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+}
+
+export interface InAppConfig {
+  type: InAppActivityType;
+  question: string;
+  options: InAppOption[];
+}
+
 export interface Activity {
   id: string;
   program_id: string;
@@ -69,6 +84,7 @@ export interface Activity {
   location_radius_meters: number;
   time_window_start: string | null;
   time_window_end: string | null;
+  in_app_config: InAppConfig | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

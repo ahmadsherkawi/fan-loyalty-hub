@@ -10,6 +10,7 @@ import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { ManualProofModal } from '@/components/ui/ManualProofModal';
 import { QRScannerModal } from '@/components/ui/QRScannerModal';
 import { LocationCheckinModal } from '@/components/ui/LocationCheckinModal';
+import { PollQuizParticipation, InAppConfig } from '@/components/ui/PollQuizParticipation';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod, ActivityFrequency } from '@/types/database';
@@ -30,6 +31,7 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 500,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -48,6 +50,7 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 100,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -66,6 +69,16 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 100,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: {
+      type: 'quiz',
+      question: 'In which year was the club founded?',
+      options: [
+        { id: 'opt1', text: '1878', isCorrect: true },
+        { id: 'opt2', text: '1892', isCorrect: false },
+        { id: 'opt3', text: '1902', isCorrect: false },
+        { id: 'opt4', text: '1910', isCorrect: false },
+      ],
+    },
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -84,6 +97,35 @@ const PREVIEW_ACTIVITIES: Activity[] = [
     location_radius_meters: 100,
     time_window_start: null,
     time_window_end: null,
+    in_app_config: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'preview-activity-5',
+    program_id: 'preview-program-1',
+    name: 'Match Day Poll',
+    description: 'Vote for your man of the match',
+    points_awarded: 15,
+    frequency: 'once_per_match',
+    verification_method: 'in_app_completion',
+    qr_code_data: null,
+    location_lat: null,
+    location_lng: null,
+    location_radius_meters: 100,
+    time_window_start: null,
+    time_window_end: null,
+    in_app_config: {
+      type: 'poll',
+      question: 'Who was the Man of the Match?',
+      options: [
+        { id: 'opt1', text: 'Rashford' },
+        { id: 'opt2', text: 'Fernandes' },
+        { id: 'opt3', text: 'Onana' },
+        { id: 'opt4', text: 'Garnacho' },
+      ],
+    },
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -138,6 +180,9 @@ export default function FanActivities() {
   // Location check-in state
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [processingLocation, setProcessingLocation] = useState(false);
+  
+  // Poll/Quiz state
+  const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
 
   useEffect(() => { 
     if (isPreviewMode) {
@@ -161,7 +206,7 @@ export default function FanActivities() {
     const { data: programs } = await supabase.from('loyalty_programs').select('*').eq('id', m.program_id).limit(1);
     if (programs) setProgram(programs[0] as LoyaltyProgram);
     const { data: acts } = await supabase.from('activities').select('*').eq('program_id', m.program_id).eq('is_active', true);
-    setActivities((acts || []) as Activity[]);
+    setActivities((acts || []) as unknown as Activity[]);
     const { data: comps } = await supabase.from('activity_completions').select('*').eq('fan_id', profile.id);
     setCompletions((comps || []) as ActivityCompletion[]);
     
@@ -198,6 +243,13 @@ export default function FanActivities() {
     if (activity.verification_method === 'location_checkin') {
       setSelectedActivity(activity);
       setLocationModalOpen(true);
+      return;
+    }
+    
+    // In-app completion activities (polls/quizzes) open the participation modal
+    if (activity.verification_method === 'in_app_completion' && activity.in_app_config) {
+      setSelectedActivity(activity);
+      setPollQuizModalOpen(true);
       return;
     }
     
@@ -341,6 +393,52 @@ export default function FanActivities() {
       toast({ title: 'Error', description: 'Failed to complete check-in', variant: 'destructive' }); 
     } finally {
       setProcessingLocation(false);
+    }
+  };
+
+  const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
+    if (!selectedActivity || !membership || !profile) return;
+    
+    const isPoll = selectedActivity.in_app_config?.type === 'poll';
+    const pointsToAward = (isPoll || isCorrect) ? selectedActivity.points_awarded : 0;
+    
+    if (isPreviewMode) {
+      if (pointsToAward > 0) {
+        toast({ 
+          title: isPoll ? 'Vote Recorded!' : 'Correct!', 
+          description: `You earned ${pointsToAward} ${program?.points_currency_name}! (simulated in preview)` 
+        });
+      } else {
+        toast({ 
+          title: 'Incorrect', 
+          description: 'Better luck next time! (simulated in preview)' 
+        });
+      }
+      return;
+    }
+    
+    if (pointsToAward > 0) {
+      try {
+        await supabase.from('activity_completions').insert({ 
+          activity_id: selectedActivity.id, 
+          fan_id: profile.id, 
+          membership_id: membership.id, 
+          points_earned: pointsToAward,
+          metadata: { 
+            verification: 'in_app_completion',
+            type: selectedActivity.in_app_config?.type,
+            selected_option: selectedOptionId,
+            is_correct: isCorrect,
+          }
+        });
+        await supabase.rpc('award_points', { 
+          p_membership_id: membership.id, 
+          p_points: pointsToAward 
+        });
+        fetchData();
+      } catch (e) { 
+        toast({ title: 'Error', description: 'Failed to record response', variant: 'destructive' }); 
+      }
     }
   };
 
@@ -521,6 +619,20 @@ export default function FanActivities() {
         onSuccess={handleLocationSuccess}
         isLoading={processingLocation}
       />
+
+      {/* Poll/Quiz Participation Modal */}
+      {selectedActivity?.in_app_config && (
+        <PollQuizParticipation
+          isOpen={pollQuizModalOpen}
+          onClose={() => setPollQuizModalOpen(false)}
+          activityName={selectedActivity.name}
+          config={selectedActivity.in_app_config as InAppConfig}
+          pointsAwarded={selectedActivity.points_awarded}
+          pointsCurrency={program?.points_currency_name || 'Points'}
+          onSubmit={handlePollQuizSubmit}
+          isPreview={isPreviewMode}
+        />
+      )}
     </div>
   );
 }
