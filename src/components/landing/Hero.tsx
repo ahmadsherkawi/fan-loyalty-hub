@@ -28,7 +28,7 @@ export function Hero() {
           <h1 className="text-5xl md:text-7xl font-display font-bold text-primary-foreground leading-tight">
             Unite Your Fans.
             <br />
-            <span className="bg-gradient-to-r from-accent to-yellow-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-accent to-accent/70 bg-clip-text text-transparent">
               Reward Their Passion.
             </span>
           </h1>
@@ -51,8 +51,7 @@ export function Hero() {
             </Button>
             <Button
               size="lg"
-              variant="outline"
-              className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+              className="gradient-golden text-accent-foreground font-semibold shadow-golden hover:opacity-90 transition-opacity"
               onClick={() => navigate('/auth?role=fan')}
             >
               Join as a Fan
