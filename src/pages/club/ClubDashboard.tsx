@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreviewMode } from '@/contexts/PreviewModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,8 +37,8 @@ interface DashboardStats {
   totalPointsIssued: number;
 }
 
-// Preview data - unverified by default to show verification flow
-const PREVIEW_CLUB: Club = {
+// Preview data factory - status comes from context
+const createPreviewClub = (status: 'unverified' | 'verified' | 'official'): Club => ({
   id: 'preview-club-admin',
   admin_id: 'preview-admin',
   name: 'Demo Football Club',
@@ -48,16 +49,17 @@ const PREVIEW_CLUB: Club = {
   stadium_name: 'Demo Stadium',
   season_start: null,
   season_end: null,
-  status: 'unverified',
+  status,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
-};
+});
 
 export default function ClubDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
+  const { previewClubStatus } = usePreviewMode();
 
   const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
@@ -81,7 +83,7 @@ export default function ClubDashboard() {
 
   useEffect(() => {
     if (isPreviewMode) {
-      setClub(PREVIEW_CLUB);
+      setClub(createPreviewClub(previewClubStatus));
       setProgram(null); // Start without a program to show the create flow
       setDataLoading(false);
     } else {
@@ -93,7 +95,7 @@ export default function ClubDashboard() {
         fetchClubData();
       }
     }
-  }, [user, profile, loading, navigate, isPreviewMode]);
+  }, [user, profile, loading, navigate, isPreviewMode, previewClubStatus]);
 
   const fetchClubData = async () => {
     if (!profile) return;
