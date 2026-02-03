@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/ui/Logo';
+import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -23,7 +24,8 @@ import {
   FileCheck,
   Loader2,
   Trash2,
-  Edit
+  Edit,
+  HelpCircle
 } from 'lucide-react';
 import { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from '@/types/database';
 
@@ -34,11 +36,25 @@ const frequencyLabels: Record<ActivityFrequency, string> = {
   unlimited: 'Unlimited',
 };
 
+const frequencyDescriptions: Record<ActivityFrequency, string> = {
+  once_ever: 'Fan can only complete this activity one time ever',
+  once_per_match: 'Fan can complete this once per match day',
+  once_per_day: 'Fan can complete this once per calendar day',
+  unlimited: 'No limit on how often fans can complete this',
+};
+
 const verificationLabels: Record<VerificationMethod, string> = {
   qr_scan: 'QR Code Scan',
   location_checkin: 'Location Check-in',
   in_app_completion: 'In-App Completion',
   manual_proof: 'Manual Proof Submission',
+};
+
+const verificationDescriptions: Record<VerificationMethod, string> = {
+  qr_scan: 'Fans scan a unique QR code you display at events or locations',
+  location_checkin: 'Fans check in using GPS at your stadium or venue',
+  in_app_completion: 'Fans complete polls, quizzes, or other in-app actions',
+  manual_proof: 'Fans submit evidence (photo, text) that you review and approve',
 };
 
 const verificationIcons: Record<VerificationMethod, React.ReactNode> = {
@@ -50,8 +66,11 @@ const verificationIcons: Record<VerificationMethod, React.ReactNode> = {
 
 export default function ActivityBuilder() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, loading } = useAuth();
   const { toast } = useToast();
+
+  const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -69,18 +88,29 @@ export default function ActivityBuilder() {
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth?role=club_admin');
-    } else if (!loading && profile?.role !== 'club_admin') {
-      navigate('/fan/home');
+    if (isPreviewMode) {
+      setProgram({
+        id: 'preview-program',
+        club_id: 'preview-club',
+        name: 'Demo Rewards',
+        description: null,
+        points_currency_name: 'Points',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setActivities([]);
+      setDataLoading(false);
+    } else {
+      if (!loading && !user) {
+        navigate('/auth?role=club_admin');
+      } else if (!loading && profile?.role !== 'club_admin') {
+        navigate('/fan/home');
+      } else if (!loading && profile) {
+        fetchData();
+      }
     }
-  }, [user, profile, loading, navigate]);
-
-  useEffect(() => {
-    if (profile) {
-      fetchData();
-    }
-  }, [profile]);
+  }, [user, profile, loading, navigate, isPreviewMode]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -107,7 +137,7 @@ export default function ActivityBuilder() {
         .limit(1);
 
       if (!programs || programs.length === 0) {
-        navigate('/club/onboarding');
+        navigate('/club/dashboard');
         return;
       }
 
@@ -159,6 +189,40 @@ export default function ActivityBuilder() {
         description: 'Points must be a positive number.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (isPreviewMode) {
+      // Simulate activity creation
+      const newActivity: Activity = {
+        id: `preview-${Date.now()}`,
+        program_id: program.id,
+        name,
+        description: description || null,
+        points_awarded: points,
+        frequency,
+        verification_method: verificationMethod,
+        qr_code_data: verificationMethod === 'qr_scan' ? 'preview-qr' : null,
+        location_lat: null,
+        location_lng: null,
+        location_radius_meters: 100,
+        time_window_start: null,
+        time_window_end: null,
+        is_active: isActive,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (editingActivity) {
+        setActivities(activities.map(a => a.id === editingActivity.id ? newActivity : a));
+        toast({ title: 'Activity Updated' });
+      } else {
+        setActivities([newActivity, ...activities]);
+        toast({ title: 'Activity Created', description: 'Your new activity is ready for fans.' });
+      }
+      
+      setIsDialogOpen(false);
+      resetForm();
       return;
     }
 
@@ -219,6 +283,12 @@ export default function ActivityBuilder() {
   const handleDelete = async (activityId: string) => {
     if (!confirm('Are you sure you want to delete this activity?')) return;
 
+    if (isPreviewMode) {
+      setActivities(activities.filter(a => a.id !== activityId));
+      toast({ title: 'Activity Deleted' });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('activities')
@@ -242,7 +312,7 @@ export default function ActivityBuilder() {
     }
   };
 
-  if (loading || dataLoading) {
+  if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -252,11 +322,16 @@ export default function ActivityBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+      
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/club/dashboard')}>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(isPreviewMode ? '/club/dashboard?preview=club_admin' : '/club/dashboard')}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -270,7 +345,7 @@ export default function ActivityBuilder() {
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
               <Zap className="h-8 w-8 text-primary" />
-              Activity Builder
+              Activities Manager
             </h1>
             <p className="text-muted-foreground">
               Create activities for fans to earn {program?.points_currency_name || 'points'}
@@ -284,16 +359,16 @@ export default function ActivityBuilder() {
             <DialogTrigger asChild>
               <Button className="gradient-stadium">
                 <Plus className="h-4 w-4 mr-2" />
-                New Activity
+                Add Activity
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingActivity ? 'Edit Activity' : 'Create New Activity'}
                 </DialogTitle>
                 <DialogDescription>
-                  Set up an activity that fans can complete to earn points
+                  Define how fans earn {program?.points_currency_name || 'points'} for this activity
                 </DialogDescription>
               </DialogHeader>
 
@@ -304,7 +379,7 @@ export default function ActivityBuilder() {
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Attend Home Match"
+                    placeholder="e.g., Attend Home Match"
                   />
                 </div>
 
@@ -332,7 +407,10 @@ export default function ActivityBuilder() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Frequency</Label>
+                    <Label className="flex items-center gap-1">
+                      Frequency
+                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                    </Label>
                     <Select value={frequency} onValueChange={(v) => setFrequency(v as ActivityFrequency)}>
                       <SelectTrigger>
                         <SelectValue />
@@ -343,11 +421,17 @@ export default function ActivityBuilder() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {frequencyDescriptions[frequency]}
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Verification Method *</Label>
+                  <Label className="flex items-center gap-1">
+                    Verification Method *
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </Label>
                   <Select value={verificationMethod} onValueChange={(v) => setVerificationMethod(v as VerificationMethod)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -363,11 +447,8 @@ export default function ActivityBuilder() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">
-                    {verificationMethod === 'qr_scan' && 'Fans scan a unique QR code to complete'}
-                    {verificationMethod === 'location_checkin' && 'Fans check in using GPS at the stadium'}
-                    {verificationMethod === 'in_app_completion' && 'Fans complete polls, quizzes, or actions in the app'}
-                    {verificationMethod === 'manual_proof' && 'Fans submit evidence for admin review'}
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                    {verificationDescriptions[verificationMethod]}
                   </p>
                 </div>
 
@@ -401,10 +482,11 @@ export default function ActivityBuilder() {
             <CardContent className="py-12 text-center">
               <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                No Activities Yet
+                You Haven't Created Any Activities Yet
               </h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first activity to start engaging fans
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                Activities are how fans earn {program?.points_currency_name || 'points'}. 
+                Create your first activity to start engaging fans.
               </p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -415,7 +497,7 @@ export default function ActivityBuilder() {
         ) : (
           <div className="grid gap-4">
             {activities.map((activity) => (
-              <Card key={activity.id} className={`${activity.is_active ? 'activity-available' : 'opacity-60'}`}>
+              <Card key={activity.id} className={`${activity.is_active ? '' : 'opacity-60'}`}>
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -425,11 +507,11 @@ export default function ActivityBuilder() {
                       <div>
                         <h3 className="font-semibold text-foreground">{activity.name}</h3>
                         {activity.description && (
-                          <p className="text-sm text-muted-foreground">{activity.description}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{activity.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary">
-                            {activity.points_awarded} {program?.points_currency_name}
+                            +{activity.points_awarded} {program?.points_currency_name}
                           </Badge>
                           <Badge variant="outline">
                             {frequencyLabels[activity.frequency]}
@@ -437,6 +519,9 @@ export default function ActivityBuilder() {
                           <Badge variant="outline">
                             {verificationLabels[activity.verification_method]}
                           </Badge>
+                          {!activity.is_active && (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
                         </div>
                       </div>
                     </div>
