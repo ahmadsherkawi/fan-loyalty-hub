@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreviewMode } from '@/contexts/PreviewModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -179,6 +180,7 @@ export default function FanActivities() {
   const [searchParams] = useSearchParams();
   const { profile, loading } = useAuth();
   const { toast } = useToast();
+  const { previewPointsBalance, addPreviewPoints, completedPreviewActivities, markActivityCompleted } = usePreviewMode();
   
   const isPreviewMode = searchParams.get('preview') === 'fan';
   
@@ -205,9 +207,16 @@ export default function FanActivities() {
   // Poll/Quiz state
   const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
 
+  // Get the effective points balance (from preview context or membership)
+  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance || 0);
+
   useEffect(() => { 
     if (isPreviewMode) {
-      setMembership(PREVIEW_MEMBERSHIP);
+      // Use preview membership with dynamic points from context
+      setMembership({
+        ...PREVIEW_MEMBERSHIP,
+        points_balance: previewPointsBalance,
+      });
       setProgram(PREVIEW_PROGRAM);
       setActivities(PREVIEW_ACTIVITIES);
       setCompletions([]);
@@ -215,7 +224,7 @@ export default function FanActivities() {
     } else if (!loading && profile) {
       fetchData(); 
     }
-  }, [profile, loading, isPreviewMode]);
+  }, [profile, loading, isPreviewMode, previewPointsBalance]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -242,7 +251,13 @@ export default function FanActivities() {
     setDataLoading(false);
   };
 
-  const isCompleted = (activityId: string) => completions.some(c => c.activity_id === activityId);
+  // Check completion status - includes preview completed activities
+  const isCompleted = (activityId: string) => {
+    if (isPreviewMode) {
+      return completedPreviewActivities.includes(activityId);
+    }
+    return completions.some(c => c.activity_id === activityId);
+  };
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
   // Check if activity is within its time window
@@ -374,16 +389,21 @@ export default function FanActivities() {
   };
 
   const handleQRSuccess = async () => {
-    if (!selectedActivity || !membership || !profile) return;
+    if (!selectedActivity || !membership) return;
     
     if (isPreviewMode) {
+      // Track points and completion in preview mode
+      addPreviewPoints(selectedActivity.points_awarded);
+      markActivityCompleted(selectedActivity.id);
       toast({ 
         title: 'Activity Completed!', 
-        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}! (simulated in preview)` 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}!` 
       });
       setQrScannerOpen(false);
       return;
     }
+    
+    if (!profile) return;
     
     setProcessingQR(true);
     try {
@@ -412,16 +432,21 @@ export default function FanActivities() {
   };
 
   const handleLocationSuccess = async () => {
-    if (!selectedActivity || !membership || !profile) return;
+    if (!selectedActivity || !membership) return;
     
     if (isPreviewMode) {
+      // Track points and completion in preview mode
+      addPreviewPoints(selectedActivity.points_awarded);
+      markActivityCompleted(selectedActivity.id);
       toast({ 
         title: 'Check-in Successful!', 
-        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}! (simulated in preview)` 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}!` 
       });
       setLocationModalOpen(false);
       return;
     }
+    
+    if (!profile) return;
     
     setProcessingLocation(true);
     try {
@@ -450,25 +475,30 @@ export default function FanActivities() {
   };
 
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
-    if (!selectedActivity || !membership || !profile) return;
+    if (!selectedActivity || !membership) return;
     
     const isPoll = selectedActivity.in_app_config?.type === 'poll';
     const pointsToAward = (isPoll || isCorrect) ? selectedActivity.points_awarded : 0;
     
     if (isPreviewMode) {
       if (pointsToAward > 0) {
+        // Track points and completion in preview mode
+        addPreviewPoints(pointsToAward);
+        markActivityCompleted(selectedActivity.id);
         toast({ 
           title: isPoll ? 'Vote Recorded!' : 'Correct!', 
-          description: `You earned ${pointsToAward} ${program?.points_currency_name}! (simulated in preview)` 
+          description: `You earned ${pointsToAward} ${program?.points_currency_name}!` 
         });
       } else {
         toast({ 
           title: 'Incorrect', 
-          description: 'Better luck next time! (simulated in preview)' 
+          description: 'Better luck next time!' 
         });
       }
       return;
     }
+    
+    if (!profile) return;
     
     if (pointsToAward > 0) {
       try {
@@ -548,7 +578,7 @@ export default function FanActivities() {
             Activities
           </h1>
           <Badge variant="secondary" className="text-lg px-4 py-2">
-            {membership?.points_balance || 0} {program?.points_currency_name}
+            {effectivePointsBalance} {program?.points_currency_name}
           </Badge>
         </div>
         

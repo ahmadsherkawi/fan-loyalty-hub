@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreviewMode } from '@/contexts/PreviewModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -124,6 +125,7 @@ export default function FanHome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, profile, signOut, loading } = useAuth();
+  const { previewPointsBalance } = usePreviewMode();
   
   const isPreviewMode = searchParams.get('preview') === 'fan';
   
@@ -134,12 +136,18 @@ export default function FanHome() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
+  // Effective points balance (preview context or actual membership)
+  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance || 0);
+
   useEffect(() => {
     if (isPreviewMode) {
-      // Load preview data
+      // Load preview data with dynamic points from context
       setClub(PREVIEW_CLUB);
       setProgram(PREVIEW_PROGRAM);
-      setMembership(PREVIEW_MEMBERSHIP);
+      setMembership({
+        ...PREVIEW_MEMBERSHIP,
+        points_balance: previewPointsBalance,
+      });
       setActivities(PREVIEW_ACTIVITIES);
       setRewards(PREVIEW_REWARDS);
       setDataLoading(false);
@@ -148,7 +156,7 @@ export default function FanHome() {
       else if (!loading && profile?.role === 'club_admin') navigate('/club/dashboard');
       else if (!loading && profile) fetchData();
     }
-  }, [user, profile, loading, navigate, isPreviewMode]);
+  }, [user, profile, loading, navigate, isPreviewMode, previewPointsBalance]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -260,13 +268,13 @@ export default function FanHome() {
           <div className="mt-6 inline-flex items-center gap-2 bg-background/20 backdrop-blur rounded-full px-6 py-3">
             <Trophy className="h-6 w-6 text-accent" />
             <span className="text-3xl font-bold text-primary-foreground">
-              {membership?.points_balance || 0}
+              {effectivePointsBalance}
             </span>
             <span className="text-primary-foreground/80">
               {program?.points_currency_name || 'Points'}
             </span>
           </div>
-          {membership?.points_balance === 0 && (
+          {effectivePointsBalance === 0 && (
             <p className="text-primary-foreground/60 text-sm mt-2">
               Complete activities to earn your first points!
             </p>
@@ -361,7 +369,7 @@ export default function FanHome() {
           ) : (
             <div className="grid md:grid-cols-3 gap-4">
               {rewards.map(reward => {
-                const canAfford = (membership?.points_balance || 0) >= reward.points_cost;
+                const canAfford = effectivePointsBalance >= reward.points_cost;
                 return (
                   <Card key={reward.id} className="card-hover">
                     <CardContent className="pt-6">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Profile, UserRole, ClubStatus } from '@/types/database';
 
 interface PreviewModeContextType {
@@ -8,6 +8,11 @@ interface PreviewModeContextType {
   enablePreviewMode: (role: UserRole) => void;
   disablePreviewMode: () => void;
   setPreviewClubVerified: () => void;
+  // Points tracking for preview mode
+  previewPointsBalance: number;
+  addPreviewPoints: (points: number) => void;
+  completedPreviewActivities: string[];
+  markActivityCompleted: (activityId: string) => void;
 }
 
 const PreviewModeContext = createContext<PreviewModeContextType | undefined>(undefined);
@@ -16,6 +21,10 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previewProfile, setPreviewProfile] = useState<Profile | null>(null);
   const [previewClubStatus, setPreviewClubStatus] = useState<ClubStatus>('unverified');
+  
+  // Preview mode points tracking
+  const [previewPointsBalance, setPreviewPointsBalance] = useState(0);
+  const [completedPreviewActivities, setCompletedPreviewActivities] = useState<string[]>([]);
 
   // Check URL params for preview mode on mount
   useEffect(() => {
@@ -44,11 +53,23 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
     setIsPreviewMode(false);
     setPreviewProfile(null);
     setPreviewClubStatus('unverified');
+    setPreviewPointsBalance(0);
+    setCompletedPreviewActivities([]);
   };
 
   const setPreviewClubVerified = () => {
     setPreviewClubStatus('verified');
   };
+
+  const addPreviewPoints = useCallback((points: number) => {
+    setPreviewPointsBalance(prev => prev + points);
+  }, []);
+
+  const markActivityCompleted = useCallback((activityId: string) => {
+    setCompletedPreviewActivities(prev => 
+      prev.includes(activityId) ? prev : [...prev, activityId]
+    );
+  }, []);
 
   return (
     <PreviewModeContext.Provider
@@ -59,6 +80,10 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
         enablePreviewMode,
         disablePreviewMode,
         setPreviewClubVerified,
+        previewPointsBalance,
+        addPreviewPoints,
+        completedPreviewActivities,
+        markActivityCompleted,
       }}
     >
       {children}
