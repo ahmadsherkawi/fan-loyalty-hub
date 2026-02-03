@@ -12,7 +12,7 @@ export function CTA() {
       <div className="container relative z-10">
         <div className="max-w-3xl mx-auto text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-display font-bold text-primary-foreground">
-            Ready to Build Your Fan Community?
+            Ready to Join ClubPass?
           </h2>
           <p className="text-xl text-primary-foreground/80">
             Join the open platform where verified clubs create authentic connections with their supporters.

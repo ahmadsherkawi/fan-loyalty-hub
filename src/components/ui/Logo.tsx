@@ -25,7 +25,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
       </div>
       {showText && (
         <span className={`font-display font-bold text-foreground ${textClasses[size]}`}>
-          FanLoyalty
+          ClubPass
         </span>
       )}
     </div>
