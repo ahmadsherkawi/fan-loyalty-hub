@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ShieldX } from 'lucide-react';
 
 interface EnrollmentModalProps {
   open: boolean;
@@ -16,6 +16,8 @@ interface EnrollmentModalProps {
   clubName: string;
   onConfirm: () => void;
   isLoading?: boolean;
+  isAlreadyEnrolled?: boolean;
+  currentClubName?: string;
 }
 
 export function EnrollmentModal({
@@ -24,7 +26,36 @@ export function EnrollmentModal({
   clubName,
   onConfirm,
   isLoading = false,
+  isAlreadyEnrolled = false,
+  currentClubName,
 }: EnrollmentModalProps) {
+  // If already enrolled, show a different message without the join button
+  if (isAlreadyEnrolled) {
+    return (
+      <AlertDialog open={open} onOpenChange={onOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldX className="h-5 w-5 text-destructive" />
+              Already Enrolled
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                You are already a member of <strong>{currentClubName || 'another club'}</strong>'s loyalty program.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Each fan can only join one club's loyalty program. You cannot join {clubName}.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
