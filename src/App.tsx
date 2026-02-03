@@ -10,6 +10,7 @@ import ExplorePage from "./pages/ExplorePage";
 import PreviewHub from "./pages/PreviewHub";
 import ClubOnboarding from "./pages/club/ClubOnboarding";
 import ClubDashboard from "./pages/club/ClubDashboard";
+import ClubVerification from "./pages/club/ClubVerification";
 import ActivityBuilder from "./pages/club/ActivityBuilder";
 import RewardsBuilder from "./pages/club/RewardsBuilder";
 import ClaimReview from "./pages/club/ClaimReview";
@@ -37,6 +38,7 @@ const App = () => (
             {/* Club Admin Routes */}
             <Route path="/club/onboarding" element={<ClubOnboarding />} />
             <Route path="/club/dashboard" element={<ClubDashboard />} />
+            <Route path="/club/verification" element={<ClubVerification />} />
             <Route path="/club/activities" element={<ActivityBuilder />} />
             <Route path="/club/rewards" element={<RewardsBuilder />} />
             <Route path="/club/claims" element={<ClaimReview />} />
