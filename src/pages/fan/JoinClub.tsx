@@ -114,6 +114,33 @@ const PREVIEW_CLUB_NO_PROGRAM: ClubWithProgram = {
   loyalty_programs: []
 };
 
+// Unverified club (should NOT appear in fan search - shown here for demo)
+const PREVIEW_CLUB_UNVERIFIED: ClubWithProgram = {
+  id: 'preview-club-unverified',
+  admin_id: 'preview-admin',
+  name: 'Pending FC',
+  logo_url: null,
+  primary_color: '#9CA3AF',
+  country: 'France',
+  city: 'Paris',
+  stadium_name: 'Small Stadium',
+  season_start: null,
+  season_end: null,
+  status: 'unverified', // Not shown to fans
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  loyalty_programs: [{
+    id: 'preview-program-unverified',
+    club_id: 'preview-club-unverified',
+    name: 'Pending Rewards',
+    description: 'Not yet visible',
+    points_currency_name: 'Points',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }]
+};
+
 export default function JoinClub() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -132,8 +159,10 @@ export default function JoinClub() {
 
   useEffect(() => { 
     if (isPreviewMode) {
-      // Use preview data
-      setClubs([...PREVIEW_CLUBS, PREVIEW_CLUB_NO_PROGRAM]);
+      // Use preview data - only include verified/official clubs (filter out unverified)
+      const allPreviewClubs = [...PREVIEW_CLUBS, PREVIEW_CLUB_NO_PROGRAM, PREVIEW_CLUB_UNVERIFIED];
+      const verifiedClubs = allPreviewClubs.filter(c => c.status === 'verified' || c.status === 'official');
+      setClubs(verifiedClubs);
       setDataLoading(false);
     } else if (!loading && profile) { 
       checkMembership(); 

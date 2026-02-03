@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Zap, 
@@ -21,7 +22,9 @@ import {
   AlertCircle,
   Loader2,
   Plus,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Club, LoyaltyProgram, ClubVerification } from '@/types/database';
 
@@ -33,7 +36,7 @@ interface DashboardStats {
   totalPointsIssued: number;
 }
 
-// Preview data
+// Preview data - unverified by default to show verification flow
 const PREVIEW_CLUB: Club = {
   id: 'preview-club-admin',
   admin_id: 'preview-admin',
@@ -45,7 +48,7 @@ const PREVIEW_CLUB: Club = {
   stadium_name: 'Demo Stadium',
   season_start: null,
   season_end: null,
-  status: 'verified',
+  status: 'unverified',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -298,6 +301,49 @@ export default function ClubDashboard() {
           </div>
         </div>
 
+        {/* Verification Status Card */}
+        {club && (
+          <Card className={`mb-6 ${club.status === 'verified' || club.status === 'official' ? 'border-primary bg-primary/5' : 'border-warning bg-warning/5'}`}>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${club.status === 'verified' || club.status === 'official' ? 'bg-primary/20' : 'bg-warning/20'}`}>
+                    {club.status === 'verified' || club.status === 'official' ? (
+                      <ShieldCheck className="h-6 w-6 text-primary" />
+                    ) : (
+                      <ShieldAlert className="h-6 w-6 text-warning" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground">
+                        {club.status === 'verified' || club.status === 'official' ? 'Club Verified' : 'Verification Required'}
+                      </h3>
+                      <Badge variant={club.status === 'verified' || club.status === 'official' ? 'default' : 'secondary'}>
+                        {club.status === 'official' ? 'Official' : club.status === 'verified' ? 'Verified' : 'Unverified'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {club.status === 'verified' || club.status === 'official' 
+                        ? 'Your club can publish loyalty programs and accept fans.' 
+                        : 'Verify your club to publish your loyalty program and become visible to fans.'}
+                    </p>
+                  </div>
+                </div>
+                {club.status === 'unverified' && (
+                  <Button 
+                    onClick={() => navigate(isPreviewMode ? '/club/verification?preview=club_admin' : '/club/verification')}
+                    className="gradient-stadium"
+                  >
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Verify Club
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* No Program State */}
         {!program && (
           <Card className="mb-8 border-primary/20 bg-primary/5">
@@ -540,10 +586,31 @@ export default function ClubDashboard() {
         {program && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Program Details</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Program Details</span>
+                {club?.status === 'unverified' ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button disabled variant="secondary" size="sm">
+                          Publish Program
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Verification required to publish your loyalty program.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Badge variant="default" className="ml-2">
+                    <ShieldCheck className="h-3 w-3 mr-1" />
+                    Published
+                  </Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Program Name</p>
                   <p className="font-medium text-foreground">{program.name}</p>
@@ -557,6 +624,20 @@ export default function ClubDashboard() {
                   <Badge variant={program.is_active ? 'default' : 'secondary'}>
                     {program.is_active ? 'Active' : 'Draft'}
                   </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Fan Visibility</p>
+                  {club?.status === 'unverified' ? (
+                    <p className="text-sm text-warning flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      Hidden (verify to show)
+                    </p>
+                  ) : (
+                    <p className="text-sm text-primary flex items-center gap-1">
+                      <ShieldCheck className="h-4 w-4" />
+                      Visible to fans
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
