@@ -384,6 +384,10 @@ export default function JoinClub() {
         isLoading={!!joining}
         isAlreadyEnrolled={!!previewEnrolledClub && selectedClub?.id !== previewEnrolledClub.id}
         currentClubName={previewEnrolledClub?.name}
+        onViewMyClub={() => {
+          setEnrollModalOpen(false);
+          navigate(`/fan/home?preview=fan&club=${previewEnrolledClub?.id}`);
+        }}
       />
     </div>
   );

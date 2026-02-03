@@ -18,6 +18,7 @@ interface EnrollmentModalProps {
   isLoading?: boolean;
   isAlreadyEnrolled?: boolean;
   currentClubName?: string;
+  onViewMyClub?: () => void;
 }
 
 export function EnrollmentModal({
@@ -28,6 +29,7 @@ export function EnrollmentModal({
   isLoading = false,
   isAlreadyEnrolled = false,
   currentClubName,
+  onViewMyClub,
 }: EnrollmentModalProps) {
   // If already enrolled, show a different message without the join button
   if (isAlreadyEnrolled) {
@@ -50,6 +52,11 @@ export function EnrollmentModal({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Close</AlertDialogCancel>
+            {onViewMyClub && (
+              <AlertDialogAction onClick={onViewMyClub} className="gradient-stadium">
+                View My Club
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
