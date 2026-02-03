@@ -122,13 +122,33 @@ export default function ClubVerification() {
     }
   };
 
+  // Pure validation functions (no side effects) - used for criteria checking
+  const isEmailValid = (email: string): boolean => {
+    if (!email.trim()) return false;
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return false;
+    if (PUBLIC_EMAIL_DOMAINS.includes(domain)) return false;
+    return true;
+  };
+
+  const isLinkValid = (link: string): boolean => {
+    if (!link.trim()) return false;
+    try {
+      const urlString = link.startsWith('http') ? link : `https://${link}`;
+      new URL(urlString);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Validation with error messages (called on input change)
   const validateEmail = (email: string): boolean => {
     if (!email.trim()) {
       setEmailError(null);
       return false;
     }
     
-    // Extract domain from email
     const domain = email.split('@')[1]?.toLowerCase();
     if (!domain) {
       setEmailError('Please enter a valid email address');
@@ -151,7 +171,6 @@ export default function ClubVerification() {
     }
     
     try {
-      // Add protocol if missing
       const urlString = link.startsWith('http') ? link : `https://${link}`;
       new URL(urlString);
       setLinkError(null);
@@ -162,10 +181,11 @@ export default function ClubVerification() {
     }
   };
 
+  // Use pure functions for criteria checking (no state updates during render)
   const getCriteriaMet = (): VerificationCriteria => {
     return {
-      officialEmail: validateEmail(officialEmail),
-      publicLink: validateLink(publicLink),
+      officialEmail: isEmailValid(officialEmail),
+      publicLink: isLinkValid(publicLink),
       authorityDeclaration: authorityDeclaration,
     };
   };
