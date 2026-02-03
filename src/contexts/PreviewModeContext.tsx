@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Profile, UserRole } from '@/types/database';
+import { Profile, UserRole, ClubStatus } from '@/types/database';
 
 interface PreviewModeContextType {
   isPreviewMode: boolean;
   previewProfile: Profile | null;
+  previewClubStatus: ClubStatus;
   enablePreviewMode: (role: UserRole) => void;
   disablePreviewMode: () => void;
+  setPreviewClubVerified: () => void;
 }
 
 const PreviewModeContext = createContext<PreviewModeContextType | undefined>(undefined);
@@ -13,6 +15,7 @@ const PreviewModeContext = createContext<PreviewModeContextType | undefined>(und
 export function PreviewModeProvider({ children }: { children: React.ReactNode }) {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previewProfile, setPreviewProfile] = useState<Profile | null>(null);
+  const [previewClubStatus, setPreviewClubStatus] = useState<ClubStatus>('unverified');
 
   // Check URL params for preview mode on mount
   useEffect(() => {
@@ -40,6 +43,11 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
   const disablePreviewMode = () => {
     setIsPreviewMode(false);
     setPreviewProfile(null);
+    setPreviewClubStatus('unverified');
+  };
+
+  const setPreviewClubVerified = () => {
+    setPreviewClubStatus('verified');
   };
 
   return (
@@ -47,8 +55,10 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
       value={{
         isPreviewMode,
         previewProfile,
+        previewClubStatus,
         enablePreviewMode,
         disablePreviewMode,
+        setPreviewClubVerified,
       }}
     >
       {children}

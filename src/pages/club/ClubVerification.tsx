@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreviewMode } from '@/contexts/PreviewModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,7 @@ export default function ClubVerification() {
   const [searchParams] = useSearchParams();
   const { profile, loading } = useAuth();
   const { toast } = useToast();
+  const { previewClubStatus, setPreviewClubVerified } = usePreviewMode();
 
   const isPreviewMode = searchParams.get('preview') === 'club_admin';
 
@@ -72,7 +74,7 @@ export default function ClubVerification() {
         stadium_name: 'Demo Stadium',
         season_start: null,
         season_end: null,
-        status: 'unverified',
+        status: previewClubStatus,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -202,7 +204,8 @@ export default function ClubVerification() {
     if (!club || !canSubmit) return;
 
     if (isPreviewMode) {
-      // Simulate verification in preview
+      // Simulate verification in preview - update shared context
+      setPreviewClubVerified();
       setClub({ ...club, status: 'verified' });
       toast({
         title: 'Club Verified!',
