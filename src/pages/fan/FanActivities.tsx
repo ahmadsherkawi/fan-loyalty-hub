@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
 import { ManualProofModal } from '@/components/ui/ManualProofModal';
+import { QRScannerModal } from '@/components/ui/QRScannerModal';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod, ActivityFrequency } from '@/types/database';
@@ -128,6 +129,10 @@ export default function FanActivities() {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [submittingProof, setSubmittingProof] = useState(false);
   const [pendingClaims, setPendingClaims] = useState<string[]>([]);
+  
+  // QR scanner state
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [processingQR, setProcessingQR] = useState(false);
 
   useEffect(() => { 
     if (isPreviewMode) {
@@ -174,6 +179,13 @@ export default function FanActivities() {
     if (activity.verification_method === 'manual_proof') {
       setSelectedActivity(activity);
       setProofModalOpen(true);
+      return;
+    }
+    
+    // QR scan activities open the scanner
+    if (activity.verification_method === 'qr_scan') {
+      setSelectedActivity(activity);
+      setQrScannerOpen(true);
       return;
     }
     
@@ -241,6 +253,44 @@ export default function FanActivities() {
       toast({ title: 'Error', description: 'Failed to submit proof', variant: 'destructive' }); 
     } finally {
       setSubmittingProof(false);
+    }
+  };
+
+  const handleQRSuccess = async () => {
+    if (!selectedActivity || !membership || !profile) return;
+    
+    if (isPreviewMode) {
+      toast({ 
+        title: 'Activity Completed!', 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}! (simulated in preview)` 
+      });
+      setQrScannerOpen(false);
+      return;
+    }
+    
+    setProcessingQR(true);
+    try {
+      await supabase.from('activity_completions').insert({ 
+        activity_id: selectedActivity.id, 
+        fan_id: profile.id, 
+        membership_id: membership.id, 
+        points_earned: selectedActivity.points_awarded,
+        metadata: { verification: 'qr_scan' }
+      });
+      await supabase.rpc('award_points', { 
+        p_membership_id: membership.id, 
+        p_points: selectedActivity.points_awarded 
+      });
+      toast({ 
+        title: 'Activity Completed!', 
+        description: `You earned ${selectedActivity.points_awarded} ${program?.points_currency_name}!` 
+      });
+      setQrScannerOpen(false);
+      fetchData();
+    } catch (e) { 
+      toast({ title: 'Error', description: 'Failed to complete activity', variant: 'destructive' }); 
+    } finally {
+      setProcessingQR(false);
     }
   };
 
@@ -394,6 +444,18 @@ export default function FanActivities() {
         pointsCurrencyName={program?.points_currency_name || 'Points'}
         onSubmit={handleSubmitProof}
         isLoading={submittingProof}
+      />
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        open={qrScannerOpen}
+        onOpenChange={setQrScannerOpen}
+        activityName={selectedActivity?.name || ''}
+        expectedQRData={selectedActivity?.qr_code_data || null}
+        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsCurrencyName={program?.points_currency_name || 'Points'}
+        onSuccess={handleQRSuccess}
+        isLoading={processingQR}
       />
     </div>
   );
