@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/ui/Logo';
 import { PreviewBanner } from '@/components/ui/PreviewBanner';
+import { QRCodeDisplay } from '@/components/ui/QRCodeDisplay';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
@@ -78,6 +79,7 @@ export default function ActivityBuilder() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [qrActivity, setQrActivity] = useState<Activity | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -526,6 +528,17 @@ export default function ActivityBuilder() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {activity.verification_method === 'qr_scan' && activity.qr_code_data && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQrActivity(activity)}
+                          className="gap-1"
+                        >
+                          <QrCode className="h-4 w-4" />
+                          View QR
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -547,6 +560,18 @@ export default function ActivityBuilder() {
               </Card>
             ))}
           </div>
+        )}
+
+        {/* QR Code Display Modal */}
+        {qrActivity && qrActivity.qr_code_data && (
+          <QRCodeDisplay
+            isOpen={!!qrActivity}
+            onClose={() => setQrActivity(null)}
+            activityName={qrActivity.name}
+            qrCodeData={qrActivity.qr_code_data}
+            pointsAwarded={qrActivity.points_awarded}
+            pointsCurrency={program?.points_currency_name || 'Points'}
+          />
         )}
       </main>
     </div>
