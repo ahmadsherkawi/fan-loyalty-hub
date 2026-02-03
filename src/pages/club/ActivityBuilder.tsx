@@ -88,6 +88,12 @@ export default function ActivityBuilder() {
   const [frequency, setFrequency] = useState<ActivityFrequency>('once_per_day');
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>('qr_scan');
   const [isActive, setIsActive] = useState(true);
+  
+  // Location check-in configuration
+  const [locationLat, setLocationLat] = useState('');
+  const [locationLng, setLocationLng] = useState('');
+  const [locationRadius, setLocationRadius] = useState('500');
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     if (isPreviewMode) {
@@ -168,6 +174,9 @@ export default function ActivityBuilder() {
     setVerificationMethod('qr_scan');
     setIsActive(true);
     setEditingActivity(null);
+    setLocationLat('');
+    setLocationLng('');
+    setLocationRadius('500');
   };
 
   const openEditDialog = (activity: Activity) => {
@@ -178,7 +187,43 @@ export default function ActivityBuilder() {
     setFrequency(activity.frequency);
     setVerificationMethod(activity.verification_method);
     setIsActive(activity.is_active);
+    setLocationLat(activity.location_lat?.toString() || '');
+    setLocationLng(activity.location_lng?.toString() || '');
+    setLocationRadius(activity.location_radius_meters?.toString() || '500');
     setIsDialogOpen(true);
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: 'Not Supported',
+        description: 'Geolocation is not supported by your browser.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocationLat(position.coords.latitude.toFixed(6));
+        setLocationLng(position.coords.longitude.toFixed(6));
+        setIsLocating(false);
+        toast({
+          title: 'Location Set',
+          description: 'Your current location has been set as the venue.',
+        });
+      },
+      (error) => {
+        setIsLocating(false);
+        toast({
+          title: 'Location Error',
+          description: error.message || 'Failed to get your location.',
+          variant: 'destructive',
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleSubmit = async () => {
@@ -194,6 +239,43 @@ export default function ActivityBuilder() {
       return;
     }
 
+    // Validate location for location_checkin activities
+    if (verificationMethod === 'location_checkin') {
+      const lat = parseFloat(locationLat);
+      const lng = parseFloat(locationLng);
+      const radius = parseInt(locationRadius);
+      
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        toast({
+          title: 'Invalid Latitude',
+          description: 'Latitude must be between -90 and 90.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (isNaN(lng) || lng < -180 || lng > 180) {
+        toast({
+          title: 'Invalid Longitude',
+          description: 'Longitude must be between -180 and 180.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (isNaN(radius) || radius < 50 || radius > 5000) {
+        toast({
+          title: 'Invalid Radius',
+          description: 'Radius must be between 50 and 5000 meters.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    // Parse location values
+    const parsedLat = verificationMethod === 'location_checkin' ? parseFloat(locationLat) : null;
+    const parsedLng = verificationMethod === 'location_checkin' ? parseFloat(locationLng) : null;
+    const parsedRadius = verificationMethod === 'location_checkin' ? parseInt(locationRadius) : 100;
+
     if (isPreviewMode) {
       // Simulate activity creation
       const newActivity: Activity = {
@@ -205,9 +287,9 @@ export default function ActivityBuilder() {
         frequency,
         verification_method: verificationMethod,
         qr_code_data: verificationMethod === 'qr_scan' ? 'preview-qr' : null,
-        location_lat: null,
-        location_lng: null,
-        location_radius_meters: 100,
+        location_lat: parsedLat,
+        location_lng: parsedLng,
+        location_radius_meters: parsedRadius,
         time_window_start: null,
         time_window_end: null,
         is_active: isActive,
@@ -240,6 +322,9 @@ export default function ActivityBuilder() {
         verification_method: verificationMethod,
         is_active: isActive,
         qr_code_data: verificationMethod === 'qr_scan' ? crypto.randomUUID() : null,
+        location_lat: parsedLat,
+        location_lng: parsedLng,
+        location_radius_meters: parsedRadius,
       };
 
       if (editingActivity) {
@@ -453,6 +538,78 @@ export default function ActivityBuilder() {
                     {verificationDescriptions[verificationMethod]}
                   </p>
                 </div>
+
+                {/* Location Configuration for Location Check-in */}
+                {verificationMethod === 'location_checkin' && (
+                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2 text-primary">
+                        <MapPin className="h-4 w-4" />
+                        Venue Location
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGetCurrentLocation}
+                        disabled={isLocating}
+                      >
+                        {isLocating ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <MapPin className="h-3 w-3 mr-1" />
+                        )}
+                        Use My Location
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="locationLat" className="text-xs">
+                          Latitude *
+                        </Label>
+                        <Input
+                          id="locationLat"
+                          type="number"
+                          step="any"
+                          value={locationLat}
+                          onChange={(e) => setLocationLat(e.target.value)}
+                          placeholder="e.g., 53.4631"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="locationLng" className="text-xs">
+                          Longitude *
+                        </Label>
+                        <Input
+                          id="locationLng"
+                          type="number"
+                          step="any"
+                          value={locationLng}
+                          onChange={(e) => setLocationLng(e.target.value)}
+                          placeholder="e.g., -2.2913"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="locationRadius" className="text-xs">
+                        Check-in Radius (meters) *
+                      </Label>
+                      <Input
+                        id="locationRadius"
+                        type="number"
+                        min="50"
+                        max="5000"
+                        value={locationRadius}
+                        onChange={(e) => setLocationRadius(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Fans must be within this distance to check in (50-5000m)
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="isActive">Active</Label>
