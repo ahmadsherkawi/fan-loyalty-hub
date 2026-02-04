@@ -1,27 +1,27 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Logo } from "@/components/ui/Logo";
-import { useToast } from "@/hooks/use-toast";
-import { UserRole } from "@/types/database";
-import { Building2, Users, Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
-import { z } from "zod";
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Logo } from '@/components/ui/Logo';
+import { useToast } from '@/hooks/use-toast';
+import { UserRole } from '@/types/database';
+import { Building2, Users, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { z } from 'zod';
 
 const signUpSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  fullName: z.string().min(2, "Please enter your full name"),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  fullName: z.string().min(2, 'Please enter your full name'),
 });
 
 const signInSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Please enter your password"),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Please enter your password'),
 });
 
 export default function AuthPage() {
@@ -30,33 +30,33 @@ export default function AuthPage() {
   const { signUp, signIn, user, profile, loading } = useAuth();
   const { toast } = useToast();
 
-  const defaultRole = (searchParams.get("role") as UserRole) || "fan";
+  const defaultRole = (searchParams.get('role') as UserRole) || 'fan';
 
   const [isLoading, setIsLoading] = useState(false);
 
   // Redirect authenticated users based on their role
   useEffect(() => {
     if (!loading && user && profile) {
-      if (profile.role === "club_admin") {
-        navigate("/club/dashboard");
+      if (profile.role === 'club_admin') {
+        navigate('/club/dashboard', { replace: true });
       } else {
-        navigate("/fan/home");
+        navigate('/fan/home'{ replace: true });
       }
     }
   }, [user, profile, loading, navigate]);
-  const [activeTab, setActiveTab] = useState<"signin" | "signup">("signup");
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signup');
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   // Sign up form state
-  const [signUpEmail, setSignUpEmail] = useState("");
-  const [signUpPassword, setSignUpPassword] = useState("");
-  const [signUpName, setSignUpName] = useState("");
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [signUpName, setSignUpName] = useState('');
   const [signUpRole, setSignUpRole] = useState<UserRole>(defaultRole);
 
   // Sign in form state
-  const [signInEmail, setSignInEmail] = useState("");
-  const [signInPassword, setSignInPassword] = useState("");
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,9 +71,9 @@ export default function AuthPage() {
 
       if (!validation.success) {
         toast({
-          title: "Validation Error",
+          title: 'Validation Error',
           description: validation.error.errors[0].message,
-          variant: "destructive",
+          variant: 'destructive',
         });
         setIsLoading(false);
         return;
@@ -82,20 +82,19 @@ export default function AuthPage() {
       const { error } = await signUp(signUpEmail, signUpPassword, signUpRole, signUpName);
 
       if (error) {
-        if (error.message.includes("already registered") || error.message.includes("User already registered")) {
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
           toast({
-            title: "Account Exists",
-            description:
-              "This email is already registered. Please sign in instead, or check your email for the verification link.",
-            variant: "destructive",
+            title: 'Account Exists',
+            description: 'This email is already registered. Please sign in instead, or check your email for the verification link.',
+            variant: 'destructive',
           });
-          setActiveTab("signin");
+          setActiveTab('signin');
           setSignInEmail(signUpEmail);
         } else {
           toast({
-            title: "Sign Up Failed",
+            title: 'Sign Up Failed',
             description: error.message,
-            variant: "destructive",
+            variant: 'destructive',
           });
         }
       } else {
@@ -105,9 +104,9 @@ export default function AuthPage() {
       }
     } catch (err) {
       toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -126,9 +125,9 @@ export default function AuthPage() {
 
       if (!validation.success) {
         toast({
-          title: "Validation Error",
+          title: 'Validation Error',
           description: validation.error.errors[0].message,
-          variant: "destructive",
+          variant: 'destructive',
         });
         setIsLoading(false);
         return;
@@ -137,40 +136,38 @@ export default function AuthPage() {
       const { error } = await signIn(signInEmail, signInPassword);
 
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
+        if (error.message.includes('Invalid login credentials')) {
           toast({
-            title: "Sign In Failed",
-            description:
-              "Invalid email or password. If you just signed up, please verify your email first by clicking the link we sent you.",
-            variant: "destructive",
+            title: 'Sign In Failed',
+            description: 'Invalid email or password. If you just signed up, please verify your email first by clicking the link we sent you.',
+            variant: 'destructive',
           });
-        } else if (error.message.includes("Email not confirmed")) {
+        } else if (error.message.includes('Email not confirmed')) {
           toast({
-            title: "Email Not Verified",
-            description:
-              "Please check your inbox (and spam folder) and click the verification link to activate your account.",
-            variant: "destructive",
+            title: 'Email Not Verified',
+            description: 'Please check your inbox (and spam folder) and click the verification link to activate your account.',
+            variant: 'destructive',
           });
         } else {
           toast({
-            title: "Sign In Failed",
+            title: 'Sign In Failed',
             description: error.message,
-            variant: "destructive",
+            variant: 'destructive',
           });
         }
       } else {
         // Wait for profile to load before redirecting
         // Profile will load via AuthContext, redirect handled by useEffect
         toast({
-          title: "Welcome Back!",
-          description: "Successfully signed in.",
+          title: 'Welcome Back!',
+          description: 'Successfully signed in.',
         });
       }
     } catch (err) {
       toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -178,7 +175,7 @@ export default function AuthPage() {
   };
 
   // Show loading state while auth context is loading or user exists but profile not yet loaded
-  if (loading) {
+  if (loading || (user && !profile)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -191,7 +188,11 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <div className="p-6">
-          <Button variant="ghost" onClick={() => navigate("/")} className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="gap-2"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Home
           </Button>
@@ -205,32 +206,42 @@ export default function AuthPage() {
                   <Mail className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <CardTitle className="text-2xl font-display">Check Your Email</CardTitle>
-              <CardDescription className="text-base mt-2">We've sent a verification link to:</CardDescription>
+              <CardTitle className="text-2xl font-display">
+                Check Your Email
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                We've sent a verification link to:
+              </CardDescription>
               <p className="font-medium text-foreground mt-1">{registeredEmail}</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-muted-foreground">Click the link in the email to verify your account</p>
+                  <p className="text-sm text-muted-foreground">
+                    Click the link in the email to verify your account
+                  </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-muted-foreground">Check your spam folder if you don't see it</p>
+                  <p className="text-sm text-muted-foreground">
+                    Check your spam folder if you don't see it
+                  </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-muted-foreground">The link expires in 24 hours</p>
+                  <p className="text-sm text-muted-foreground">
+                    The link expires in 24 hours
+                  </p>
                 </div>
               </div>
-
+              
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={() => {
                   setShowConfirmationMessage(false);
-                  setActiveTab("signin");
+                  setActiveTab('signin');
                   setSignInEmail(registeredEmail);
                 }}
               >
@@ -247,7 +258,11 @@ export default function AuthPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="gap-2">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/')}
+          className="gap-2"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Home
         </Button>
@@ -261,14 +276,16 @@ export default function AuthPage() {
               <Logo size="lg" />
             </div>
             <CardTitle className="text-2xl font-display">
-              {activeTab === "signup" ? "Create Your Account" : "Welcome Back"}
+              {activeTab === 'signup' ? 'Create Your Account' : 'Welcome Back'}
             </CardTitle>
             <CardDescription>
-              {activeTab === "signup" ? "Join the football loyalty community" : "Sign in to access your account"}
+              {activeTab === 'signup'
+                ? 'Join the football loyalty community'
+                : 'Sign in to access your account'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'signin' | 'signup')}>
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -287,7 +304,9 @@ export default function AuthPage() {
                       <Label
                         htmlFor="fan"
                         className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                          signUpRole === "fan" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                          signUpRole === 'fan'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
                         }`}
                       >
                         <RadioGroupItem value="fan" id="fan" />
@@ -297,9 +316,9 @@ export default function AuthPage() {
                       <Label
                         htmlFor="club_admin"
                         className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                          signUpRole === "club_admin"
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50"
+                          signUpRole === 'club_admin'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
                         }`}
                       >
                         <RadioGroupItem value="club_admin" id="club_admin" />
@@ -351,7 +370,7 @@ export default function AuthPage() {
                         Creating Account...
                       </>
                     ) : (
-                      "Create Account"
+                      'Create Account'
                     )}
                   </Button>
                 </form>
@@ -390,10 +409,10 @@ export default function AuthPage() {
                         Signing In...
                       </>
                     ) : (
-                      "Sign In"
+                      'Sign In'
                     )}
                   </Button>
-
+                  
                   <p className="text-xs text-center text-muted-foreground mt-4">
                     Just signed up? Check your email for the verification link before signing in.
                   </p>
