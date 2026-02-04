@@ -72,7 +72,7 @@ export interface InAppConfig {
 
 export interface Activity {
   id: string;
-  program_id: string;
+  loyalty_program_id: string;
   title: string;
   description: string | null;
   points_awarded: number;
