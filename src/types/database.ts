@@ -1,11 +1,11 @@
 // Database types for the football loyalty platform
 
-export type UserRole = 'club_admin' | 'fan';
-export type ClubStatus = 'unverified' | 'verified' | 'official';
-export type ActivityFrequency = 'once_ever' | 'once_per_match' | 'once_per_day' | 'unlimited';
-export type VerificationMethod = 'qr_scan' | 'location_checkin' | 'in_app_completion' | 'manual_proof';
-export type RedemptionMethod = 'voucher' | 'manual_fulfillment' | 'code_display';
-export type ClaimStatus = 'pending' | 'approved' | 'rejected';
+export type UserRole = "club_admin" | "fan";
+export type ClubStatus = "unverified" | "verified" | "official";
+export type ActivityFrequency = "once_ever" | "once_per_match" | "once_per_day" | "unlimited";
+export type VerificationMethod = "qr_scan" | "location_checkin" | "in_app_completion" | "manual_proof";
+export type RedemptionMethod = "voucher" | "manual_fulfillment" | "code_display";
+export type ClaimStatus = "pending" | "approved" | "rejected";
 
 export interface Profile {
   id: string;
@@ -20,7 +20,7 @@ export interface Profile {
 export interface Club {
   id: string;
   admin_id: string;
-  name: string;
+  title: string;
   logo_url: string | null;
   primary_color: string;
   country: string;
@@ -47,7 +47,7 @@ export interface ClubVerification {
 export interface LoyaltyProgram {
   id: string;
   club_id: string;
-  name: string;
+  title: string;
   description: string | null;
   points_currency_name: string;
   is_active: boolean;
@@ -56,7 +56,7 @@ export interface LoyaltyProgram {
 }
 
 // In-app activity configuration types
-export type InAppActivityType = 'poll' | 'quiz';
+export type InAppActivityType = "poll" | "quiz";
 
 export interface InAppOption {
   id: string;
@@ -73,7 +73,7 @@ export interface InAppConfig {
 export interface Activity {
   id: string;
   program_id: string;
-  name: string;
+  title: string;
   description: string | null;
   points_awarded: number;
   frequency: ActivityFrequency;
@@ -128,7 +128,7 @@ export interface ManualClaim {
 export interface Reward {
   id: string;
   program_id: string;
-  name: string;
+  title: string;
   description: string | null;
   points_cost: number;
   quantity_limit: number | null;
