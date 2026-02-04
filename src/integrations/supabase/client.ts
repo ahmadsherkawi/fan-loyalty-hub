@@ -14,3 +14,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     detectSessionInUrl: true,
   },
 });
+// TEMP DEBUG – remove later
+// @ts-ignore
+window.supabase = supabase;
