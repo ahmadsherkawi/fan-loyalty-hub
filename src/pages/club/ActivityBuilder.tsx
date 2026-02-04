@@ -170,7 +170,7 @@ export default function ActivityBuilder() {
       const { data: activitiesData } = await supabase
         .from("activities")
         .select("*")
-        .eq("program_id", programs.id)
+        .eq("loyalty_program_id", programs[0].id)
         .order("created_at", { ascending: false });
 
       setActivities((activitiesData || []) as unknown as Activity[]);
@@ -406,7 +406,7 @@ export default function ActivityBuilder() {
 
     try {
       const activityData = {
-        program_id: program.id,
+        loyalty_program_id: program.id,
         name,
         description: description || null,
         points_awarded: points,
