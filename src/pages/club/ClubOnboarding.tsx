@@ -140,7 +140,14 @@ export default function ClubOnboarding() {
   };
 
   const handleCreateClub = async () => {
-    if (!profile) return;
+    if (!profile) {
+      toast({
+        title: 'Profile Not Loaded',
+        description: 'Please wait for your profile to load before creating a club.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -467,7 +474,7 @@ export default function ClubOnboarding() {
 
                 <Button
                   onClick={handleCreateClub}
-                  disabled={!clubName || !country || !city || isSubmitting || isUploadingLogo}
+                  disabled={!clubName || !country || !city || isSubmitting || isUploadingLogo || !profile}
                   className="w-full gradient-stadium"
                 >
                   {(isSubmitting || isUploadingLogo) ? (
