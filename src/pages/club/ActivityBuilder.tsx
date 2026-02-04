@@ -200,7 +200,7 @@ export default function ActivityBuilder() {
 
   const openEditDialog = (activity: Activity) => {
     setEditingActivity(activity);
-    setName(activity.name);
+    setName(activity.title);
     setDescription(activity.description || "");
     setPointsAwarded(activity.points_awarded.toString());
     setFrequency(activity.frequency);
@@ -372,7 +372,7 @@ export default function ActivityBuilder() {
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
         loyalty_program_id: program.id,
-        name,
+        title: name,
         description: description || null,
         points_awarded: points,
         frequency,
@@ -407,7 +407,7 @@ export default function ActivityBuilder() {
     try {
       const activityData = {
         loyalty_program_id: program.id,
-        name,
+        title: name,
         description: description || null,
         points_awarded: points,
         frequency,
@@ -818,7 +818,7 @@ export default function ActivityBuilder() {
                         {verificationIcons[activity.verification_method]}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-foreground">{activity.name}</h3>
+                        <h3 className="font-semibold text-foreground">{activity.title}</h3>
                         {activity.description && (
                           <p className="text-sm text-muted-foreground line-clamp-1">{activity.description}</p>
                         )}
@@ -869,7 +869,7 @@ export default function ActivityBuilder() {
           <QRCodeDisplay
             isOpen={!!qrActivity}
             onClose={() => setQrActivity(null)}
-            activityName={qrActivity.name}
+            activityName={qrActivity.title}
             qrCodeData={qrActivity.qr_code_data}
             pointsAwarded={qrActivity.points_awarded}
             pointsCurrency={program?.points_currency_name || "Points"}
