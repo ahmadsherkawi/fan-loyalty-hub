@@ -119,7 +119,7 @@ export default function ActivityBuilder() {
       setProgram({
         id: "preview-program",
         club_id: "preview-club",
-        name: "Demo Rewards",
+        title: "Demo Rewards",
         description: null,
         points_currency_name: "Points",
         is_active: true,
