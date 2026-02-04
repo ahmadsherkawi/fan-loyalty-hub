@@ -41,9 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // TEMP DEBUG – remove later
     supabase.auth.getSession().then(({ data, error }) => {
-      console.log("SESSION:", data?.session);
-      console.log("USER:", data?.session?.user);
+      console.log("[Auth] getSession (startup) error:", error);
+      console.log("[Auth] getSession (startup) session:", data?.session);
+      console.log("[Auth] getSession (startup) session.user.id:", data?.session?.user?.id);
     });
   }, []);
 
@@ -52,12 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // TEMP DEBUG – remove later
+      console.log("[Auth] onAuthStateChange event:", event);
+      console.log("[Auth] onAuthStateChange session:", session);
+      console.log("[Auth] onAuthStateChange session.user.id:", session?.user?.id);
+
       setSession(session);
       setUser(session?.user ?? null);
 
       // Defer profile fetch with setTimeout to avoid deadlock
       if (session?.user) {
         setTimeout(() => {
+          // TEMP DEBUG – remove later
+          console.log("[Auth] fetching profile by profiles.user_id:", session.user.id);
           fetchProfile(session.user.id).then(setProfile);
         }, 0);
       } else {
@@ -71,11 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // TEMP DEBUG – remove later
+      console.log("[Auth] getSession (init) session:", session);
+      console.log("[Auth] getSession (init) session.user.id:", session?.user?.id);
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
         fetchProfile(session.user.id).then((profileData) => {
+          // TEMP DEBUG – remove later
+          console.log("[Auth] profile loaded:", profileData);
           setProfile(profileData);
           setLoading(false);
         });
