@@ -183,7 +183,7 @@ export default function ActivityBuilder() {
   };
 
   const resetForm = () => {
-    setName("");
+    setTitle("");
     setDescription("");
     setPointsAwarded("100");
     setFrequency("once_per_day");
@@ -201,7 +201,7 @@ export default function ActivityBuilder() {
 
   const openEditDialog = (activity: Activity) => {
     setEditingActivity(activity);
-    setName(activity.name);
+    setTitle(activity.title);
     setDescription(activity.description || "");
     setPointsAwarded(activity.points_awarded.toString());
     setFrequency(activity.frequency);
@@ -373,7 +373,7 @@ export default function ActivityBuilder() {
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
         loyalty_program_id: program.id,
-        name,
+        title,
         description: description || null,
         points_awarded: points,
         frequency,
@@ -554,7 +554,7 @@ export default function ActivityBuilder() {
                   <Input
                     id="title"
                     value={title}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g., Attend Home Match"
                   />
                 </div>
@@ -783,7 +783,7 @@ export default function ActivityBuilder() {
                   <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
                 </div>
 
-                <Button onClick={handleSubmit} disabled={!name || isSubmitting} className="w-full gradient-stadium">
+                <Button onClick={handleSubmit} disabled={!title || isSubmitting} className="w-full gradient-stadium">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {editingActivity ? "Update Activity" : "Create Activity"}
                 </Button>
@@ -870,7 +870,7 @@ export default function ActivityBuilder() {
           <QRCodeDisplay
             isOpen={!!qrActivity}
             onClose={() => setQrActivity(null)}
-            activityName={qrActivity.name}
+            activityName={qrActivity.title}
             qrCodeData={qrActivity.qr_code_data}
             pointsAwarded={qrActivity.points_awarded}
             pointsCurrency={program?.points_currency_name || "Points"}
