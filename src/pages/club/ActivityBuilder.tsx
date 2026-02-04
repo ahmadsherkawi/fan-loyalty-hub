@@ -371,7 +371,7 @@ export default function ActivityBuilder() {
       // Simulate activity creation
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
-        program_id: program.id,
+        loyalty_program_id: program.id,
         name,
         description: description || null,
         points_awarded: points,
