@@ -94,7 +94,7 @@ export interface FanMembership {
   id: string;
   fan_id: string;
   club_id: string;
-  program_id: string;
+  loyalty_program_id: string;
   points_balance: number;
   joined_at: string;
   updated_at: string;
@@ -127,7 +127,7 @@ export interface ManualClaim {
 
 export interface Reward {
   id: string;
-  program_id: string;
+  loyalty_program_id: string;
   title: string;
   description: string | null;
   points_cost: number;
