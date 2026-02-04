@@ -171,7 +171,7 @@ export default function ActivityBuilder() {
       const activitiesTable = supabase.from("activities") as any;
       const { data: activitiesData } = await activitiesTable
         .select("*")
-        .eq("program_id", programs[0].id)
+        .eq("loyalty_program_id", programs[0].id)
         .order("created_at", { ascending: false });
 
       setActivities((activitiesData || []) as unknown as Activity[]);
@@ -372,7 +372,7 @@ export default function ActivityBuilder() {
       // Simulate activity creation
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
-        program_id: program.id,
+        loyalty_program_id: program.id,
         name,
         description: description || null,
         points_awarded: points,
@@ -407,7 +407,7 @@ export default function ActivityBuilder() {
 
     try {
       const activityData = {
-        program_id: program.id,
+        loyalty_program_id: program.id,
         name,
         description: description || null,
         points_awarded: points,
