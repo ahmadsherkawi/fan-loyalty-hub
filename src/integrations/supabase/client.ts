@@ -5,7 +5,7 @@ import type { Database } from "./types";
 const SUPABASE_URL = "https://ohjhzmqcbprcybjlsusp.supabase.co";
 const VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ecIjomNewTs7vYY1IWCD9Q_Ba9e6M6-";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
