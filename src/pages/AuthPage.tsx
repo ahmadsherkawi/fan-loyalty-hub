@@ -178,7 +178,7 @@ export default function AuthPage() {
   };
 
   // Show loading state while auth context is loading or user exists but profile not yet loaded
-  if (loading || (user && !profile)) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
