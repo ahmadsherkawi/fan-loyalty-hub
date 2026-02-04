@@ -13,6 +13,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, VITE_SUPABASE_PUBLI
     detectSessionInUrl: true,
   },
 });
-// TEMP DEBUG – remove later
-// @ts-ignore
-window.supabase = supabase;
