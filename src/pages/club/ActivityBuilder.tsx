@@ -93,7 +93,7 @@ export default function ActivityBuilder() {
   const [qrActivity, setQrActivity] = useState<Activity | null>(null);
 
   // Form state
-  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [pointsAwarded, setPointsAwarded] = useState("100");
   const [frequency, setFrequency] = useState<ActivityFrequency>("once_per_day");
@@ -408,7 +408,7 @@ export default function ActivityBuilder() {
     try {
       const activityData = {
         loyalty_program_id: program.id,
-        name,
+        title,
         description: description || null,
         points_awarded: points,
         frequency,
@@ -552,8 +552,8 @@ export default function ActivityBuilder() {
                 <div className="space-y-2">
                   <Label htmlFor="name">Activity Name *</Label>
                   <Input
-                    id="name"
-                    value={name}
+                    id="title"
+                    value={title}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., Attend Home Match"
                   />
@@ -819,7 +819,7 @@ export default function ActivityBuilder() {
                         {verificationIcons[activity.verification_method]}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-foreground">{activity.name}</h3>
+                        <h3 className="font-semibold text-foreground">{activity.title}</h3>
                         {activity.description && (
                           <p className="text-sm text-muted-foreground line-clamp-1">{activity.description}</p>
                         )}
