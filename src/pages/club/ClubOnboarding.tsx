@@ -1,46 +1,46 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Logo } from '@/components/ui/Logo';
-import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X } from 'lucide-react';
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Logo } from "@/components/ui/Logo";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X } from "lucide-react";
 
-type Step = 'club' | 'program' | 'verification';
+type Step = "club" | "program" | "verification";
 
 export default function ClubOnboarding() {
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<Step>('club');
+  const [step, setStep] = useState<Step>("club");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Club form state
-  const [clubName, setClubName] = useState('');
-  const [country, setCountry] = useState('');
-  const [city, setCity] = useState('');
-  const [stadiumName, setStadiumName] = useState('');
-  const [primaryColor, setPrimaryColor] = useState('#1a7a4c');
+  const [clubName, setClubName] = useState("");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [stadiumName, setStadiumName] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#1a7a4c");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Program form state
-  const [programName, setProgramName] = useState('');
-  const [programDescription, setProgramDescription] = useState('');
-  const [pointsCurrencyName, setPointsCurrencyName] = useState('Points');
+  const [programName, setProgramName] = useState("");
+  const [programDescription, setProgramDescription] = useState("");
+  const [pointsCurrencyName, setPointsCurrencyName] = useState("Points");
 
   // Verification form state
-  const [officialEmailDomain, setOfficialEmailDomain] = useState('');
-  const [publicLink, setPublicLink] = useState('');
+  const [officialEmailDomain, setOfficialEmailDomain] = useState("");
+  const [publicLink, setPublicLink] = useState("");
   const [authorityDeclaration, setAuthorityDeclaration] = useState(false);
 
   // Created IDs
@@ -49,9 +49,9 @@ export default function ClubOnboarding() {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate('/auth?role=club_admin');
-    } else if (!loading && profile?.role !== 'club_admin') {
-      navigate('/fan/home');
+      navigate("/auth?role=club_admin");
+    } else if (!loading && profile?.role !== "club_admin") {
+      navigate("/fan/home");
     }
   }, [user, profile, loading, navigate]);
 
@@ -65,33 +65,29 @@ export default function ClubOnboarding() {
   const checkExistingClub = async () => {
     if (!profile) return;
 
-    const { data: clubs } = await supabase
-      .from('clubs')
-      .select('id')
-      .eq('admin_id', profile.id)
-      .limit(1);
+    const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
 
     if (clubs && clubs.length > 0) {
-      navigate('/club/dashboard');
+      navigate("/club/dashboard");
     }
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
-          title: 'Invalid file type',
-          description: 'Please upload an image file (PNG, JPG, etc.)',
-          variant: 'destructive',
+          title: "Invalid file type",
+          description: "Please upload an image file (PNG, JPG, etc.)",
+          variant: "destructive",
         });
         return;
       }
       if (file.size > 2 * 1024 * 1024) {
         toast({
-          title: 'File too large',
-          description: 'Logo must be less than 2MB',
-          variant: 'destructive',
+          title: "File too large",
+          description: "Logo must be less than 2MB",
+          variant: "destructive",
         });
         return;
       }
@@ -108,31 +104,31 @@ export default function ClubOnboarding() {
     setLogoFile(null);
     setLogoPreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const uploadLogo = async (clubId: string): Promise<string | null> => {
     if (!logoFile) return null;
-    
+
     setIsUploadingLogo(true);
     try {
-      const fileExt = logoFile.name.split('.').pop();
+      const fileExt = logoFile.title.split(".").pop();
       const fileName = `${clubId}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
-        .from('club-logos')
+        .from("club-logos")
         .upload(fileName, logoFile, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('club-logos')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("club-logos").getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error) {
-      console.error('Logo upload error:', error);
+      console.error("Logo upload error:", error);
       return null;
     } finally {
       setIsUploadingLogo(false);
@@ -142,9 +138,9 @@ export default function ClubOnboarding() {
   const handleCreateClub = async () => {
     if (!profile) {
       toast({
-        title: 'Profile Not Loaded',
-        description: 'Please wait for your profile to load before creating a club.',
-        variant: 'destructive',
+        title: "Profile Not Loaded",
+        description: "Please wait for your profile to load before creating a club.",
+        variant: "destructive",
       });
       return;
     }
@@ -153,7 +149,7 @@ export default function ClubOnboarding() {
     try {
       // Create club first
       const { data: club, error } = await supabase
-        .from('clubs')
+        .from("clubs")
         .insert({
           admin_id: profile.id,
           name: clubName,
@@ -171,25 +167,22 @@ export default function ClubOnboarding() {
       if (logoFile) {
         const logoUrl = await uploadLogo(club.id);
         if (logoUrl) {
-          await supabase
-            .from('clubs')
-            .update({ logo_url: logoUrl })
-            .eq('id', club.id);
+          await supabase.from("clubs").update({ logo_url: logoUrl }).eq("id", club.id);
         }
       }
 
       setClubId(club.id);
-      setStep('program');
+      setStep("program");
       toast({
-        title: 'Club Created',
-        description: 'Now set up your loyalty program.',
+        title: "Club Created",
+        description: "Now set up your loyalty program.",
       });
     } catch (error: unknown) {
       const err = error as Error;
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to create club',
-        variant: 'destructive',
+        title: "Error",
+        description: err.message || "Failed to create club",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -202,7 +195,7 @@ export default function ClubOnboarding() {
 
     try {
       const { data: program, error } = await supabase
-        .from('loyalty_programs')
+        .from("loyalty_programs")
         .insert({
           club_id: clubId,
           name: programName,
@@ -215,17 +208,17 @@ export default function ClubOnboarding() {
       if (error) throw error;
 
       setProgramId(program.id);
-      setStep('verification');
+      setStep("verification");
       toast({
-        title: 'Program Created',
-        description: 'Now verify your club to publish.',
+        title: "Program Created",
+        description: "Now verify your club to publish.",
       });
     } catch (error: unknown) {
       const err = error as Error;
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to create program',
-        variant: 'destructive',
+        title: "Error",
+        description: err.message || "Failed to create program",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -237,7 +230,10 @@ export default function ClubOnboarding() {
 
     // Check if at least 2 of 3 requirements are met
     let count = 0;
-    if (officialEmailDomain && !['gmail', 'yahoo', 'outlook', 'hotmail', 'live'].some(d => officialEmailDomain.toLowerCase().includes(d))) {
+    if (
+      officialEmailDomain &&
+      !["gmail", "yahoo", "outlook", "hotmail", "live"].some((d) => officialEmailDomain.toLowerCase().includes(d))
+    ) {
       count++;
     }
     if (publicLink) count++;
@@ -245,9 +241,9 @@ export default function ClubOnboarding() {
 
     if (count < 2) {
       toast({
-        title: 'Verification Requirements',
-        description: 'Please provide at least 2 of 3 verification requirements.',
-        variant: 'destructive',
+        title: "Verification Requirements",
+        description: "Please provide at least 2 of 3 verification requirements.",
+        variant: "destructive",
       });
       return;
     }
@@ -255,28 +251,26 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('club_verifications')
-        .insert({
-          club_id: clubId,
-          official_email_domain: officialEmailDomain || null,
-          public_link: publicLink || null,
-          authority_declaration: authorityDeclaration,
-        });
+      const { error } = await supabase.from("club_verifications").insert({
+        club_id: clubId,
+        official_email_domain: officialEmailDomain || null,
+        public_link: publicLink || null,
+        authority_declaration: authorityDeclaration,
+      });
 
       if (error) throw error;
 
       toast({
-        title: 'Verification Submitted',
-        description: 'Your club is now verified! You can start building activities.',
+        title: "Verification Submitted",
+        description: "Your club is now verified! You can start building activities.",
       });
-      navigate('/club/dashboard');
+      navigate("/club/dashboard");
     } catch (error: unknown) {
       const err = error as Error;
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to submit verification',
-        variant: 'destructive',
+        title: "Error",
+        description: err.message || "Failed to submit verification",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -285,10 +279,10 @@ export default function ClubOnboarding() {
 
   const handleSkipVerification = () => {
     toast({
-      title: 'Verification Skipped',
-      description: 'You can verify later. Note: Only verified clubs can publish programs.',
+      title: "Verification Skipped",
+      description: "You can verify later. Note: Only verified clubs can publish programs.",
     });
-    navigate('/club/dashboard');
+    navigate("/club/dashboard");
   };
 
   if (loading) {
@@ -305,7 +299,7 @@ export default function ClubOnboarding() {
       <div className="border-b">
         <div className="container py-4 flex items-center justify-between">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate('/')}>
+          <Button variant="ghost" onClick={() => navigate("/")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -316,29 +310,23 @@ export default function ClubOnboarding() {
       <div className="container py-8">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-8">
-            {(['club', 'program', 'verification'] as Step[]).map((s, i) => (
+            {(["club", "program", "verification"] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
                     step === s
-                      ? 'gradient-stadium text-primary-foreground'
-                      : i < ['club', 'program', 'verification'].indexOf(step)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
+                      ? "gradient-stadium text-primary-foreground"
+                      : i < ["club", "program", "verification"].indexOf(step)
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {i < ['club', 'program', 'verification'].indexOf(step) ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    i + 1
-                  )}
+                  {i < ["club", "program", "verification"].indexOf(step) ? <CheckCircle className="h-5 w-5" /> : i + 1}
                 </div>
                 {i < 2 && (
                   <div
                     className={`w-24 md:w-32 h-1 mx-2 ${
-                      i < ['club', 'program', 'verification'].indexOf(step)
-                        ? 'bg-primary'
-                        : 'bg-muted'
+                      i < ["club", "program", "verification"].indexOf(step) ? "bg-primary" : "bg-muted"
                     }`}
                   />
                 )}
@@ -347,16 +335,14 @@ export default function ClubOnboarding() {
           </div>
 
           {/* Step 1: Club Details */}
-          {step === 'club' && (
+          {step === "club" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-primary" />
                   Club Details
                 </CardTitle>
-                <CardDescription>
-                  Tell us about your football club
-                </CardDescription>
+                <CardDescription>Tell us about your football club</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Club Logo Upload */}
@@ -365,9 +351,9 @@ export default function ClubOnboarding() {
                   <div className="flex items-center gap-4">
                     {logoPreview ? (
                       <div className="relative">
-                        <img 
-                          src={logoPreview} 
-                          alt="Club logo preview" 
+                        <img
+                          src={logoPreview}
+                          alt="Club logo preview"
                           className="w-20 h-20 rounded-lg object-cover border"
                         />
                         <button
@@ -379,7 +365,7 @@ export default function ClubOnboarding() {
                         </button>
                       </div>
                     ) : (
-                      <div 
+                      <div
                         className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
                         onClick={() => fileInputRef.current?.click()}
                       >
@@ -394,18 +380,16 @@ export default function ClubOnboarding() {
                         onChange={handleLogoChange}
                         className="hidden"
                       />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         className="w-full"
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {logoFile ? 'Change Logo' : 'Upload Logo'}
+                        {logoFile ? "Change Logo" : "Upload Logo"}
                       </Button>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        PNG or JPG, max 2MB
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG or JPG, max 2MB</p>
                     </div>
                   </div>
                 </div>
@@ -477,10 +461,8 @@ export default function ClubOnboarding() {
                   disabled={!clubName || !country || !city || isSubmitting || isUploadingLogo || !profile}
                   className="w-full gradient-stadium"
                 >
-                  {(isSubmitting || isUploadingLogo) ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isUploadingLogo ? 'Uploading Logo...' : 'Continue to Program Setup'}
+                  {isSubmitting || isUploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {isUploadingLogo ? "Uploading Logo..." : "Continue to Program Setup"}
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </CardContent>
@@ -488,16 +470,14 @@ export default function ClubOnboarding() {
           )}
 
           {/* Step 2: Program Setup */}
-          {step === 'program' && (
+          {step === "program" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
                   Loyalty Program
                 </CardTitle>
-                <CardDescription>
-                  Set up your fan loyalty program
-                </CardDescription>
+                <CardDescription>Set up your fan loyalty program</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -530,9 +510,7 @@ export default function ClubOnboarding() {
                     onChange={(e) => setPointsCurrencyName(e.target.value)}
                     placeholder="Points, Stars, Coins..."
                   />
-                  <p className="text-sm text-muted-foreground">
-                    Example: "You earned 100 {pointsCurrencyName}!"
-                  </p>
+                  <p className="text-sm text-muted-foreground">Example: "You earned 100 {pointsCurrencyName}!"</p>
                 </div>
 
                 <Button
@@ -540,9 +518,7 @@ export default function ClubOnboarding() {
                   disabled={!programName || isSubmitting}
                   className="w-full gradient-stadium"
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Continue to Verification
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -551,22 +527,20 @@ export default function ClubOnboarding() {
           )}
 
           {/* Step 3: Verification */}
-          {step === 'verification' && (
+          {step === "verification" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-primary" />
                   Club Verification
                 </CardTitle>
-                <CardDescription>
-                  Provide at least 2 of 3 requirements to become verified
-                </CardDescription>
+                <CardDescription>Provide at least 2 of 3 requirements to become verified</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
                   <p className="text-sm text-warning-foreground">
-                    <strong>Why verify?</strong> Only verified clubs can publish programs, 
-                    appear in search, issue QR codes, and allow fans to earn points.
+                    <strong>Why verify?</strong> Only verified clubs can publish programs, appear in search, issue QR
+                    codes, and allow fans to earn points.
                   </p>
                 </div>
 
@@ -591,9 +565,7 @@ export default function ClubOnboarding() {
                     onChange={(e) => setPublicLink(e.target.value)}
                     placeholder="https://www.yourclub.com"
                   />
-                  <p className="text-sm text-muted-foreground">
-                    Official website or verified social media page.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Official website or verified social media page.</p>
                 </div>
 
                 <div className="flex items-start gap-3">
@@ -607,18 +579,14 @@ export default function ClubOnboarding() {
                       3. Authority Declaration
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      I confirm that I am authorized to represent this football club and 
-                      create a loyalty program on their behalf.
+                      I confirm that I am authorized to represent this football club and create a loyalty program on
+                      their behalf.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={handleSkipVerification}
-                    className="flex-1"
-                  >
+                  <Button variant="outline" onClick={handleSkipVerification} className="flex-1">
                     Skip for Now
                   </Button>
                   <Button
@@ -626,9 +594,7 @@ export default function ClubOnboarding() {
                     disabled={isSubmitting}
                     className="flex-1 gradient-stadium"
                   >
-                    {isSubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Submit Verification
                   </Button>
                 </div>
