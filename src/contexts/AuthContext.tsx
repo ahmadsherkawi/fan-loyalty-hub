@@ -41,6 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      console.log("SESSION:", data?.session);
+      console.log("USER:", data?.session?.user);
+    });
+  }, []);
+
+  useEffect(() => {
     // Set up auth state listener FIRST
     const {
       data: { subscription },
