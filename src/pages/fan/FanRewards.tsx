@@ -10,40 +10,15 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
 import { useToast } from "@/hooks/use-toast";
-import {
-  ArrowLeft,
-  Gift,
-  Loader2,
-  Trophy,
-  AlertCircle,
-  History,
-  CheckCircle2,
-  Clock,
-  Ticket,
-  Wrench,
-  Code,
-} from "lucide-react";
-import { Reward, FanMembership, LoyaltyProgram, RewardRedemption, RedemptionMethod } from "@/types/database";
+import { ArrowLeft, Gift, Loader2, Trophy } from "lucide-react";
+import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
 interface RedemptionWithReward extends RewardRedemption {
   rewards?: {
     name: string;
     description: string | null;
-    redemption_method: RedemptionMethod;
   };
 }
-
-const redemptionIcons: Record<RedemptionMethod, React.ReactNode> = {
-  voucher: <Ticket className="h-4 w-4" />,
-  manual_fulfillment: <Wrench className="h-4 w-4" />,
-  code_display: <Code className="h-4 w-4" />,
-};
-
-const redemptionLabels: Record<RedemptionMethod, string> = {
-  voucher: "Digital Voucher",
-  manual_fulfillment: "Fulfilled by Club",
-  code_display: "Display Code",
-};
 
 export default function FanRewards() {
   const navigate = useNavigate();
@@ -58,14 +33,22 @@ export default function FanRewards() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("available");
 
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [redemptionModalOpen, setRedemptionModalOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
+  /* ---------------- FETCH DATA ---------------- */
+
   useEffect(() => {
-    if (!isPreviewMode && !loading && profile) fetchData();
+    if (isPreviewMode) {
+      setDataLoading(false);
+      return;
+    }
+
+    if (!loading && profile) {
+      fetchData();
+    }
   }, [profile, loading, isPreviewMode]);
 
   const fetchData = async () => {
@@ -74,6 +57,7 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
+      /* membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -88,18 +72,21 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      /* program */
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
-      setProgram(programs as LoyaltyProgram);
+      setProgram(programData as LoyaltyProgram);
 
-      const { data: rews } = await supabase
+      /* rewards */
+      const { data: rewardsData } = await supabase
         .from("rewards")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true);
 
-      setRewards((rews ?? []) as Reward[]);
+      setRewards((rewardsData ?? []) as Reward[]);
 
+      /* redemption history */
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
         .select(
@@ -107,8 +94,7 @@ export default function FanRewards() {
           *,
           rewards (
             name,
-            description,
-            redemption_method
+            description
           )
         `,
         )
@@ -118,23 +104,35 @@ export default function FanRewards() {
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
     } catch (err) {
       console.error("FanRewards fetch error:", err);
+      toast({
+        title: "Error loading rewards",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setDataLoading(false);
     }
   };
 
-  /**
-   * SECURE REDEMPTION USING RPC
-   */
-  const handleConfirmRedeem = async (): Promise<{ success: boolean; code?: string | null; error?: string }> => {
+  /* ---------------- SECURE REDEMPTION ---------------- */
+
+  const handleConfirmRedeem = async (): Promise<{
+    success: boolean;
+    code?: string | null;
+    error?: string;
+  }> => {
     if (!membership || !selectedReward) {
       return { success: false, error: "Missing required data" };
+    }
+
+    if (isPreviewMode) {
+      return { success: true };
     }
 
     setRedeeming(true);
 
     try {
-      const { data, error } = await supabase.rpc("redeem_reward", {
+      const { error } = await supabase.rpc("redeem_reward", {
         p_membership_id: membership.id,
         p_reward_id: selectedReward.id,
       });
@@ -148,20 +146,23 @@ export default function FanRewards() {
 
       await fetchData();
 
-      return { success: true, code: data ?? null };
+      return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message ?? "Redemption failed" };
+      const message = err?.message || "Redemption failed. Please try again.";
+
+      toast({
+        title: "Redemption failed",
+        description: message,
+        variant: "destructive",
+      });
+
+      return { success: false, error: message };
     } finally {
       setRedeeming(false);
     }
   };
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  /* ---------------- LOADING ---------------- */
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
@@ -170,6 +171,8 @@ export default function FanRewards() {
       </div>
     );
   }
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="min-h-screen bg-background">
@@ -186,6 +189,7 @@ export default function FanRewards() {
       </header>
 
       <main className="container py-8">
+        {/* HEADER */}
         <div className="flex justify-between mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Gift className="h-8 w-8 text-accent" />
@@ -199,12 +203,14 @@ export default function FanRewards() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* TABS */}
+        <Tabs defaultValue="available">
           <TabsList className="grid grid-cols-2 max-w-md">
             <TabsTrigger value="available">Available</TabsTrigger>
             <TabsTrigger value="history">My Redemptions</TabsTrigger>
           </TabsList>
 
+          {/* AVAILABLE */}
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
@@ -233,6 +239,7 @@ export default function FanRewards() {
             </div>
           </TabsContent>
 
+          {/* HISTORY */}
           <TabsContent value="history">
             <div className="space-y-4 mt-6">
               {redemptions.map((r) => (
@@ -240,7 +247,7 @@ export default function FanRewards() {
                   <CardContent className="py-4 flex justify-between">
                     <div>
                       <p className="font-semibold">{r.rewards?.name}</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(r.redeemed_at)}</p>
+                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
                     <Badge>-{r.points_spent}</Badge>
                   </CardContent>
@@ -251,6 +258,7 @@ export default function FanRewards() {
         </Tabs>
       </main>
 
+      {/* MODAL */}
       <RewardRedemptionModal
         isOpen={redemptionModalOpen}
         onClose={() => setRedemptionModalOpen(false)}
