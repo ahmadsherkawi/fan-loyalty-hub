@@ -166,24 +166,6 @@ export default function JoinClub() {
   const [joining, setJoining] = useState<string | null>(null);
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-
-      toast({
-        title: "Signed out",
-        description: "You have been logged out successfully.",
-      });
-
-      navigate("/auth");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to sign out.",
-        variant: "destructive",
-      });
-    }
-  };
 
   useEffect(() => {
     if (isPreviewMode) {
@@ -288,6 +270,11 @@ export default function JoinClub() {
 
       {/* Header */}
       <header className="py-16 gradient-stadium">
+        <div className="absolute top-4 right-4">
+          <Button variant="secondary" onClick={handleSignOut}>
+            Sign out
+          </Button>
+        </div>
         <div className="container text-center">
           <Logo size="lg" className="justify-center" />
           <h1 className="text-3xl font-display font-bold text-primary-foreground mt-6">Choose Your Club</h1>
