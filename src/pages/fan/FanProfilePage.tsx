@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePreviewMode } from '@/contexts/PreviewModeContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Logo } from '@/components/ui/Logo';
-import { PreviewBanner } from '@/components/ui/PreviewBanner';
-import { BadgeDisplay, computeFanBadges, BadgeDefinition } from '@/components/ui/BadgeDisplay';
-import { 
-  ArrowLeft, 
-  Loader2, 
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePreviewMode } from "@/contexts/PreviewModeContext";
+import { supabase } from "@/integrations/supabase/client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+import { Logo } from "@/components/ui/Logo";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { BadgeDisplay, computeFanBadges, BadgeDefinition } from "@/components/ui/BadgeDisplay";
+
+import {
+  ArrowLeft,
+  Loader2,
   Trophy,
   Zap,
   Gift,
@@ -23,19 +26,20 @@ import {
   MapPin,
   QrCode,
   FileText,
-  Gamepad2
-} from 'lucide-react';
-import { 
-  Club, 
-  LoyaltyProgram, 
-  FanMembership, 
-  Activity,
+  Gamepad2,
+} from "lucide-react";
+
+import type {
+  Club,
+  LoyaltyProgram,
+  FanMembership,
   ActivityCompletion,
   RewardRedemption,
-  RedemptionMethod
-} from '@/types/database';
+  RedemptionMethod,
+} from "@/types/database";
 
-// Extended types
+/* ---------------- Types ---------------- */
+
 interface CompletionWithActivity extends ActivityCompletion {
   activities?: {
     name: string;
@@ -51,95 +55,34 @@ interface RedemptionWithReward extends RewardRedemption {
   };
 }
 
-// Preview data
+/* ---------------- Preview Data ---------------- */
+
 const PREVIEW_CLUB: Club = {
-  id: 'preview-club-1',
-  admin_id: 'preview-admin',
-  name: 'Manchester United FC',
+  id: "preview-club-1",
+  admin_id: "preview-admin",
+  name: "Manchester United FC",
   logo_url: null,
-  primary_color: '#DA291C',
-  country: 'United Kingdom',
-  city: 'Manchester',
-  stadium_name: 'Old Trafford',
+  primary_color: "#DA291C",
+  country: "United Kingdom",
+  city: "Manchester",
+  stadium_name: "Old Trafford",
   season_start: null,
   season_end: null,
-  status: 'verified',
+  status: "verified",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
 
 const PREVIEW_PROGRAM: LoyaltyProgram = {
-  id: 'preview-program-1',
-  club_id: 'preview-club-1',
-  name: 'Red Devils Rewards',
+  id: "preview-program-1",
+  club_id: "preview-club-1",
+  name: "Red Devils Rewards",
   description: null,
-  points_currency_name: 'Red Points',
+  points_currency_name: "Red Points",
   is_active: true,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
-
-const PREVIEW_COMPLETIONS: CompletionWithActivity[] = [
-  {
-    id: 'comp-1',
-    activity_id: 'act-1',
-    fan_id: 'preview-fan',
-    membership_id: 'preview-membership-1',
-    points_earned: 100,
-    completed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    metadata: null,
-    activities: {
-      name: 'Attend Home Match',
-      verification_method: 'location_checkin',
-      points_awarded: 100,
-    },
-  },
-  {
-    id: 'comp-2',
-    activity_id: 'act-2',
-    fan_id: 'preview-fan',
-    membership_id: 'preview-membership-1',
-    points_earned: 50,
-    completed_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    metadata: null,
-    activities: {
-      name: 'Scan Match Day QR',
-      verification_method: 'qr_scan',
-      points_awarded: 50,
-    },
-  },
-  {
-    id: 'comp-3',
-    activity_id: 'act-3',
-    fan_id: 'preview-fan',
-    membership_id: 'preview-membership-1',
-    points_earned: 25,
-    completed_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    metadata: null,
-    activities: {
-      name: 'Match Day Quiz',
-      verification_method: 'in_app_completion',
-      points_awarded: 25,
-    },
-  },
-];
-
-const PREVIEW_REDEMPTIONS: RedemptionWithReward[] = [
-  {
-    id: 'red-1',
-    reward_id: 'reward-1',
-    fan_id: 'preview-fan',
-    membership_id: 'preview-membership-1',
-    points_spent: 200,
-    redemption_code: 'MUFC10OFF',
-    redeemed_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    fulfilled_at: null,
-    rewards: {
-      name: '10% Shop Discount',
-      redemption_method: 'voucher',
-    },
-  },
-];
 
 const verificationIcons: Record<string, React.ReactNode> = {
   qr_scan: <QrCode className="h-4 w-4" />,
@@ -148,216 +91,211 @@ const verificationIcons: Record<string, React.ReactNode> = {
   manual_proof: <FileText className="h-4 w-4" />,
 };
 
+/* ================= COMPONENT ================= */
+
 export default function FanProfilePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const { user, profile, loading } = useAuth();
   const { previewPointsBalance, completedPreviewActivities } = usePreviewMode();
-  
-  const isPreviewMode = searchParams.get('preview') === 'fan';
-  
+
+  const isPreviewMode = searchParams.get("preview") === "fan";
+
   const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [membership, setMembership] = useState<FanMembership | null>(null);
+
   const [completions, setCompletions] = useState<CompletionWithActivity[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
+
   const [badges, setBadges] = useState<BadgeDefinition[]>([]);
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
-  const [leaderboardRank, setLeaderboardRank] = useState<number | undefined>(undefined);
+  const [leaderboardRank, setLeaderboardRank] = useState<number | undefined>();
+
   const [dataLoading, setDataLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('badges');
+  const [activeTab, setActiveTab] = useState("badges");
 
-  useEffect(() => {
-    if (isPreviewMode) {
-      loadPreviewData();
-    } else {
-      if (!loading && !user) navigate('/auth');
-      else if (!loading && profile) fetchData();
-    }
-  }, [user, profile, loading, navigate, isPreviewMode, previewPointsBalance, completedPreviewActivities]);
+  /* ================= PREVIEW ================= */
 
-  const loadPreviewData = () => {
+  const loadPreview = () => {
     setClub(PREVIEW_CLUB);
     setProgram(PREVIEW_PROGRAM);
+
     setMembership({
-      id: 'preview-membership-1',
-      fan_id: 'preview-fan',
-      club_id: 'preview-club-1',
-      program_id: 'preview-program-1',
+      id: "preview-membership-1",
+      fan_id: "preview-fan",
+      club_id: "preview-club-1",
+      program_id: "preview-program-1",
       points_balance: previewPointsBalance,
       joined_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     });
-    
-    // Use preview completions plus any from context
-    const baseCompletions = [...PREVIEW_COMPLETIONS];
-    setCompletions(baseCompletions);
-    setRedemptions(PREVIEW_REDEMPTIONS);
-    
-    // Calculate stats for badges
-    const totalEarned = baseCompletions.reduce((sum, c) => sum + c.points_earned, 0) + previewPointsBalance;
+
+    const totalEarned = previewPointsBalance;
     setTotalPointsEarned(totalEarned);
-    setLeaderboardRank(5); // Preview rank
-    
+    setLeaderboardRank(5);
+
     const fanBadges = computeFanBadges({
       totalPoints: totalEarned,
-      activitiesCompleted: baseCompletions.length + completedPreviewActivities.length,
-      rewardsRedeemed: PREVIEW_REDEMPTIONS.length,
+      activitiesCompleted: completedPreviewActivities.length,
+      rewardsRedeemed: 0,
       memberSinceDays: 45,
       leaderboardRank: 5,
     });
+
     setBadges(fanBadges);
     setDataLoading(false);
   };
 
+  /* ================= PRODUCTION ================= */
+
   const fetchData = async () => {
     if (!profile) return;
+
     setDataLoading(true);
-    
+
     try {
-      // Fetch membership
+      /* Membership */
       const { data: memberships } = await supabase
-        .from('fan_memberships')
-        .select('*')
-        .eq('fan_id', profile.id)
+        .from("fan_memberships")
+        .select("*")
+        .eq("fan_id", profile.id)
         .limit(1);
-      
-      if (!memberships || memberships.length === 0) { 
-        navigate('/fan/join'); 
-        return; 
+
+      if (!memberships?.length) {
+        navigate("/fan/join");
+        return;
       }
-      
+
       const m = memberships[0] as FanMembership;
       setMembership(m);
-      
-      // Fetch club
-      const { data: clubs } = await supabase
-        .from('clubs')
-        .select('*')
-        .eq('id', m.club_id)
-        .limit(1);
-      if (clubs) setClub(clubs[0] as Club);
-      
-      // Fetch program
-      const { data: programs } = await supabase
-        .from('loyalty_programs')
-        .select('*')
-        .eq('id', m.program_id)
-        .limit(1);
-      if (programs) setProgram(programs[0] as LoyaltyProgram);
-      
-      // Fetch activity completions
-      const { data: completionsData } = await supabase
-        .from('activity_completions')
-        .select(`
+
+      /* Club */
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
+      if (clubs?.length) setClub(clubs[0] as Club);
+
+      /* Program */
+      const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
+      if (programs?.length) setProgram(programs[0] as LoyaltyProgram);
+
+      /* Completions */
+      const { data: comps } = await supabase
+        .from("activity_completions")
+        .select(
+          `
           *,
-          activities (
-            name,
-            verification_method,
-            points_awarded
-          )
-        `)
-        .eq('fan_id', profile.id)
-        .order('completed_at', { ascending: false })
+          activities (name, verification_method, points_awarded)
+        `,
+        )
+        .eq("fan_id", profile.id)
+        .order("completed_at", { ascending: false })
         .limit(50);
-      
-      setCompletions((completionsData || []) as CompletionWithActivity[]);
-      
-      // Fetch redemptions
-      const { data: redemptionsData } = await supabase
-        .from('reward_redemptions')
-        .select(`
+
+      const completionsData = (comps ?? []) as CompletionWithActivity[];
+      setCompletions(completionsData);
+
+      /* Redemptions */
+      const { data: reds } = await supabase
+        .from("reward_redemptions")
+        .select(
+          `
           *,
-          rewards (
-            name,
-            redemption_method
-          )
-        `)
-        .eq('fan_id', profile.id)
-        .order('redeemed_at', { ascending: false })
+          rewards (name, redemption_method)
+        `,
+        )
+        .eq("fan_id", profile.id)
+        .order("redeemed_at", { ascending: false })
         .limit(50);
-      
-      setRedemptions((redemptionsData || []) as RedemptionWithReward[]);
-      
-      // Calculate total points earned
-      const totalEarned = (completionsData || []).reduce(
-        (sum: number, c: any) => sum + c.points_earned, 0
-      );
+
+      const redemptionsData = (reds ?? []) as RedemptionWithReward[];
+      setRedemptions(redemptionsData);
+
+      /* Stats */
+      const totalEarned = completionsData.reduce((s, c) => s + c.points_earned, 0);
       setTotalPointsEarned(totalEarned);
-      
-      // Get leaderboard rank
+
+      /* Leaderboard rank */
       const { data: allMemberships } = await supabase
-        .from('fan_memberships')
-        .select('fan_id, points_balance')
-        .eq('club_id', m.club_id)
-        .order('points_balance', { ascending: false });
-      
+        .from("fan_memberships")
+        .select("fan_id, points_balance")
+        .eq("club_id", m.club_id)
+        .order("points_balance", { ascending: false });
+
+      let rank: number | undefined;
       if (allMemberships) {
-        const rank = allMemberships.findIndex(mem => mem.fan_id === profile.id) + 1;
-        setLeaderboardRank(rank > 0 ? rank : undefined);
+        const idx = allMemberships.findIndex((mem) => mem.fan_id === profile.id);
+        rank = idx >= 0 ? idx + 1 : undefined;
       }
-      
-      // Calculate days as member
-      const memberSince = new Date(m.joined_at);
-      const daysMember = Math.floor((Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Compute badges
+
+      setLeaderboardRank(rank);
+
+      /* Badges */
+      const daysMember = Math.floor((Date.now() - new Date(m.joined_at).getTime()) / 86400000);
+
       const fanBadges = computeFanBadges({
         totalPoints: totalEarned,
-        activitiesCompleted: (completionsData || []).length,
-        rewardsRedeemed: (redemptionsData || []).length,
+        activitiesCompleted: completionsData.length,
+        rewardsRedeemed: redemptionsData.length,
         memberSinceDays: daysMember,
-        leaderboardRank: leaderboardRank,
+        leaderboardRank: rank,
       });
+
       setBadges(fanBadges);
-      
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
+    } catch (err) {
+      console.error("FanProfile fetch error:", err);
     } finally {
       setDataLoading(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  /* ================= EFFECT ================= */
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+  useEffect(() => {
+    if (isPreviewMode) {
+      loadPreview();
+      return;
+    }
+
+    if (!loading && !user) {
+      navigate("/auth");
+      return;
+    }
+
+    if (!loading && profile) fetchData();
+  }, [isPreviewMode, loading, user, profile]);
+
+  /* ================= UI HELPERS ================= */
+
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const formatTime = (d: string) => new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const earnedBadgesCount = badges.filter(b => b.earned).length;
-  const displayName = isPreviewMode ? 'Preview Fan' : (profile?.full_name || profile?.email?.split('@')[0] || 'Fan');
+  const earnedBadgesCount = badges.filter((b) => b.earned).length;
+  const displayName = isPreviewMode ? "Preview Fan" : profile?.full_name || profile?.email?.split("@")[0] || "Fan";
+
+  /* ================= RENDER ================= */
 
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
-      
+
       {/* Header */}
-      <header 
-        className="border-b"
-        style={{ backgroundColor: club?.primary_color || 'hsl(var(--primary))' }}
-      >
+      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
         <div className="container py-4 flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
-            onClick={() => navigate(isPreviewMode ? '/fan/home?preview=fan' : '/fan/home')}
+            onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
             className="text-primary-foreground hover:bg-white/10"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -365,212 +303,169 @@ export default function FanProfilePage() {
           </Button>
           <Logo />
         </div>
-        
-        {/* Profile Header */}
-        <div className="container py-8">
-          <div className="flex items-center gap-6">
-            <Avatar className="h-20 w-20 border-4 border-white/30">
-              <AvatarFallback className="text-2xl font-bold bg-white/20 text-primary-foreground">
-                {displayName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-2xl font-display font-bold text-primary-foreground">
-                {displayName}
-              </h1>
-              <p className="text-primary-foreground/80">{club?.name}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-2">
+
+        {/* Profile header */}
+        <div className="container py-8 flex items-center gap-6">
+          <Avatar className="h-20 w-20 border-4 border-white/30">
+            <AvatarFallback className="text-2xl font-bold bg-white/20 text-primary-foreground">
+              {displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+
+          <div>
+            <h1 className="text-2xl font-display font-bold text-primary-foreground">{displayName}</h1>
+            <p className="text-primary-foreground/80">{club?.name}</p>
+
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0">
+                <Trophy className="h-3 w-3 mr-1" />
+                {membership?.points_balance ?? 0} {program?.points_currency_name}
+              </Badge>
+
+              {leaderboardRank && (
                 <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0">
-                  <Trophy className="h-3 w-3 mr-1" />
-                  {membership?.points_balance || 0} {program?.points_currency_name}
+                  Rank #{leaderboardRank}
                 </Badge>
-                {leaderboardRank && (
-                  <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0">
-                    Rank #{leaderboardRank}
-                  </Badge>
-                )}
-                <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0">
-                  🏅 {earnedBadgesCount} badges
-                </Badge>
-              </div>
+              )}
+
+              <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0">
+                🏅 {earnedBadgesCount} badges
+              </Badge>
             </div>
           </div>
         </div>
       </header>
 
+      {/* MAIN */}
       <main className="container py-8">
-        {/* Stats Summary */}
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Trophy className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">{totalPointsEarned}</p>
-              <p className="text-xs text-muted-foreground">Total Earned</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Zap className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">{completions.length}</p>
-              <p className="text-xs text-muted-foreground">Activities</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Gift className="h-8 w-8 text-accent mx-auto mb-2" />
-              <p className="text-2xl font-bold">{redemptions.length}</p>
-              <p className="text-xs text-muted-foreground">Rewards</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-2xl font-bold">
-                {membership ? Math.floor((Date.now() - new Date(membership.joined_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
-              </p>
-              <p className="text-xs text-muted-foreground">Days Member</p>
-            </CardContent>
-          </Card>
+          <Stat icon={<Trophy />} label="Total Earned" value={totalPointsEarned} />
+          <Stat icon={<Zap />} label="Activities" value={completions.length} />
+          <Stat icon={<Gift />} label="Rewards" value={redemptions.length} />
+          <Stat
+            icon={<Calendar />}
+            label="Days Member"
+            value={membership ? Math.floor((Date.now() - new Date(membership.joined_at).getTime()) / 86400000) : 0}
+          />
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="badges" className="gap-2">
-              🏅 Badges
-            </TabsTrigger>
-            <TabsTrigger value="activities" className="gap-2">
-              <Zap className="h-4 w-4" />
-              Activities
-            </TabsTrigger>
-            <TabsTrigger value="rewards" className="gap-2">
-              <Gift className="h-4 w-4" />
-              Rewards
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-3 max-w-md">
+            <TabsTrigger value="badges">🏅 Badges</TabsTrigger>
+            <TabsTrigger value="activities">Activities</TabsTrigger>
+            <TabsTrigger value="rewards">Rewards</TabsTrigger>
           </TabsList>
 
-          {/* Badges Tab */}
           <TabsContent value="badges">
-            <BadgeDisplay 
-              badges={badges} 
-              title="All Badges" 
-              showAll={true}
+            <BadgeDisplay badges={badges} title="All Badges" showAll />
+          </TabsContent>
+
+          <TabsContent value="activities">
+            <HistoryList
+              items={completions}
+              iconMap={verificationIcons}
+              formatDate={formatDate}
+              formatTime={formatTime}
+              currency={program?.points_currency_name || "Points"}
             />
           </TabsContent>
 
-          {/* Activity History Tab */}
-          <TabsContent value="activities">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  Activity History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {completions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      No activities completed yet. Start earning points!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {completions.map(completion => (
-                      <div 
-                        key={completion.id}
-                        className="flex items-center gap-4 p-4 rounded-lg bg-muted/30"
-                      >
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          {verificationIcons[completion.activities?.verification_method || 'manual_proof']}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">
-                            {completion.activities?.name || 'Activity'}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(completion.completed_at)} at {formatTime(completion.completed_at)}
-                          </div>
-                        </div>
-                        <Badge className="bg-primary/10 text-primary border-0">
-                          +{completion.points_earned} {program?.points_currency_name}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Redemption History Tab */}
           <TabsContent value="rewards">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gift className="h-5 w-5 text-accent" />
-                  Redemption History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {redemptions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      No rewards redeemed yet. Check out available rewards!
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-4"
-                      onClick={() => navigate(isPreviewMode ? '/fan/rewards?preview=fan' : '/fan/rewards')}
-                    >
-                      View Rewards
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {redemptions.map(redemption => (
-                      <div 
-                        key={redemption.id}
-                        className="flex items-center gap-4 p-4 rounded-lg bg-muted/30"
-                      >
-                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                          redemption.fulfilled_at ? 'bg-green-500/10' : 'bg-accent/10'
-                        }`}>
-                          {redemption.fulfilled_at ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <Gift className="h-5 w-5 text-accent" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">
-                            {redemption.rewards?.name || 'Reward'}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(redemption.redeemed_at)}
-                            {redemption.fulfilled_at && (
-                              <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                Fulfilled
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <Badge variant="secondary">
-                          -{redemption.points_spent} {program?.points_currency_name}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <RedemptionList
+              items={redemptions}
+              formatDate={formatDate}
+              currency={program?.points_currency_name || "Points"}
+              onBrowse={() => navigate(isPreviewMode ? "/fan/rewards?preview=fan" : "/fan/rewards")}
+            />
           </TabsContent>
         </Tabs>
       </main>
+    </div>
+  );
+}
+
+/* ================= SMALL SUBCOMPONENTS ================= */
+
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <Card>
+      <CardContent className="pt-6 text-center">
+        <div className="h-8 w-8 mx-auto mb-2 text-primary">{icon}</div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryList({ items, iconMap, formatDate, formatTime, currency }: any) {
+  if (!items.length) return <Empty icon={<Zap />} text="No activities completed yet. Start earning points!" />;
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 pt-6">
+        {items.map((c: any) => (
+          <Row
+            key={c.id}
+            icon={iconMap[c.activities?.verification_method || "manual_proof"]}
+            title={c.activities?.name || "Activity"}
+            subtitle={`${formatDate(c.completed_at)} at ${formatTime(c.completed_at)}`}
+            badge={`+${c.points_earned} ${currency}`}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RedemptionList({ items, formatDate, currency, onBrowse }: any) {
+  if (!items.length)
+    return (
+      <Empty icon={<Gift />} text="No rewards redeemed yet.">
+        <Button variant="outline" onClick={onBrowse}>
+          View Rewards
+        </Button>
+      </Empty>
+    );
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 pt-6">
+        {items.map((r: any) => (
+          <Row
+            key={r.id}
+            icon={r.fulfilled_at ? <CheckCircle2 /> : <Gift />}
+            title={r.rewards?.name || "Reward"}
+            subtitle={formatDate(r.redeemed_at)}
+            badge={`-${r.points_spent} ${currency}`}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Row({ icon, title, subtitle, badge }: any) {
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
+      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{title}</p>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <Badge variant="secondary">{badge}</Badge>
+    </div>
+  );
+}
+
+function Empty({ icon, text, children }: any) {
+  return (
+    <div className="text-center py-12">
+      <div className="h-12 w-12 mx-auto mb-4 text-muted-foreground">{icon}</div>
+      <p className="text-muted-foreground">{text}</p>
+      {children && <div className="mt-4">{children}</div>}
     </div>
   );
 }
