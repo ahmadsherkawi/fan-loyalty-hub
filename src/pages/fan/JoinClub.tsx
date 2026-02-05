@@ -167,36 +167,87 @@ export default function JoinClub() {
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
 
+  /* ---------------- SIGN OUT ---------------- */
+  const handleSignOut = async () => {
+    try {
+      if (isPreviewMode) {
+        setPreviewEnrolledClub(null);
+        navigate("/auth?preview=fan");
+        return;
+      }
+
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Signed out",
+        description: "You have been logged out successfully.",
+      });
+
+      navigate("/auth");
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to sign out.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  /* ---------------- EFFECT ---------------- */
   useEffect(() => {
     if (isPreviewMode) {
-      // Use preview data - only include verified/official clubs (filter out unverified)
       const allPreviewClubs = [...PREVIEW_CLUBS, PREVIEW_CLUB_NO_PROGRAM, PREVIEW_CLUB_UNVERIFIED];
       const verifiedClubs = allPreviewClubs.filter((c) => c.status === "verified" || c.status === "official");
       setClubs(verifiedClubs);
       setDataLoading(false);
-    } else if (!loading && profile) {
+      return;
+    }
+
+    if (!loading && !profile) {
+      navigate("/auth");
+      return;
+    }
+
+    if (!loading && profile) {
       checkMembership();
       fetchClubs();
     }
   }, [profile, loading, isPreviewMode]);
 
+  /* ---------------- MEMBERSHIP CHECK ---------------- */
   const checkMembership = async () => {
     if (!profile) return;
-    const { data } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
-    if (data?.length) navigate("/fan/home");
+
+    const { data, error } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
+
+    if (!error && data?.length) navigate("/fan/home");
   };
 
+  /* ---------------- FETCH CLUBS ---------------- */
   const fetchClubs = async () => {
     setDataLoading(true);
-    const { data } = await supabase
-      .from("clubs")
-      .select("*, loyalty_programs(*)")
-      .in("status", ["verified", "official"]);
-    const clubsWithPrograms = (data || []) as unknown as ClubWithProgram[];
-    setClubs(clubsWithPrograms);
-    setDataLoading(false);
+
+    try {
+      const { data, error } = await supabase
+        .from("clubs")
+        .select("*, loyalty_programs(*)")
+        .in("status", ["verified", "official"]);
+
+      if (error) throw error;
+
+      setClubs((data || []) as unknown as ClubWithProgram[]);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to load clubs.",
+        variant: "destructive",
+      });
+    } finally {
+      setDataLoading(false);
+    }
   };
 
+  /* ---------------- JOIN FLOW ---------------- */
   const handleJoinClick = (club: ClubWithProgram) => {
     if (!club.loyalty_programs?.length) {
       toast({
@@ -211,51 +262,62 @@ export default function JoinClub() {
   };
 
   const handleConfirmJoin = async () => {
-    if (!selectedClub) return;
+    if (!selectedClub || !profile) return;
 
     if (isPreviewMode) {
-      // In preview mode, track the enrolled club in context
       setPreviewEnrolledClub({ id: selectedClub.id, name: selectedClub.name });
+
       toast({
         title: "Welcome!",
         description: `You joined ${selectedClub.name}'s loyalty program!`,
       });
+
       navigate(`/fan/home?preview=fan&club=${selectedClub.id}`);
       return;
     }
 
-    if (!profile) return;
     setJoining(selectedClub.id);
+
     try {
       const { error } = await supabase.from("fan_memberships").insert({
         fan_id: profile.id,
         club_id: selectedClub.id,
         program_id: selectedClub.loyalty_programs[0].id,
       });
+
       if (error) throw error;
+
       toast({
         title: "Welcome!",
         description: `You joined ${selectedClub.name}'s loyalty program!`,
       });
+
       navigate("/fan/home");
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to join", variant: "destructive" });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to join.",
+        variant: "destructive",
+      });
+    } finally {
+      setJoining(null);
+      setEnrollModalOpen(false);
     }
-    setJoining(null);
-    setEnrollModalOpen(false);
   };
 
-  // Get unique countries
+  /* ---------------- FILTERING ---------------- */
   const countries = Array.from(new Set(clubs.map((c) => c.country))).sort();
 
-  // Filter clubs
   const filtered = clubs.filter((c) => {
     const matchesSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) || c.city.toLowerCase().includes(search.toLowerCase());
+
     const matchesCountry = selectedCountry === "all" || c.country === selectedCountry;
+
     return matchesSearch && matchesCountry;
   });
 
+  /* ---------------- LOADING ---------------- */
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -264,116 +326,65 @@ export default function JoinClub() {
     );
   }
 
+  /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* Header */}
-      <header className="py-16 gradient-stadium">
+      {/* HEADER */}
+      <header className="py-16 gradient-stadium relative">
         <div className="absolute top-4 right-4">
           <Button variant="secondary" onClick={handleSignOut}>
             Sign out
           </Button>
         </div>
+
         <div className="container text-center">
           <Logo size="lg" className="justify-center" />
           <h1 className="text-3xl font-display font-bold text-primary-foreground mt-6">Choose Your Club</h1>
           <p className="text-primary-foreground/80 mb-6">Find your club and start earning rewards</p>
-
-          {/* Search & Filter */}
-          <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search clubs..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 bg-background/90 border-0"
-              />
-            </div>
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger className="w-full sm:w-48 bg-background/90 border-0">
-                <Globe className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="All Countries" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Countries</SelectItem>
-                {countries.map((country) => (
-                  <SelectItem key={country} value={country}>
-                    {country}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       </header>
 
-      {/* Club Grid */}
+      {/* CLUB GRID */}
       <main className="container py-8">
-        {dataLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Clubs Found</h3>
-              <p className="text-muted-foreground">
-                {search || selectedCountry !== "all"
-                  ? "Try adjusting your search or filters."
-                  : "No clubs are available yet. Check back soon!"}
-              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((club) => {
               const hasProgram = club.loyalty_programs?.length > 0;
+
               return (
                 <Card key={club.id} className="card-hover overflow-hidden">
-                  {/* Club Header with Color */}
                   <div
                     className="h-24 flex items-center justify-center relative"
                     style={{ backgroundColor: club.primary_color }}
                   >
                     <span className="text-4xl font-bold text-white/90">{club.name.charAt(0)}</span>
-                    {!hasProgram && (
-                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/50 rounded text-xs text-white">
-                        Coming Soon
-                      </div>
-                    )}
                   </div>
 
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-lg">{club.name}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
-                      <MapPin className="h-4 w-4" />
-                      {club.city}, {club.country}
-                    </p>
 
                     {hasProgram ? (
-                      <>
-                        <p className="text-sm text-primary mb-4">{club.loyalty_programs[0].name}</p>
-                        <Button
-                          className="w-full gradient-stadium"
-                          onClick={() => handleJoinClick(club)}
-                          disabled={joining === club.id}
-                        >
-                          {joining === club.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Enroll
-                        </Button>
-                      </>
+                      <Button
+                        className="w-full gradient-stadium mt-4"
+                        onClick={() => handleJoinClick(club)}
+                        disabled={joining === club.id}
+                      >
+                        {joining === club.id && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        Enroll
+                      </Button>
                     ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground mb-4 italic">
-                          This club has not launched a loyalty program yet.
-                        </p>
-                        <Button className="w-full" variant="outline" disabled>
-                          Not Available
-                        </Button>
-                      </>
+                      <Button className="w-full mt-4" variant="outline" disabled>
+                        Not Available
+                      </Button>
                     )}
                   </CardContent>
                 </Card>
@@ -383,7 +394,7 @@ export default function JoinClub() {
         )}
       </main>
 
-      {/* Enrollment Modal */}
+      {/* ENROLL MODAL */}
       <EnrollmentModal
         open={enrollModalOpen}
         onOpenChange={setEnrollModalOpen}
