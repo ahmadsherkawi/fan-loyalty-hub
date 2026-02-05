@@ -1,40 +1,41 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Logo } from '@/components/ui/Logo';
-import { useToast } from '@/hooks/use-toast';
-import { UserRole } from '@/types/database';
-import {
-  Building2,
-  Users,
-  Loader2,
-  ArrowLeft,
-  Mail,
-  CheckCircle2,
-} from 'lucide-react';
-import { z } from 'zod';
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Logo } from "@/components/ui/Logo";
+import { useToast } from "@/hooks/use-toast";
+import { UserRole } from "@/types/database";
+import { Building2, Users, Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { z } from "zod";
+
+const { user, profile, loading } = useAuth();
+const navigate = useNavigate();
+
+useEffect(() => {
+  if (loading) return;
+  if (!user || !profile) return;
+
+  if (profile.role === "fan") {
+    navigate("/fan/home", { replace: true });
+  } else if (profile.role === "club_admin") {
+    navigate("/club/dashboard", { replace: true });
+  }
+}, [user, profile, loading, navigate]);
 
 const signUpSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  fullName: z.string().min(2, 'Please enter your full name'),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  fullName: z.string().min(2, "Please enter your full name"),
 });
 
 const signInSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Please enter your password'),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Please enter your password"),
 });
 
 export default function AuthPage() {
@@ -43,32 +44,27 @@ export default function AuthPage() {
   const { signUp, signIn, user, profile, loading } = useAuth();
   const { toast } = useToast();
 
-  const defaultRole = (searchParams.get('role') as UserRole) || 'fan';
+  const defaultRole = (searchParams.get("role") as UserRole) || "fan";
 
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signup');
+  const [activeTab, setActiveTab] = useState<"signin" | "signup">("signup");
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpName, setSignUpName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+  const [signUpName, setSignUpName] = useState("");
   const [signUpRole, setSignUpRole] = useState(defaultRole);
 
-  const [signInEmail, setSignInEmail] = useState('');
-  const [signInPassword, setSignInPassword] = useState('');
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
 
   /**
    * ROLE-BASED REDIRECT (DO NOT BLOCK RENDERING ON PROFILE)
    */
   useEffect(() => {
     if (!loading && user && profile?.role) {
-      navigate(
-        profile.role === 'club_admin'
-          ? '/club/dashboard'
-          : '/fan/home',
-        { replace: true }
-      );
+      navigate(profile.role === "club_admin" ? "/club/dashboard" : "/fan/home", { replace: true });
     }
   }, [loading, user, profile, navigate]);
 
@@ -88,25 +84,20 @@ export default function AuthPage() {
 
       if (!validation.success) {
         toast({
-          title: 'Validation Error',
+          title: "Validation Error",
           description: validation.error.errors[0].message,
-          variant: 'destructive',
+          variant: "destructive",
         });
         return;
       }
 
-      const { error } = await signUp(
-        signUpEmail,
-        signUpPassword,
-        signUpRole,
-        signUpName
-      );
+      const { error } = await signUp(signUpEmail, signUpPassword, signUpRole, signUpName);
 
       if (error) {
         toast({
-          title: 'Sign Up Failed',
+          title: "Sign Up Failed",
           description: error.message,
-          variant: 'destructive',
+          variant: "destructive",
         });
         return;
       }
@@ -133,9 +124,9 @@ export default function AuthPage() {
 
       if (!validation.success) {
         toast({
-          title: 'Validation Error',
+          title: "Validation Error",
           description: validation.error.errors[0].message,
-          variant: 'destructive',
+          variant: "destructive",
         });
         return;
       }
@@ -144,16 +135,16 @@ export default function AuthPage() {
 
       if (error) {
         toast({
-          title: 'Sign In Failed',
+          title: "Sign In Failed",
           description: error.message,
-          variant: 'destructive',
+          variant: "destructive",
         });
         return;
       }
 
       toast({
-        title: 'Welcome back',
-        description: 'Signing you in...',
+        title: "Welcome back",
+        description: "Signing you in...",
       });
     } finally {
       setIsLoading(false);
@@ -181,16 +172,14 @@ export default function AuthPage() {
           <CardHeader>
             <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
             <CardTitle>Check your email</CardTitle>
-            <CardDescription>
-              We sent a verification link to {registeredEmail}
-            </CardDescription>
+            <CardDescription>We sent a verification link to {registeredEmail}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
               variant="link"
               onClick={() => {
                 setShowConfirmationMessage(false);
-                setActiveTab('signin');
+                setActiveTab("signin");
                 setSignInEmail(registeredEmail);
               }}
             >
@@ -210,9 +199,7 @@ export default function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Logo className="mx-auto h-10 w-auto mb-4" />
-          <CardTitle>
-            {activeTab === 'signup' ? 'Create account' : 'Welcome back'}
-          </CardTitle>
+          <CardTitle>{activeTab === "signup" ? "Create account" : "Welcome back"}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
@@ -228,21 +215,23 @@ export default function AuthPage() {
                   onValueChange={(v) => setSignUpRole(v as UserRole)}
                   className="grid grid-cols-2 gap-2"
                 >
-                  <Label htmlFor="role-fan" className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary">
+                  <Label
+                    htmlFor="role-fan"
+                    className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary"
+                  >
                     <RadioGroupItem value="fan" id="role-fan" />
                     <Users className="h-4 w-4" /> Fan
                   </Label>
-                  <Label htmlFor="role-club" className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary">
+                  <Label
+                    htmlFor="role-club"
+                    className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary"
+                  >
                     <RadioGroupItem value="club_admin" id="role-club" />
                     <Building2 className="h-4 w-4" /> Club
                   </Label>
                 </RadioGroup>
 
-                <Input
-                  placeholder="Full Name"
-                  value={signUpName}
-                  onChange={(e) => setSignUpName(e.target.value)}
-                />
+                <Input placeholder="Full Name" value={signUpName} onChange={(e) => setSignUpName(e.target.value)} />
                 <Input
                   type="email"
                   placeholder="Email"
