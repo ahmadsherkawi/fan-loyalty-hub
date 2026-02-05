@@ -285,17 +285,17 @@ export default function ClubVerification() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <Logo />
-          {club && (
-            <div className="flex items-center gap-2 ml-auto">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: club.primary_color }}
-              >
-                <span className="text-sm font-bold text-white">{club.title.charAt(0)}</span>
+            {club && (
+              <div className="flex items-center gap-2 ml-auto">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: club.primary_color || "#1a7a4c" }}
+                >
+                  <span className="text-sm font-bold text-white">{club.name.charAt(0)}</span>
+                </div>
+                <span className="font-semibold text-foreground">{club.name}</span>
               </div>
-              <span className="font-semibold text-foreground">{club.title}</span>
-            </div>
-          )}
+            )}
         </div>
       </header>
 

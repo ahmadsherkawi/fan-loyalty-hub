@@ -38,7 +38,7 @@ export default function ExplorePage() {
 
   const filteredClubs = clubs.filter(
     (club) =>
-      club.title.toLowerCase().includes(search.toLowerCase()) ||
+      club.name.toLowerCase().includes(search.toLowerCase()) ||
       club.city.toLowerCase().includes(search.toLowerCase()) ||
       club.country.toLowerCase().includes(search.toLowerCase()),
   );
@@ -94,16 +94,16 @@ export default function ExplorePage() {
                       style={{ backgroundColor: club.primary_color }}
                     >
                       {club.logo_url ? (
-                        <img src={club.logo_url} alt={`${club.title} logo`} className="h-16 w-16 object-contain" />
+                        <img src={club.logo_url} alt={`${club.name} logo`} className="h-16 w-16 object-contain" />
                       ) : (
                         <div className="h-16 w-16 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                          <span className="text-2xl font-bold text-primary-foreground">{club.title.charAt(0)}</span>
+                          <span className="text-2xl font-bold text-primary-foreground">{club.name.charAt(0)}</span>
                         </div>
                       )}
                     </div>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-foreground">{club.title}</h3>
+                        <h3 className="font-semibold text-foreground">{club.name}</h3>
                         <Badge variant="secondary" className="badge-verified">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Verified

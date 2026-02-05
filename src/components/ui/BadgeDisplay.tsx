@@ -113,12 +113,12 @@ function BadgeItem({ badge, size = "md" }: BadgeItemProps) {
               badge.earned ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            {badge.title}
+            {badge.name}
           </span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-[200px]">
-        <p className="font-semibold">{badge.title}</p>
+        <p className="font-semibold">{badge.name}</p>
         <p className="text-xs text-muted-foreground">{badge.description}</p>
         {badge.earned && badge.earnedAt && (
           <p className="text-xs text-primary mt-1">Earned {new Date(badge.earnedAt).toLocaleDateString()}</p>

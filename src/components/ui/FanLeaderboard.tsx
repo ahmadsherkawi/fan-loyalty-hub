@@ -97,11 +97,11 @@ export function FanLeaderboard({
             <div className="flex flex-col items-center">
               <Avatar className="h-12 w-12 border-2 border-gray-400">
                 <AvatarFallback className="bg-gray-100 text-gray-600 font-bold">
-                  {topThree[1]?.title.charAt(0) || "?"}
+                  {topThree[1]?.name.charAt(0) || "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="mt-2 text-center">
-                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[1]?.title}</p>
+                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[1]?.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {topThree[1]?.points} {currencyName}
                 </p>
@@ -116,11 +116,11 @@ export function FanLeaderboard({
               <Crown className="h-6 w-6 text-yellow-500 mb-1" />
               <Avatar className="h-16 w-16 border-4 border-yellow-500 ring-2 ring-yellow-200">
                 <AvatarFallback className="bg-yellow-100 text-yellow-700 font-bold text-xl">
-                  {topThree[0]?.title.charAt(0) || "?"}
+                  {topThree[0]?.name.charAt(0) || "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="mt-2 text-center">
-                <p className="text-sm font-semibold truncate max-w-[80px]">{topThree[0]?.title}</p>
+                <p className="text-sm font-semibold truncate max-w-[80px]">{topThree[0]?.name}</p>
                 <p className="text-xs text-muted-foreground font-medium">
                   {topThree[0]?.points} {currencyName}
                 </p>
@@ -134,11 +134,11 @@ export function FanLeaderboard({
             <div className="flex flex-col items-center">
               <Avatar className="h-12 w-12 border-2 border-amber-600">
                 <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
-                  {topThree[2]?.title.charAt(0) || "?"}
+                  {topThree[2]?.name.charAt(0) || "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="mt-2 text-center">
-                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[2]?.title}</p>
+                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[2]?.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {topThree[2]?.points} {currencyName}
                 </p>
@@ -180,14 +180,14 @@ export function FanLeaderboard({
                       fan.rank === 3 && "bg-amber-100 text-amber-700",
                     )}
                   >
-                    {fan.title.charAt(0)}
+                    {fan.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className={cn("truncate", isCurrentUser && "text-primary font-semibold")}>
-                      {fan.title}
+                      {fan.name}
                       {isCurrentUser && <span className="text-xs ml-1">(You)</span>}
                     </p>
                     {getRankBadge(fan.rank)}

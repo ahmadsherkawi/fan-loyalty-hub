@@ -285,7 +285,7 @@ export default function ClaimReview() {
                     <div className="flex flex-col md:flex-row md:items-start gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-foreground">{claim.activity.title}</h3>
+                          <h3 className="font-semibold text-foreground">{claim.activity.name}</h3>
                           <Badge variant="secondary">
                             {claim.activity.points_awarded} {program?.points_currency_name}
                           </Badge>
@@ -364,7 +364,7 @@ export default function ClaimReview() {
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="font-medium text-foreground">{claim.activity.title}</span>
+                        <span className="font-medium text-foreground">{claim.activity.name}</span>
                         <span className="text-sm text-muted-foreground ml-2">
                           by {claim.fan_profile?.full_name || "Unknown"}
                         </span>

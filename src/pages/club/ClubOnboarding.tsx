@@ -113,7 +113,7 @@ export default function ClubOnboarding() {
 
     setIsUploadingLogo(true);
     try {
-      const fileExt = logoFile.title.split(".").pop();
+      const fileExt = logoFile.name.split(".").pop();
       const fileName = `${clubId}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage

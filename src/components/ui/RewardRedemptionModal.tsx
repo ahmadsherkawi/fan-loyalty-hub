@@ -116,7 +116,7 @@ export function RewardRedemptionModal({
             <div className="space-y-6 pt-4">
               {/* Reward Info */}
               <div className="p-4 rounded-lg border bg-muted/30">
-                <h3 className="font-semibold text-lg">{reward.title}</h3>
+                <h3 className="font-semibold text-lg">{reward.name}</h3>
                 {reward.description && <p className="text-sm text-muted-foreground mt-1">{reward.description}</p>}
                 <div className="flex items-center gap-2 mt-3">
                   <Badge variant="outline" className="gap-1">
@@ -203,7 +203,7 @@ export function RewardRedemptionModal({
                 <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
                   <Gift className="h-8 w-8 text-success" />
                 </div>
-                <h3 className="font-semibold text-lg">{reward.title}</h3>
+                <h3 className="font-semibold text-lg">{reward.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   Successfully redeemed for {reward.points_cost} {pointsCurrency}
                 </p>
