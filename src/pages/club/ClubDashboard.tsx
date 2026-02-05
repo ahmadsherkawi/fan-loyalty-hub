@@ -275,7 +275,7 @@ export default function ClubDashboard() {
             {club && (
               <div className="flex items-center gap-2">
                 {club.logo_url ? (
-                  <img src={club.logo_url} alt={`${club.title} logo`} className="w-8 h-8 rounded-full object-cover" />
+                  <img src={club.logo_url} alt={`${club.name} logo`} className="w-8 h-8 rounded-full object-cover" />
                 ) : (
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -284,7 +284,7 @@ export default function ClubDashboard() {
                     <span className="text-sm font-bold text-white">{club.name.charAt(0)}</span>
                   </div>
                 )}
-                <span className="font-semibold text-foreground">{club.title}</span>
+                <span className="font-semibold text-foreground">{club.name}</span>
               </div>
             )}
           </div>
@@ -632,7 +632,7 @@ export default function ClubDashboard() {
               <div className="grid md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Program Name</p>
-                  <p className="font-medium text-foreground">{program.title}</p>
+                  <p className="font-medium text-foreground">{program.name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Points Currency</p>

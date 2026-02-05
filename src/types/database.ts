@@ -1,4 +1,5 @@
 // Database types for the football loyalty platform
+// These types match the Supabase schema exactly
 
 export type UserRole = "club_admin" | "fan";
 export type ClubStatus = "unverified" | "verified" | "official";
@@ -20,9 +21,9 @@ export interface Profile {
 export interface Club {
   id: string;
   admin_id: string;
-  title: string;
+  name: string;
   logo_url: string | null;
-  primary_color: string;
+  primary_color: string | null;
   country: string;
   city: string;
   stadium_name: string | null;
@@ -38,7 +39,7 @@ export interface ClubVerification {
   club_id: string;
   official_email_domain: string | null;
   public_link: string | null;
-  authority_declaration: boolean;
+  authority_declaration: boolean | null;
   verified_at: string | null;
   created_at: string;
   updated_at: string;
@@ -47,10 +48,10 @@ export interface ClubVerification {
 export interface LoyaltyProgram {
   id: string;
   club_id: string;
-  title: string;
+  name: string;
   description: string | null;
   points_currency_name: string;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,8 +73,8 @@ export interface InAppConfig {
 
 export interface Activity {
   id: string;
-  loyalty_program_id: string;
-  title: string;
+  program_id: string;
+  name: string;
   description: string | null;
   points_awarded: number;
   frequency: ActivityFrequency;
@@ -81,11 +82,11 @@ export interface Activity {
   qr_code_data: string | null;
   location_lat: number | null;
   location_lng: number | null;
-  location_radius_meters: number;
+  location_radius_meters: number | null;
   time_window_start: string | null;
   time_window_end: string | null;
   in_app_config: InAppConfig | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,7 +95,7 @@ export interface FanMembership {
   id: string;
   fan_id: string;
   club_id: string;
-  loyalty_program_id: string;
+  program_id: string;
   points_balance: number;
   joined_at: string;
   updated_at: string;
@@ -107,7 +108,7 @@ export interface ActivityCompletion {
   membership_id: string;
   points_earned: number;
   completed_at: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ManualClaim {
@@ -127,15 +128,15 @@ export interface ManualClaim {
 
 export interface Reward {
   id: string;
-  loyalty_program_id: string;
-  title: string;
+  program_id: string;
+  name: string;
   description: string | null;
   points_cost: number;
   quantity_limit: number | null;
-  quantity_redeemed: number;
+  quantity_redeemed: number | null;
   redemption_method: RedemptionMethod;
   voucher_code: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
 }
