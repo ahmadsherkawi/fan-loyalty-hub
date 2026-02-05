@@ -10,23 +10,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Logo } from "@/components/ui/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/database";
-import { Building2, Users, Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { Building2, Users, Loader2, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
 
-const { user, profile, loading } = useAuth();
-const navigate = useNavigate();
-
-useEffect(() => {
-  if (loading) return;
-  if (!user || !profile) return;
-
-  if (profile.role === "fan") {
-    navigate("/fan/home", { replace: true });
-  } else if (profile.role === "club_admin") {
-    navigate("/club/dashboard", { replace: true });
-  }
-}, [user, profile, loading, navigate]);
-const navigate = useNavigate();
 const signUpSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -60,11 +46,16 @@ export default function AuthPage() {
   const [signInPassword, setSignInPassword] = useState("");
 
   /**
-   * ROLE-BASED REDIRECT (DO NOT BLOCK RENDERING ON PROFILE)
+   * ROLE-BASED REDIRECT
+   * Runs when auth + profile are ready
    */
   useEffect(() => {
-    if (!loading && user && profile?.role) {
-      navigate(profile.role === "club_admin" ? "/club/dashboard" : "/fan/home", { replace: true });
+    if (loading) return;
+
+    if (user && profile?.role) {
+      navigate(profile.role === "club_admin" ? "/club/dashboard" : "/fan/home", {
+        replace: true,
+      });
     }
   }, [loading, user, profile, navigate]);
 
@@ -152,7 +143,7 @@ export default function AuthPage() {
   };
 
   /**
-   * GLOBAL LOADING STATE
+   * GLOBAL LOADING SCREEN
    */
   if (loading) {
     return (
@@ -201,6 +192,7 @@ export default function AuthPage() {
           <Logo className="mx-auto h-10 w-auto mb-4" />
           <CardTitle>{activeTab === "signup" ? "Create account" : "Welcome back"}</CardTitle>
         </CardHeader>
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -208,6 +200,7 @@ export default function AuthPage() {
               <TabsTrigger value="signin">Sign In</TabsTrigger>
             </TabsList>
 
+            {/* SIGN UP */}
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <RadioGroup
@@ -215,18 +208,13 @@ export default function AuthPage() {
                   onValueChange={(v) => setSignUpRole(v as UserRole)}
                   className="grid grid-cols-2 gap-2"
                 >
-                  <Label
-                    htmlFor="role-fan"
-                    className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary"
-                  >
-                    <RadioGroupItem value="fan" id="role-fan" />
+                  <Label className="flex items-center gap-2 border rounded-md p-3 cursor-pointer">
+                    <RadioGroupItem value="fan" />
                     <Users className="h-4 w-4" /> Fan
                   </Label>
-                  <Label
-                    htmlFor="role-club"
-                    className="flex items-center gap-2 border rounded-md p-3 cursor-pointer has-[:checked]:border-primary"
-                  >
-                    <RadioGroupItem value="club_admin" id="role-club" />
+
+                  <Label className="flex items-center gap-2 border rounded-md p-3 cursor-pointer">
+                    <RadioGroupItem value="club_admin" />
                     <Building2 className="h-4 w-4" /> Club
                   </Label>
                 </RadioGroup>
@@ -252,6 +240,7 @@ export default function AuthPage() {
               </form>
             </TabsContent>
 
+            {/* SIGN IN */}
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <Input
@@ -266,6 +255,7 @@ export default function AuthPage() {
                   value={signInPassword}
                   onChange={(e) => setSignInPassword(e.target.value)}
                 />
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Sign in
