@@ -10,15 +10,19 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Crown } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
-
 export default function FanHome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, signOut, loading } = useAuth();
-  const { previewPointsBalance } = usePreviewMode();
-
+  const {
+    user,
+    profile,
+    signOut,
+    loading
+  } = useAuth();
+  const {
+    previewPointsBalance
+  } = usePreviewMode();
   const isPreviewMode = searchParams.get("preview") === "fan";
-
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
@@ -27,99 +31,79 @@ export default function FanHome() {
   const [tierName, setTierName] = useState<string | null>(null);
   const [vipSeasons, setVipSeasons] = useState<number>(0);
   const [dataLoading, setDataLoading] = useState(true);
-
-  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
-
+  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance ?? 0;
   useEffect(() => {
     if (loading) return;
-
     if (!isPreviewMode && !user) {
-      navigate("/auth", { replace: true });
+      navigate("/auth", {
+        replace: true
+      });
       return;
     }
-
     if (!isPreviewMode && profile?.role === "club_admin") {
-      navigate("/club/dashboard", { replace: true });
+      navigate("/club/dashboard", {
+        replace: true
+      });
       return;
     }
-
     if (!isPreviewMode && profile?.role === "fan") {
       fetchData();
     }
   }, [loading, user, profile, isPreviewMode]);
-
   const fetchData = async () => {
     if (!profile) return;
-
     setDataLoading(true);
-
     try {
       /* Membership */
-      const { data: memberships } = await supabase
-        .from("fan_memberships")
-        .select("*")
-        .eq("fan_id", profile.id)
-        .limit(1);
-
+      const {
+        data: memberships
+      } = await supabase.from("fan_memberships").select("*").eq("fan_id", profile.id).limit(1);
       if (!memberships?.length) {
         navigate("/fan/join");
         return;
       }
-
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
       /* Club */
-      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      const {
+        data: clubData
+      } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
       setClub(clubData as Club);
 
       /* Program */
-      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      const {
+        data: programData
+      } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
       setProgram(programData as LoyaltyProgram);
 
       /* Activities preview */
-      const { data: acts } = await supabase
-        .from("activities")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .eq("is_active", true)
-        .limit(3);
-
+      const {
+        data: acts
+      } = await supabase.from("activities").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
       setActivities((acts ?? []) as Activity[]);
 
       /* Rewards preview */
-      const { data: rews } = await supabase
-        .from("rewards")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .eq("is_active", true)
-        .limit(3);
-
+      const {
+        data: rews
+      } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
       setRewards((rews ?? []) as Reward[]);
 
       /* Tier display */
-      const { data: tierDisplay } = await supabase
-        .from("membership_tier_display")
-        .select("display_tier_id")
-        .eq("membership_id", m.id)
-        .single();
-
+      const {
+        data: tierDisplay
+      } = await supabase.from("membership_tier_display").select("display_tier_id").eq("membership_id", m.id).single();
       if (tierDisplay?.display_tier_id) {
-        const { data: tier } = await supabase
-          .from("tiers")
-          .select("name")
-          .eq("id", tierDisplay.display_tier_id)
-          .single();
+        const {
+          data: tier
+        } = await supabase.from("tiers").select("name").eq("id", tierDisplay.display_tier_id).single();
         setTierName(tier?.name ?? null);
       }
 
       /* VIP summary */
-      const { data: vip } = await supabase
-        .from("membership_vip_summary")
-        .select("seasons_achieved_count")
-        .eq("membership_id", m.id)
-        .single();
-
+      const {
+        data: vip
+      } = await supabase.from("membership_vip_summary").select("seasons_achieved_count").eq("membership_id", m.id).single();
       setVipSeasons(vip?.seasons_achieved_count ?? 0);
     } catch (err) {
       console.error("FanHome fetch error:", err);
@@ -127,26 +111,22 @@ export default function FanHome() {
       setDataLoading(false);
     }
   };
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
-
   if (!isPreviewMode && (loading || dataLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+    return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
-      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
+      <header className="border-b" style={{
+      backgroundColor: club?.primary_color || "hsl(var(--primary))"
+    }}>
         <div className="container py-4 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-2">
@@ -160,7 +140,7 @@ export default function FanHome() {
         </div>
 
         {/* POINTS */}
-        <div className="container py-8 text-center text-primary-foreground">
+        <div className="container text-center text-primary-foreground mx-0 pb-px pl-0 pt-px py-[3px]">
           <h1 className="text-3xl font-bold">{club?.name}</h1>
           <p>{program?.name}</p>
 
@@ -171,12 +151,10 @@ export default function FanHome() {
               <span>{program?.points_currency_name ?? "Points"}</span>
             </div>
 
-            {tierName && (
-              <Badge className="flex items-center gap-1 mt-2">
+            {tierName && <Badge className="flex items-center gap-1 mt-2">
                 <Crown className="h-3 w-3" />
                 {tierName} • {vipSeasons} seasons
-              </Badge>
-            )}
+              </Badge>}
           </div>
 
           <Button variant="ghost" size="sm" onClick={() => navigate("/fan/leaderboard")} className="mt-4">
@@ -202,8 +180,7 @@ export default function FanHome() {
           </div>
 
           <div className="space-y-3">
-            {activities.map((a) => (
-              <Card key={a.id}>
+            {activities.map(a => <Card key={a.id}>
                 <CardContent className="py-4 flex justify-between items-center">
                   <div>
                     <p className="font-semibold">{a.name}</p>
@@ -214,8 +191,7 @@ export default function FanHome() {
                     Participate
                   </Button>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </section>
 
@@ -233,11 +209,9 @@ export default function FanHome() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
-            {rewards.map((r) => {
-              const canAfford = effectivePointsBalance >= r.points_cost;
-
-              return (
-                <Card key={r.id}>
+            {rewards.map(r => {
+            const canAfford = effectivePointsBalance >= r.points_cost;
+            return <Card key={r.id}>
                   <CardContent className="pt-6">
                     <h3 className="font-semibold">{r.name}</h3>
                     <p className="text-sm text-muted-foreground">{r.description}</p>
@@ -248,12 +222,10 @@ export default function FanHome() {
                       Redeem
                     </Button>
                   </CardContent>
-                </Card>
-              );
-            })}
+                </Card>;
+          })}
           </div>
         </section>
       </main>
-    </div>
-  );
+    </div>;
 }
