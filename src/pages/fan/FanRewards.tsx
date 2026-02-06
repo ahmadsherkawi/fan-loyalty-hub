@@ -132,7 +132,7 @@ export default function FanRewards() {
     setRedeeming(true);
 
     try {
-      const { error } = await supabase.rpc("redeem_reward", {
+      const { data, error } = await supabase.rpc("redeem_reward", {
         p_membership_id: membership.id,
         p_reward_id: selectedReward.id,
       });
@@ -141,11 +141,11 @@ export default function FanRewards() {
 
       toast({
         title: "Reward redeemed!",
-        description: "Your redemption was successful.",
+        description: data ? `Your code: ${data}` : "Your redemption was successful.",
       });
-
+      setRedemptionModalOpen(false);
+      setSelectedReward(null);
       await fetchData();
-
       return { success: true };
     } catch (err: any) {
       const message = err?.message || "Redemption failed. Please try again.";
