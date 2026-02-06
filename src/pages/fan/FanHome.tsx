@@ -251,12 +251,19 @@ export default function FanHome() {
 
               return (
                 <Card key={r.id}>
-                  <CardContent className="pt-6">
+                  <CardContent className="pt-6 space-y-2">
                     <h3 className="font-semibold">{r.name}</h3>
-                    <p className="text-sm text-muted-foreground">{r.description}</p>
 
-                    <Button disabled={!canAfford} className="mt-3" onClick={() => navigate("/fan/rewards")}>
-                      Redeem
+                    {r.description && <p className="text-sm text-muted-foreground">{r.description}</p>}
+
+                    {/* ⭐ POINTS COST — NEW */}
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Trophy className="h-4 w-4 text-primary" />
+                      {r.points_cost} {program?.points_currency_name ?? "Points"}
+                    </div>
+
+                    <Button disabled={!canAfford} className="mt-3 w-full" variant={canAfford ? "default" : "secondary"}>
+                      {canAfford ? "Redeem" : "Not enough points"}
                     </Button>
                   </CardContent>
                 </Card>
