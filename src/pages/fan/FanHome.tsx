@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Crown } from "lucide-react";
+import { Trophy, Zap, Gift, LogOut, Loader2, Users, User, Crown } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 
 export default function FanHome() {
@@ -68,6 +68,7 @@ export default function FanHome() {
         .limit(1);
 
       if (mErr) throw mErr;
+
       if (!memberships?.length) {
         navigate("/fan/join");
         return;
@@ -77,21 +78,24 @@ export default function FanHome() {
       setMembership(m);
 
       /** Club */
-      const { data: clubs } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-      setClub(clubs as Club);
+      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+
+      setClub(clubData as Club);
 
       /** Program */
-      const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-      setProgram(programs as LoyaltyProgram);
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
-      /** Activities */
+      setProgram(programData as LoyaltyProgram);
+
+      /** Activities (limit preview on home) */
       const { data: acts } = await supabase
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true)
         .limit(3);
-      setActivities((acts ?? []) as Activity[]);
+
+      setActivities((acts ?? []) as unknown as Activity[]);
 
       /** Rewards */
       const { data: rews } = await supabase
@@ -100,33 +104,43 @@ export default function FanHome() {
         .eq("program_id", m.program_id)
         .eq("is_active", true)
         .limit(3);
-      setRewards((rews ?? []) as Reward[]);
 
-      /** Tier display */
-      const { data: tierDisplay } = await supabase
-        .from("membership_tier_display")
-        .select("display_tier_id")
-        .eq("membership_id", m.id)
-        .single();
+      setRewards((rews ?? []) as unknown as Reward[]);
 
-      if (tierDisplay?.display_tier_id) {
-        const { data: tier } = await supabase
-          .from("tiers")
-          .select("name")
-          .eq("id", tierDisplay.display_tier_id)
-          .single();
+      /** Tier display (safe optional query) */
+      try {
+        const { data: tierDisplay } = await supabase
+          .from("membership_tier_display")
+          .select("display_tier_id")
+          .eq("membership_id", m.id)
+          .maybeSingle();
 
-        setTierName(tier?.name ?? null);
+        if (tierDisplay?.display_tier_id) {
+          const { data: tier } = await supabase
+            .from("tiers")
+            .select("name")
+            .eq("id", tierDisplay.display_tier_id)
+            .maybeSingle();
+
+          setTierName(tier?.name ?? null);
+        }
+      } catch {
+        // optional feature not critical
+        setTierName(null);
       }
 
-      /** VIP summary */
-      const { data: vip } = await supabase
-        .from("membership_vip_summary")
-        .select("seasons_achieved_count")
-        .eq("membership_id", m.id)
-        .single();
+      /** VIP summary (safe optional query) */
+      try {
+        const { data: vip } = await supabase
+          .from("membership_vip_summary")
+          .select("seasons_achieved_count")
+          .eq("membership_id", m.id)
+          .maybeSingle();
 
-      setVipSeasons(vip?.seasons_achieved_count ?? 0);
+        setVipSeasons(vip?.seasons_achieved_count ?? 0);
+      } catch {
+        setVipSeasons(0);
+      }
     } catch (err) {
       console.error("FanHome fetch error:", err);
     } finally {
@@ -139,6 +153,9 @@ export default function FanHome() {
     navigate("/");
   };
 
+  /**
+   * LOADING
+   */
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -147,6 +164,9 @@ export default function FanHome() {
     );
   }
 
+  /**
+   * UI
+   */
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
@@ -155,10 +175,12 @@ export default function FanHome() {
       <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
         <div className="container py-4 flex items-center justify-between">
           <Logo />
+
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")}>
               <User className="h-5 w-5" />
             </Button>
+
             <Button variant="ghost" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" /> Sign Out
             </Button>
@@ -208,7 +230,9 @@ export default function FanHome() {
                   <p className="font-semibold">{a.name}</p>
                   <Badge>+{a.points_awarded}</Badge>
                 </div>
-                <Badge>Available</Badge>
+                <Button size="sm" onClick={() => navigate("/fan/activities")}>
+                  View
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -224,12 +248,14 @@ export default function FanHome() {
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
               const canAfford = effectivePointsBalance >= r.points_cost;
+
               return (
                 <Card key={r.id}>
                   <CardContent className="pt-6">
                     <h3 className="font-semibold">{r.name}</h3>
                     <p className="text-sm text-muted-foreground">{r.description}</p>
-                    <Button disabled={!canAfford} className="mt-3">
+
+                    <Button disabled={!canAfford} className="mt-3" onClick={() => navigate("/fan/rewards")}>
                       Redeem
                     </Button>
                   </CardContent>
