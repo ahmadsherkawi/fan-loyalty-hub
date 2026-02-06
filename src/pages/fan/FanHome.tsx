@@ -1,73 +1,68 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Trophy, Zap, Gift, LogOut, Loader2, Users, User, Crown } from "lucide-react";
-import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
+import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Gift, Loader2, Trophy } from "lucide-react";
+import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
-export default function FanHome() {
+interface RedemptionWithReward extends RewardRedemption {
+  rewards?: {
+    name: string;
+    description: string | null;
+  };
+}
+
+export default function FanRewards() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, signOut, loading } = useAuth();
-  const { previewPointsBalance } = usePreviewMode();
+  const { profile, loading } = useAuth();
+  const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
 
   const [membership, setMembership] = useState<FanMembership | null>(null);
-  const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
-  const [tierName, setTierName] = useState<string | null>(null);
-  const [vipSeasons, setVipSeasons] = useState<number>(0);
+  const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
+  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [redemptionModalOpen, setRedemptionModalOpen] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
 
-  /**
-   * AUTH + ROLE GUARD
-   */
+  /* ---------------- FETCH DATA ---------------- */
+
   useEffect(() => {
-    if (loading) return;
-
-    if (!isPreviewMode && !user) {
-      navigate("/auth", { replace: true });
+    if (isPreviewMode) {
+      setDataLoading(false);
       return;
     }
 
-    if (!isPreviewMode && profile?.role === "club_admin") {
-      navigate("/club/dashboard", { replace: true });
-      return;
-    }
-
-    if (!isPreviewMode && profile?.role === "fan") {
+    if (!loading && profile) {
       fetchData();
     }
-  }, [loading, user, profile, isPreviewMode]);
+  }, [profile, loading, isPreviewMode]);
 
-  /**
-   * FETCH FAN DATA
-   */
   const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      /** Membership */
-      const { data: memberships, error: mErr } = await supabase
+      // Membership
+      const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
-
-      if (mErr) throw mErr;
 
       if (!memberships?.length) {
         navigate("/fan/join");
@@ -77,201 +72,214 @@ export default function FanHome() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      /** Club */
-      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-
-      setClub(clubData as Club);
-
-      /** Program */
+      // Program
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
-      /** Activities (limit preview on home) */
-      const { data: acts } = await supabase
-        .from("activities")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .eq("is_active", true)
-        .limit(3);
-
-      setActivities((acts ?? []) as unknown as Activity[]);
-
-      /** Rewards */
-      const { data: rews } = await supabase
+      // Rewards
+      const { data: rewardsData } = await supabase
         .from("rewards")
         .select("*")
         .eq("program_id", m.program_id)
-        .eq("is_active", true)
-        .limit(3);
+        .eq("is_active", true);
 
-      setRewards((rews ?? []) as unknown as Reward[]);
+      setRewards((rewardsData ?? []) as Reward[]);
 
-      /** Tier display (safe optional query) */
-      try {
-        const { data: tierDisplay } = await supabase
-          .from("membership_tier_display")
-          .select("display_tier_id")
-          .eq("membership_id", m.id)
-          .maybeSingle();
+      // Redemption history
+      const { data: redemptionsData } = await supabase
+        .from("reward_redemptions")
+        .select(
+          `
+          *,
+          rewards (
+            name,
+            description
+          )
+        `,
+        )
+        .eq("fan_id", profile.id)
+        .order("redeemed_at", { ascending: false });
 
-        if (tierDisplay?.display_tier_id) {
-          const { data: tier } = await supabase
-            .from("tiers")
-            .select("name")
-            .eq("id", tierDisplay.display_tier_id)
-            .maybeSingle();
-
-          setTierName(tier?.name ?? null);
-        }
-      } catch {
-        // optional feature not critical
-        setTierName(null);
-      }
-
-      /** VIP summary (safe optional query) */
-      try {
-        const { data: vip } = await supabase
-          .from("membership_vip_summary")
-          .select("seasons_achieved_count")
-          .eq("membership_id", m.id)
-          .maybeSingle();
-
-        setVipSeasons(vip?.seasons_achieved_count ?? 0);
-      } catch {
-        setVipSeasons(0);
-      }
+      setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
     } catch (err) {
-      console.error("FanHome fetch error:", err);
+      console.error("FanRewards fetch error:", err);
+      toast({
+        title: "Error loading rewards",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setDataLoading(false);
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
+  /* ---------------- SECURE REDEMPTION ---------------- */
+
+  const handleConfirmRedeem = async (): Promise<{
+    success: boolean;
+    code?: string | null;
+    error?: string;
+  }> => {
+    if (!membership || !selectedReward) {
+      return { success: false, error: "Missing required data" };
+    }
+
+    if (isPreviewMode) {
+      return { success: true };
+    }
+
+    setRedeeming(true);
+
+    try {
+      const { data, error } = await supabase.rpc("redeem_reward", {
+        p_membership_id: membership.id,
+        p_reward_id: selectedReward.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Reward redeemed!",
+        description: data ? `Your code: ${data}` : "Your redemption was successful.",
+      });
+
+      // Close modal + refresh state
+      setRedemptionModalOpen(false);
+      setSelectedReward(null);
+      await fetchData();
+
+      return { success: true, code: data ?? null };
+    } catch (err: any) {
+      const message = err?.message || "Redemption failed. Please try again.";
+
+      toast({
+        title: "Redemption failed",
+        description: message,
+        variant: "destructive",
+      });
+
+      return { success: false, error: message };
+    } finally {
+      setRedeeming(false);
+    }
   };
 
-  /**
-   * LOADING
-   */
+  /* ---------------- LOADING ---------------- */
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  /**
-   * UI
-   */
+  /* ---------------- UI ---------------- */
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
-      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
-        <div className="container py-4 flex items-center justify-between">
-          <Logo />
-
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")}>
-              <User className="h-5 w-5" />
-            </Button>
-
-            <Button variant="ghost" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" /> Sign Out
-            </Button>
-          </div>
-        </div>
-
-        {/* POINTS + TIER */}
-        <div className="container py-8 text-center text-primary-foreground">
-          <h1 className="text-3xl font-bold">{club?.name}</h1>
-          <p>{program?.name}</p>
-
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 bg-background/20 rounded-full px-6 py-3">
-              <Trophy className="h-6 w-6 text-accent" />
-              <span className="text-3xl font-bold">{effectivePointsBalance}</span>
-              <span>{program?.points_currency_name ?? "Points"}</span>
-            </div>
-
-            {tierName && (
-              <Badge className="flex items-center gap-1 mt-2">
-                <Crown className="h-3 w-3" />
-                {tierName} • {vipSeasons} seasons
-              </Badge>
-            )}
-          </div>
-
-          <Button variant="ghost" size="sm" onClick={() => navigate("/fan/leaderboard")} className="mt-4">
-            <Users className="h-4 w-4 mr-2" />
-            View Leaderboard
+      <header className="border-b bg-card">
+        <div className="container py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate("/fan/home")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
+          <Logo />
         </div>
       </header>
 
-      {/* CONTENT */}
-      <main className="container py-8 space-y-8">
-        {/* Activities */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            Activities
-          </h2>
-
-          {activities.map((a) => (
-            <Card key={a.id}>
-              <CardContent className="py-4 flex justify-between">
-                <div>
-                  <p className="font-semibold">{a.name}</p>
-                  <Badge>+{a.points_awarded}</Badge>
-                </div>
-                <Button size="sm" onClick={() => navigate("/fan/activities")}>
-                  View
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-
-        {/* Rewards */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Gift className="h-5 w-5 text-accent" />
+      <main className="container py-8">
+        {/* TITLE + BALANCE */}
+        <div className="flex justify-between mb-6">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Gift className="h-8 w-8 text-accent" />
             Rewards
-          </h2>
+          </h1>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            {rewards.map((r) => {
-              const canAfford = effectivePointsBalance >= r.points_cost;
+          <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
+            <Trophy className="h-5 w-5 text-primary" />
+            <span className="font-bold">{membership?.points_balance ?? 0}</span>
+            <span className="text-muted-foreground">{program?.points_currency_name ?? "Points"}</span>
+          </div>
+        </div>
 
-              return (
+        {/* TABS */}
+        <Tabs defaultValue="available">
+          <TabsList className="grid grid-cols-2 max-w-md">
+            <TabsTrigger value="available">Available</TabsTrigger>
+            <TabsTrigger value="history">My Redemptions</TabsTrigger>
+          </TabsList>
+
+          {/* AVAILABLE REWARDS */}
+          <TabsContent value="available">
+            <div className="grid md:grid-cols-3 gap-6 mt-6">
+              {rewards.map((reward) => {
+                const canAfford = (membership?.points_balance ?? 0) >= reward.points_cost;
+
+                return (
+                  <Card key={reward.id}>
+                    <CardContent className="pt-6">
+                      <h3 className="font-semibold">{reward.name}</h3>
+                      <p className="text-sm text-muted-foreground">{reward.description}</p>
+
+                      {/* COST DISPLAY */}
+                      <Badge className="mt-2">
+                        {reward.points_cost} {program?.points_currency_name ?? "Points"}
+                      </Badge>
+
+                      <Button
+                        className="mt-4 w-full"
+                        disabled={!canAfford || redeeming}
+                        onClick={() => {
+                          setSelectedReward(reward);
+                          setRedemptionModalOpen(true);
+                        }}
+                      >
+                        Redeem
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* REDEMPTION HISTORY */}
+          <TabsContent value="history">
+            <div className="space-y-4 mt-6">
+              {redemptions.map((r) => (
                 <Card key={r.id}>
-                  <CardContent className="pt-6 space-y-2">
-                    <h3 className="font-semibold">{r.name}</h3>
-
-                    {r.description && <p className="text-sm text-muted-foreground">{r.description}</p>}
-
-                    {/* ⭐ POINTS COST — NEW */}
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Trophy className="h-4 w-4 text-primary" />
-                      {r.points_cost} {program?.points_currency_name ?? "Points"}
+                  <CardContent className="py-4 flex justify-between">
+                    <div>
+                      <p className="font-semibold">{r.rewards?.name}</p>
+                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
-
-                    <Button disabled={!canAfford} className="mt-3 w-full" variant={canAfford ? "default" : "secondary"}>
-                      {canAfford ? "Redeem" : "Not enough points"}
-                    </Button>
+                    <Badge>-{r.points_spent}</Badge>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        </section>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
+
+      {/* REDEMPTION MODAL */}
+      <RewardRedemptionModal
+        isOpen={redemptionModalOpen}
+        onClose={() => {
+          setRedemptionModalOpen(false);
+          setSelectedReward(null);
+        }}
+        reward={selectedReward}
+        pointsBalance={membership?.points_balance ?? 0}
+        pointsCurrency={program?.points_currency_name ?? "Points"}
+        onConfirmRedeem={handleConfirmRedeem}
+        isPreview={isPreviewMode}
+      />
     </div>
   );
 }
