@@ -1,3 +1,4 @@
+// FULL FINAL VERSION — SEARCH + FILTER + INVITE + SIGNOUT
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
@@ -32,13 +34,16 @@ export default function JoinClub() {
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
 
-  // invite request state
+  // NEW — search/filter
+  const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState("all");
+
+  // Invite-club state
   const [requestClubName, setRequestClubName] = useState("");
   const [requestCountry, setRequestCountry] = useState("");
   const [requestContact, setRequestContact] = useState("");
   const [requestSending, setRequestSending] = useState(false);
 
-  /* AUTH GUARD */
   useEffect(() => {
     if (loading) return;
 
@@ -54,24 +59,31 @@ export default function JoinClub() {
 
     if (!isPreviewMode && profile?.role === "fan") {
       initRealFlow();
-    } else {
-      setDataLoading(false);
     }
   }, [loading, profile, isPreviewMode]);
 
   const initRealFlow = async () => {
-    const { data } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile!.id).limit(1);
+    const alreadyMember = await checkMembership();
+    if (alreadyMember) return;
+    await fetchClubs();
+  };
+
+  const checkMembership = async (): Promise<boolean> => {
+    if (!profile) return false;
+
+    const { data } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
 
     if (data?.length) {
       navigate("/fan/home", { replace: true });
-      return;
+      return true;
     }
 
-    await fetchClubs();
+    return false;
   };
 
   const fetchClubs = async () => {
     setDataLoading(true);
+
     try {
       const { data, error } = await supabase
         .from("clubs")
@@ -79,9 +91,14 @@ export default function JoinClub() {
         .in("status", ["verified", "official"]);
 
       if (error) throw error;
-      setClubs((data ?? []) as ClubWithProgram[]);
+
+      setClubs((data ?? []) as unknown as ClubWithProgram[]);
     } catch {
-      toast({ title: "Error", description: "Failed to load clubs.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to load clubs.",
+        variant: "destructive",
+      });
     } finally {
       setDataLoading(false);
     }
@@ -92,12 +109,16 @@ export default function JoinClub() {
     navigate("/", { replace: true });
   };
 
-  /* JOIN */
   const handleJoinClick = (club: ClubWithProgram) => {
     if (!club.loyalty_programs?.length) {
-      toast({ title: "No Loyalty Program", description: "This club has not launched one.", variant: "destructive" });
+      toast({
+        title: "No Loyalty Program",
+        description: "This club has not launched a loyalty program yet.",
+        variant: "destructive",
+      });
       return;
     }
+
     setSelectedClub(club);
     setEnrollModalOpen(true);
   };
@@ -116,63 +137,70 @@ export default function JoinClub() {
 
       if (error) throw error;
 
-      toast({ title: "Welcome!", description: `You joined ${selectedClub.name}!` });
+      toast({
+        title: "Welcome!",
+        description: `You joined ${selectedClub.name}!`,
+      });
+
       navigate("/fan/home");
     } catch {
-      toast({ title: "Error", description: "Failed to join.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to join.",
+        variant: "destructive",
+      });
     } finally {
       setJoining(null);
       setEnrollModalOpen(false);
     }
   };
 
-  /* INVITE CLUB EMAIL */
+  // SEARCH + FILTER
+  const countries = Array.from(new Set(clubs.map((c) => c.country))).sort();
+
+  const filteredClubs = clubs.filter((c) => {
+    const matchSearch =
+      c.name.toLowerCase().includes(search.toLowerCase()) || c.city.toLowerCase().includes(search.toLowerCase());
+
+    const matchCountry = countryFilter === "all" || c.country === countryFilter;
+
+    return matchSearch && matchCountry;
+  });
+
+  // INVITE CLUB
   const handleSendJoinRequest = async () => {
-    if (!requestClubName.trim()) {
-      toast({ title: "Missing info", description: "Enter club name.", variant: "destructive" });
-      return;
-    }
-
-    const fanName = profile?.full_name || profile?.email?.split("@")[0] || "Fan";
-
-    const subject = "Request to join ClubPass loyalty program";
-    const body = `Hello,
-
-My name is ${fanName}.
-I tried to join your ClubPass loyalty program but couldn't find your club in the app.
-
-Club name: ${requestClubName}
-Country: ${requestCountry || "N/A"}
-
-Please create or verify your club so fans can enroll.
-
-Thanks,
-${fanName}`;
+    if (!profile || !requestClubName.trim()) return;
 
     setRequestSending(true);
 
     try {
       await supabase.from("club_join_requests").insert({
-        fan_id: profile!.id,
-        club_name: requestClubName,
+        fan_id: profile.id,
+        club_name: requestClubName.trim(),
         country: requestCountry || null,
         club_contact: requestContact || null,
-        message: body,
       });
 
-      toast({ title: "Request saved", description: "You can also email the club." });
+      toast({
+        title: "Request sent",
+        description: "We saved your request and will notify the club.",
+      });
 
-      if (requestContact.includes("@")) {
-        window.location.href = `mailto:${requestContact}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      }
+      setRequestClubName("");
+      setRequestCountry("");
+      setRequestContact("");
     } catch {
-      toast({ title: "Error", description: "Failed to send request.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to send request.",
+        variant: "destructive",
+      });
     } finally {
       setRequestSending(false);
     }
   };
 
-  if (!isPreviewMode && (loading || dataLoading)) {
+  if (loading || dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -188,30 +216,53 @@ ${fanName}`;
         </Button>
       </div>
 
-      {isPreviewMode && <PreviewBanner role="fan" />}
-
       <header className="py-16 gradient-stadium text-center">
         <Logo size="lg" className="justify-center" />
         <h1 className="text-3xl font-bold text-primary-foreground mt-6">Choose Your Club</h1>
       </header>
 
-      <main className="container py-8 space-y-8">
-        {clubs.length === 0 ? (
+      <main className="container py-8 space-y-6">
+        {/* SEARCH + FILTER */}
+        <div className="grid md:grid-cols-3 gap-4">
+          <Input placeholder="Search club or city..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+          <Select value={countryFilter} onValueChange={setCountryFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All countries</SelectItem>
+              {countries.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* CLUB GRID */}
+        {filteredClubs.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">No Clubs Found</h3>
+              <h3 className="text-lg font-semibold">No clubs found</h3>
             </CardContent>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clubs.map((club) => (
-              <Card key={club.id}>
+            {filteredClubs.map((club) => (
+              <Card key={club.id} className="card-hover">
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-lg">{club.name}</h3>
-                  <Button className="w-full mt-4" onClick={() => handleJoinClick(club)} disabled={joining === club.id}>
+
+                  <Button
+                    className="w-full mt-4"
+                    onClick={() => handleJoinClick(club)}
+                    disabled={!club.loyalty_programs?.length || joining === club.id}
+                  >
                     {joining === club.id && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Enroll
+                    {club.loyalty_programs?.length ? "Enroll" : "Not Available"}
                   </Button>
                 </CardContent>
               </Card>
@@ -219,7 +270,7 @@ ${fanName}`;
           </div>
         )}
 
-        {/* Invite club */}
+        {/* INVITE CLUB */}
         <Card>
           <CardContent className="p-6 space-y-3">
             <h3 className="font-semibold text-lg">Can’t find your club?</h3>
@@ -229,9 +280,13 @@ ${fanName}`;
               value={requestClubName}
               onChange={(e) => setRequestClubName(e.target.value)}
             />
-            <Input placeholder="Country" value={requestCountry} onChange={(e) => setRequestCountry(e.target.value)} />
             <Input
-              placeholder="Club email (optional)"
+              placeholder="Country (optional)"
+              value={requestCountry}
+              onChange={(e) => setRequestCountry(e.target.value)}
+            />
+            <Input
+              placeholder="Club email or website (optional)"
               value={requestContact}
               onChange={(e) => setRequestContact(e.target.value)}
             />
