@@ -85,10 +85,7 @@ export default function JoinClub() {
     setDataLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from("clubs")
-        .select("*, loyalty_programs(*)")
-        .in("status", ["verified", "official"]);
+      const { data, error } = await supabase.from("clubs").select("*, loyalty_programs(*)").eq("is_verified", true);
 
       if (error) throw error;
 
