@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FanLeaderboard } from "@/components/ui/FanLeaderboard";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { ArrowLeft, Loader2, Trophy } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership } from "@/types/database";
 
 interface LeaderboardEntry {
@@ -31,22 +30,29 @@ export default function FanLeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
+  /* ---------------- AUTH GUARD ---------------- */
+
   useEffect(() => {
     if (loading) return;
+
     if (!isPreviewMode && !user) {
       navigate("/auth", { replace: true });
       return;
     }
+
     if (!isPreviewMode && profile?.role === "club_admin") {
       navigate("/club/dashboard", { replace: true });
       return;
     }
+
     if (isPreviewMode) {
       loadPreview();
     } else if (profile?.role === "fan") {
       fetchData();
     }
   }, [loading, user, profile, isPreviewMode, previewPointsBalance]);
+
+  /* ---------------- PREVIEW ---------------- */
 
   const loadPreview = () => {
     const PREVIEW = [
@@ -90,50 +96,54 @@ export default function FanLeaderboardPage() {
     setDataLoading(false);
   };
 
+  /* ---------------- REAL DATA ---------------- */
+
   const fetchData = async () => {
     if (!profile) return;
+
     setDataLoading(true);
+
     try {
+      /* membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
+
       if (!memberships?.length) {
         navigate("/fan/join");
         return;
       }
+
       const m = memberships[0] as FanMembership;
 
-      const { data: clubData } = await supabase
-        .from("clubs")
-        .select("*")
-        .eq("id", m.club_id)
-        .single();
+      /* club */
+      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+
       setClub(clubData as Club);
 
-      const { data: programData } = await supabase
-        .from("loyalty_programs")
-        .select("*")
-        .eq("id", m.program_id)
-        .single();
+      /* program */
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+
       setProgram(programData as LoyaltyProgram);
 
-      // Build leaderboard from fan_memberships + profiles
+      /* leaderboard from SQL view */
       const { data: rows } = await supabase
-        .from("fan_memberships")
-        .select("fan_id, points_balance, profiles!fan_memberships_fan_id_fkey(full_name, email)")
+        .from("club_leaderboard")
+        .select("*")
         .eq("club_id", m.club_id)
-        .order("points_balance", { ascending: false })
+        .order("rank", { ascending: true })
         .limit(50);
 
       if (rows) {
-        const mapped: LeaderboardEntry[] = rows.map((r: any, i: number) => ({
+        const mapped: LeaderboardEntry[] = rows.map((r: any) => ({
           id: r.fan_id,
-          name: r.profiles?.full_name || r.profiles?.email?.split("@")[0] || "Fan",
+          name: r.name,
           points: r.points_balance ?? 0,
-          rank: i + 1,
+          rank: r.rank,
         }));
+
         setLeaderboard(mapped);
       }
     } catch (err) {
@@ -143,6 +153,8 @@ export default function FanLeaderboardPage() {
     }
   };
 
+  /* ---------------- LOADING ---------------- */
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -151,57 +163,31 @@ export default function FanLeaderboardPage() {
     );
   }
 
-  const clubColor = club?.primary_color || "hsl(145, 63%, 32%)";
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* ─── HERO HEADER ─── */}
-      <header
-        className="fan-hero-header relative pb-6"
-        style={{
-          background: `linear-gradient(160deg, ${clubColor}dd 0%, ${clubColor}88 100%)`,
-        }}
-      >
-        <div className="relative z-10 flex items-center justify-between px-5 pt-4 pb-2">
+      {/* HEADER */}
+      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
+        <div className="container py-4 flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() =>
-              navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")
-            }
-            className="text-white/80 hover:text-white hover:bg-white/10 rounded-full gap-2 -ml-2"
+            onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
+            className="text-primary-foreground hover:bg-white/10"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Logo showText={false} size="sm" />
-        </div>
-
-        <div className="relative z-10 px-5 pt-2 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <h1 className="text-2xl font-display font-bold text-white flex items-center justify-center gap-3">
-              <Trophy className="h-6 w-6 text-amber-300" />
-              Leaderboard
-            </h1>
-            <p className="text-white/60 text-sm mt-1">
-              {club?.name || "Club"} Rankings
-            </p>
-          </motion.div>
+          <Logo />
         </div>
       </header>
 
-      {/* ─── CONTENT ─── */}
-      <main className="px-5 py-6 max-w-2xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
+      {/* CONTENT */}
+      <main className="container py-8">
+        <div className="max-w-2xl mx-auto">
           <FanLeaderboard
             fans={leaderboard}
             currencyName={program?.points_currency_name || "Points"}
@@ -209,7 +195,7 @@ export default function FanLeaderboardPage() {
             showFullList
             currentUserId={isPreviewMode ? "preview-fan" : profile?.id}
           />
-        </motion.div>
+        </div>
       </main>
     </div>
   );

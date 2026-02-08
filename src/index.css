@@ -2,9 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ClubPass Design System — Premium Sports Loyalty */
+/* FanLoyalty Design System - Football Stadium Inspired */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -50,25 +50,17 @@
 
     --radius: 0.75rem;
 
-    /* Stadium gradients */
+    /* Stadium gradient */
     --gradient-stadium: linear-gradient(135deg, hsl(145 63% 32%) 0%, hsl(150 50% 25%) 100%);
     --gradient-golden: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(45 93% 47%) 100%);
     --gradient-hero: linear-gradient(180deg, hsl(150 40% 8%) 0%, hsl(145 63% 20%) 100%);
     
-    /* Fan-specific gradients */
-    --gradient-fan-hero: linear-gradient(160deg, hsl(150 40% 6%) 0%, hsl(145 50% 18%) 60%, hsl(145 63% 28%) 100%);
-    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%);
-    --gradient-glass-border: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 100%);
-
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(150 40% 8% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(150 40% 8% / 0.1), 0 2px 4px -2px hsl(150 40% 8% / 0.1);
     --shadow-lg: 0 10px 15px -3px hsl(150 40% 8% / 0.1), 0 4px 6px -4px hsl(150 40% 8% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(150 40% 8% / 0.1), 0 8px 10px -6px hsl(150 40% 8% / 0.1);
     --shadow-stadium: 0 20px 40px -12px hsl(145 63% 32% / 0.25);
     --shadow-golden: 0 10px 30px -10px hsl(38 92% 50% / 0.4);
-    --shadow-glow: 0 0 20px hsl(145 63% 32% / 0.15);
-    --shadow-card: 0 2px 8px -2px hsl(150 40% 8% / 0.08), 0 4px 16px -4px hsl(150 40% 8% / 0.06);
 
     /* Sidebar */
     --sidebar-background: 150 40% 8%;
@@ -142,7 +134,6 @@
 }
 
 @layer components {
-  /* === Stadium Gradients === */
   .gradient-stadium {
     background: var(--gradient-stadium);
   }
@@ -155,11 +146,6 @@
     background: var(--gradient-hero);
   }
 
-  .gradient-fan-hero {
-    background: var(--gradient-fan-hero);
-  }
-
-  /* === Shadows === */
   .shadow-stadium {
     box-shadow: var(--shadow-stadium);
   }
@@ -168,42 +154,14 @@
     box-shadow: var(--shadow-golden);
   }
 
-  .shadow-card-elevated {
-    box-shadow: var(--shadow-card);
-  }
-
-  /* === Glass Effects === */
-  .glass {
-    @apply backdrop-blur-xl border;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-    border-color: rgba(255,255,255,0.15);
-  }
-
-  .glass-card {
-    @apply backdrop-blur-xl rounded-2xl border;
-    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
-    border-color: rgba(255,255,255,0.12);
-  }
-
-  .glass-card-light {
-    @apply backdrop-blur-xl rounded-2xl border;
-    background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 100%);
-    border-color: rgba(255,255,255,0.5);
-    box-shadow: var(--shadow-card);
-  }
-
-  .glass-dark {
-    @apply bg-black/40 backdrop-blur-md border border-white/10;
-  }
-
-  /* === Stadium pattern overlay === */
+  /* Stadium pattern overlay */
   .stadium-pattern {
     background-image: 
       radial-gradient(circle at 25% 25%, hsl(145 63% 40% / 0.1) 0%, transparent 50%),
       radial-gradient(circle at 75% 75%, hsl(38 92% 50% / 0.08) 0%, transparent 50%);
   }
 
-  /* === Pitch lines effect === */
+  /* Pitch lines effect */
   .pitch-lines {
     background-image: repeating-linear-gradient(
       0deg,
@@ -214,24 +172,21 @@
     );
   }
 
-  /* === Card styles === */
+  /* Glass effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-md border border-white/10;
+  }
+
+  /* Card hover effect */
   .card-hover {
     @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
   }
 
-  .card-press {
-    @apply transition-all duration-150 active:scale-[0.98] active:shadow-sm;
-  }
-
-  .card-fan {
-    @apply rounded-2xl border border-border/50 bg-card shadow-card-elevated transition-all duration-300;
-  }
-
-  .card-fan:hover {
-    @apply shadow-lg -translate-y-0.5;
-  }
-
-  /* === Activity card states === */
+  /* Activity card states */
   .activity-available {
     @apply border-l-4 border-l-primary;
   }
@@ -244,7 +199,7 @@
     @apply border-l-4 border-l-warning opacity-60;
   }
 
-  /* === Badge variants === */
+  /* Badge variants */
   .badge-verified {
     @apply bg-primary/10 text-primary border border-primary/20;
   }
@@ -257,77 +212,18 @@
     @apply bg-accent/10 text-accent border border-accent/20;
   }
 
-  /* === Points display === */
+  /* Points display */
   .points-display {
-    @apply font-display font-bold bg-gradient-to-r from-accent to-yellow-400 bg-clip-text text-transparent;
+    @apply font-display text-2xl font-bold bg-gradient-to-r from-accent to-yellow-400 bg-clip-text text-transparent;
   }
 
-  .points-hero {
-    @apply font-display font-black tracking-tight;
-    font-size: clamp(2.5rem, 8vw, 4rem);
-    line-height: 1;
-  }
-
-  /* === Hero section === */
+  /* Hero section */
   .hero-gradient {
     background: linear-gradient(180deg, 
       hsl(150 40% 8%) 0%, 
       hsl(145 50% 15%) 50%,
       hsl(145 63% 25%) 100%
     );
-  }
-
-  /* === Fan hero header === */
-  .fan-hero-header {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .fan-hero-header::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: 
-      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 100%, hsl(38 92% 50% / 0.1) 0%, transparent 50%);
-    pointer-events: none;
-  }
-
-  /* === Glow effects === */
-  .glow-primary {
-    box-shadow: 0 0 20px hsl(145 63% 32% / 0.2), 0 0 40px hsl(145 63% 32% / 0.1);
-  }
-
-  .glow-accent {
-    box-shadow: 0 0 20px hsl(38 92% 50% / 0.25), 0 0 40px hsl(38 92% 50% / 0.12);
-  }
-
-  .glow-affordable {
-    box-shadow: 0 0 16px hsl(145 63% 32% / 0.15);
-    border-color: hsl(145 63% 32% / 0.3);
-  }
-
-  /* === Scrollbar hide for horizontal scroll === */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* === Verification type icon backgrounds === */
-  .verification-qr {
-    @apply bg-blue-500/10 text-blue-600;
-  }
-  .verification-location {
-    @apply bg-emerald-500/10 text-emerald-600;
-  }
-  .verification-poll {
-    @apply bg-purple-500/10 text-purple-600;
-  }
-  .verification-proof {
-    @apply bg-orange-500/10 text-orange-600;
   }
 }
 
@@ -344,43 +240,21 @@
     animation: glow 2s ease-in-out infinite alternate;
   }
 
-  .animate-shimmer {
-    animation: shimmer 2s linear infinite;
-    background-size: 200% 100%;
-  }
-
-  .animate-count-up {
-    animation: count-up 0.6s ease-out forwards;
-  }
-
   @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
   }
 
   @keyframes glow {
-    from { box-shadow: 0 0 20px hsl(145 63% 32% / 0.3); }
-    to { box-shadow: 0 0 40px hsl(145 63% 32% / 0.5); }
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  @keyframes count-up {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes confetti-fall {
-    0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-  }
-
-  @keyframes pulse-ring {
-    0% { transform: scale(0.9); opacity: 0.7; }
-    50% { transform: scale(1.05); opacity: 0.3; }
-    100% { transform: scale(0.9); opacity: 0.7; }
+    from {
+      box-shadow: 0 0 20px hsl(145 63% 32% / 0.3);
+    }
+    to {
+      box-shadow: 0 0 40px hsl(145 63% 32% / 0.5);
+    }
   }
 }
