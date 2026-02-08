@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Trophy, Medal, Award, Crown, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -24,29 +25,42 @@ interface FanLeaderboardProps {
 const getRankIcon = (rank: number) => {
   switch (rank) {
     case 1:
-      return <Crown className="h-5 w-5 text-yellow-500" />;
+      return <Crown className="h-5 w-5 text-amber-400" />;
     case 2:
       return <Medal className="h-5 w-5 text-gray-400" />;
     case 3:
       return <Award className="h-5 w-5 text-amber-600" />;
     default:
-      return <span className="text-sm font-medium text-muted-foreground w-5 text-center">{rank}</span>;
+      return (
+        <span className="text-sm font-bold text-muted-foreground w-5 text-center">
+          {rank}
+        </span>
+      );
   }
 };
 
-const getRankBadge = (rank: number) => {
-  switch (rank) {
-    case 1:
-      return (
-        <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 hover:bg-yellow-500/30">🥇 1st</Badge>
-      );
-    case 2:
-      return <Badge className="bg-gray-400/20 text-gray-600 border-gray-400/30 hover:bg-gray-400/30">🥈 2nd</Badge>;
-    case 3:
-      return <Badge className="bg-amber-600/20 text-amber-700 border-amber-600/30 hover:bg-amber-600/30">🥉 3rd</Badge>;
-    default:
-      return null;
-  }
+const podiumColors = {
+  1: {
+    bg: "bg-amber-400/15",
+    border: "border-amber-400/30",
+    ring: "ring-amber-400",
+    text: "text-amber-500",
+    avatar: "bg-amber-100 text-amber-700",
+  },
+  2: {
+    bg: "bg-gray-300/15",
+    border: "border-gray-400/30",
+    ring: "ring-gray-400",
+    text: "text-gray-500",
+    avatar: "bg-gray-100 text-gray-600",
+  },
+  3: {
+    bg: "bg-amber-600/10",
+    border: "border-amber-600/30",
+    ring: "ring-amber-600",
+    text: "text-amber-600",
+    avatar: "bg-amber-100 text-amber-700",
+  },
 };
 
 export function FanLeaderboard({
@@ -62,147 +76,181 @@ export function FanLeaderboard({
 
   if (fans.length === 0) {
     return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-accent" />
-            {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">
-              No fans on the leaderboard yet. Complete activities to be the first!
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={cn("card-fan p-10 text-center", className)}>
+        <Trophy className="h-14 w-14 text-muted-foreground/15 mx-auto mb-4" />
+        <p className="text-muted-foreground font-medium">
+          No fans on the leaderboard yet
+        </p>
+        <p className="text-sm text-muted-foreground/60 mt-1">
+          Complete activities to be the first!
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-accent" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Top 3 Podium View (only for lists with at least 3 fans) */}
-        {fans.length >= 3 && !showFullList && (
-          <div className="flex items-end justify-center gap-4 mb-6 pb-4 border-b">
-            {/* 2nd Place */}
-            <div className="flex flex-col items-center">
-              <Avatar className="h-12 w-12 border-2 border-gray-400">
-                <AvatarFallback className="bg-gray-100 text-gray-600 font-bold">
-                  {topThree[1]?.name.charAt(0) || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="mt-2 text-center">
-                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[1]?.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {topThree[1]?.points} {currencyName}
-                </p>
-              </div>
-              <div className="mt-2 h-16 w-16 rounded-t-md bg-gray-200 flex items-center justify-center">
-                <Medal className="h-6 w-6 text-gray-500" />
-              </div>
-            </div>
+    <div className={cn("space-y-4", className)}>
+      {/* Podium — top 3 */}
+      {fans.length >= 3 && (
+        <motion.div
+          className="flex items-end justify-center gap-3 pt-4 pb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+        >
+          {/* 2nd */}
+          <PodiumSlot fan={topThree[1]} rank={2} currencyName={currencyName} />
+          {/* 1st */}
+          <PodiumSlot fan={topThree[0]} rank={1} currencyName={currencyName} />
+          {/* 3rd */}
+          <PodiumSlot fan={topThree[2]} rank={3} currencyName={currencyName} />
+        </motion.div>
+      )}
 
-            {/* 1st Place */}
-            <div className="flex flex-col items-center -mb-4">
-              <Crown className="h-6 w-6 text-yellow-500 mb-1" />
-              <Avatar className="h-16 w-16 border-4 border-yellow-500 ring-2 ring-yellow-200">
-                <AvatarFallback className="bg-yellow-100 text-yellow-700 font-bold text-xl">
-                  {topThree[0]?.name.charAt(0) || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="mt-2 text-center">
-                <p className="text-sm font-semibold truncate max-w-[80px]">{topThree[0]?.name}</p>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {topThree[0]?.points} {currencyName}
-                </p>
+      {/* Full list */}
+      <div className="space-y-2">
+        {displayFans.map((fan, i) => {
+          const isCurrentUser = currentUserId && fan.id === currentUserId;
+          return (
+            <motion.div
+              key={fan.id}
+              className={cn(
+                "card-fan p-3.5 flex items-center gap-3",
+                isCurrentUser && "glow-primary border-primary/25",
+                fan.rank <= 3 && "font-medium"
+              )}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.03 }}
+            >
+              <div className="flex items-center justify-center w-8">
+                {getRankIcon(fan.rank)}
               </div>
-              <div className="mt-2 h-24 w-16 rounded-t-md bg-yellow-400 flex items-center justify-center">
-                <Star className="h-6 w-6 text-yellow-700" />
-              </div>
-            </div>
 
-            {/* 3rd Place */}
-            <div className="flex flex-col items-center">
-              <Avatar className="h-12 w-12 border-2 border-amber-600">
-                <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
-                  {topThree[2]?.name.charAt(0) || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="mt-2 text-center">
-                <p className="text-sm font-medium truncate max-w-[80px]">{topThree[2]?.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {topThree[2]?.points} {currencyName}
-                </p>
-              </div>
-              <div className="mt-2 h-12 w-16 rounded-t-md bg-amber-200 flex items-center justify-center">
-                <Award className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Full List View */}
-        <div className="space-y-2">
-          {displayFans.map((fan) => {
-            const isCurrentUser = currentUserId && fan.id === currentUserId;
-            return (
-              <div
-                key={fan.id}
+              <Avatar
                 className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg transition-colors",
-                  isCurrentUser ? "bg-primary/10 border border-primary/20" : "bg-muted/30 hover:bg-muted/50",
-                  fan.rank <= 3 && "font-medium",
+                  "h-9 w-9",
+                  fan.rank === 1 && "ring-2 ring-amber-400",
+                  fan.rank === 2 && "ring-2 ring-gray-400",
+                  fan.rank === 3 && "ring-2 ring-amber-500"
                 )}
               >
-                <div className="flex items-center justify-center w-8">{getRankIcon(fan.rank)}</div>
-
-                <Avatar
+                <AvatarFallback
                   className={cn(
-                    "h-10 w-10",
-                    fan.rank === 1 && "ring-2 ring-yellow-400",
-                    fan.rank === 2 && "ring-2 ring-gray-400",
-                    fan.rank === 3 && "ring-2 ring-amber-500",
+                    "text-xs font-bold",
+                    fan.rank === 1 && "bg-amber-100 text-amber-700",
+                    fan.rank === 2 && "bg-gray-100 text-gray-600",
+                    fan.rank === 3 && "bg-amber-100 text-amber-700"
                   )}
                 >
-                  <AvatarFallback
-                    className={cn(
-                      fan.rank === 1 && "bg-yellow-100 text-yellow-700",
-                      fan.rank === 2 && "bg-gray-100 text-gray-600",
-                      fan.rank === 3 && "bg-amber-100 text-amber-700",
-                    )}
-                  >
-                    {fan.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                  {fan.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={cn("truncate", isCurrentUser && "text-primary font-semibold")}>
-                      {fan.name}
-                      {isCurrentUser && <span className="text-xs ml-1">(You)</span>}
-                    </p>
-                    {getRankBadge(fan.rank)}
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <p className="font-bold text-foreground">{fan.points.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">{currencyName}</p>
-                </div>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={cn(
+                    "text-sm truncate",
+                    isCurrentUser && "text-primary font-semibold"
+                  )}
+                >
+                  {fan.name}
+                  {isCurrentUser && (
+                    <span className="text-[10px] ml-1 text-primary/70">
+                      (You)
+                    </span>
+                  )}
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+
+              <div className="text-right">
+                <p className="font-bold text-sm text-foreground">
+                  {fan.points.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {currencyName}
+                </p>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PodiumSlot({
+  fan,
+  rank,
+  currencyName,
+}: {
+  fan: LeaderboardFan;
+  rank: 1 | 2 | 3;
+  currencyName: string;
+}) {
+  const colors = podiumColors[rank];
+  const isFirst = rank === 1;
+
+  return (
+    <motion.div
+      className="flex flex-col items-center"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: rank === 1 ? 0.15 : rank === 2 ? 0.25 : 0.3 }}
+    >
+      {isFirst && <Crown className="h-6 w-6 text-amber-400 mb-1.5" />}
+
+      <Avatar
+        className={cn(
+          "border-2",
+          isFirst ? "h-16 w-16" : "h-12 w-12",
+          `ring-2 ${colors.ring}`,
+          colors.border
+        )}
+      >
+        <AvatarFallback
+          className={cn(
+            "font-bold",
+            isFirst ? "text-xl" : "text-sm",
+            colors.avatar
+          )}
+        >
+          {fan?.name.charAt(0) || "?"}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="mt-2 text-center">
+        <p
+          className={cn(
+            "font-semibold truncate max-w-[80px]",
+            isFirst ? "text-sm" : "text-xs"
+          )}
+        >
+          {fan?.name}
+        </p>
+        <p className="text-[10px] text-muted-foreground font-medium">
+          {fan?.points.toLocaleString()} {currencyName}
+        </p>
+      </div>
+
+      {/* Podium bar */}
+      <div
+        className={cn(
+          "mt-2 rounded-t-lg flex items-center justify-center",
+          isFirst ? "h-20 w-16" : rank === 2 ? "h-14 w-14" : "h-10 w-14",
+          colors.bg,
+          "border",
+          colors.border
+        )}
+      >
+        {isFirst ? (
+          <Star className="h-5 w-5 text-amber-400" />
+        ) : rank === 2 ? (
+          <Medal className="h-4 w-4 text-gray-400" />
+        ) : (
+          <Award className="h-4 w-4 text-amber-600" />
+        )}
+      </div>
+    </motion.div>
   );
 }

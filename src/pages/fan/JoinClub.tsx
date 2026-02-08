@@ -1,18 +1,31 @@
-// FULL FINAL VERSION — SEARCH + FILTER + INVITE + SIGNOUT
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  MapPin,
+  Shield,
+  LogOut,
+  Trophy,
+  Sparkles,
+} from "lucide-react";
 import { Club, LoyaltyProgram } from "@/types/database";
 
 interface ClubWithProgram extends Club {
@@ -34,29 +47,19 @@ export default function JoinClub() {
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
 
-  // NEW — search/filter
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
 
-  // Invite-club state
-  const [requestClubName, setRequestClubName] = useState("");
-  const [requestCountry, setRequestCountry] = useState("");
-  const [requestContact, setRequestContact] = useState("");
-  const [requestSending, setRequestSending] = useState(false);
-
   useEffect(() => {
     if (loading) return;
-
     if (!isPreviewMode && !profile) {
       navigate("/auth", { replace: true });
       return;
     }
-
     if (!isPreviewMode && profile?.role === "club_admin") {
       navigate("/club/dashboard", { replace: true });
       return;
     }
-
     if (!isPreviewMode && profile?.role === "fan") {
       initRealFlow();
     }
@@ -70,25 +73,26 @@ export default function JoinClub() {
 
   const checkMembership = async (): Promise<boolean> => {
     if (!profile) return false;
-
-    const { data } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
-
+    const { data } = await supabase
+      .from("fan_memberships")
+      .select("id")
+      .eq("fan_id", profile.id)
+      .limit(1);
     if (data?.length) {
       navigate("/fan/home", { replace: true });
       return true;
     }
-
     return false;
   };
 
   const fetchClubs = async () => {
     setDataLoading(true);
-
     try {
-      const { data, error } = await supabase.from("clubs").select("*, loyalty_programs(*)").eq("is_verified", true);
-
+      const { data, error } = await supabase
+        .from("clubs")
+        .select("*, loyalty_programs(*)")
+        .in("status", ["verified", "official"]);
       if (error) throw error;
-
       setClubs((data ?? []) as unknown as ClubWithProgram[]);
     } catch {
       toast({
@@ -115,30 +119,24 @@ export default function JoinClub() {
       });
       return;
     }
-
     setSelectedClub(club);
     setEnrollModalOpen(true);
   };
 
   const handleConfirmJoin = async () => {
     if (!selectedClub || !profile) return;
-
     setJoining(selectedClub.id);
-
     try {
       const { error } = await supabase.from("fan_memberships").insert({
         fan_id: profile.id,
         club_id: selectedClub.id,
         program_id: selectedClub.loyalty_programs[0].id,
       });
-
       if (error) throw error;
-
       toast({
         title: "Welcome!",
         description: `You joined ${selectedClub.name}!`,
       });
-
       navigate("/fan/home");
     } catch {
       toast({
@@ -152,50 +150,15 @@ export default function JoinClub() {
     }
   };
 
-  // SEARCH + FILTER
   const countries = Array.from(new Set(clubs.map((c) => c.country))).sort();
 
   const filteredClubs = clubs.filter((c) => {
     const matchSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) || c.city.toLowerCase().includes(search.toLowerCase());
-
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.city.toLowerCase().includes(search.toLowerCase());
     const matchCountry = countryFilter === "all" || c.country === countryFilter;
-
     return matchSearch && matchCountry;
   });
-
-  // INVITE CLUB
-  const handleSendJoinRequest = async () => {
-    if (!profile || !requestClubName.trim()) return;
-
-    setRequestSending(true);
-
-    try {
-      await supabase.from("club_join_requests").insert({
-        fan_id: profile.id,
-        club_name: requestClubName.trim(),
-        country: requestCountry || null,
-        club_contact: requestContact || null,
-      });
-
-      toast({
-        title: "Request sent",
-        description: "We saved your request and will notify the club.",
-      });
-
-      setRequestClubName("");
-      setRequestCountry("");
-      setRequestContact("");
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to send request.",
-        variant: "destructive",
-      });
-    } finally {
-      setRequestSending(false);
-    }
-  };
 
   if (loading || dataLoading) {
     return (
@@ -207,27 +170,61 @@ export default function JoinClub() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="absolute top-4 right-4">
-        <Button variant="secondary" onClick={handleSignOut}>
+      {isPreviewMode && <PreviewBanner role="fan" />}
+
+      {/* Sign out button */}
+      <div className="absolute top-4 right-4 z-20">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSignOut}
+          className="text-white/70 hover:text-white hover:bg-white/10 rounded-full gap-2"
+        >
+          <LogOut className="h-4 w-4" />
           Sign out
         </Button>
       </div>
 
-      <header className="py-16 gradient-stadium text-center">
-        <Logo size="lg" className="justify-center" />
-        <h1 className="text-3xl font-bold text-primary-foreground mt-6">Choose Your Club</h1>
+      {/* ─── HERO ─── */}
+      <header className="fan-hero-header gradient-fan-hero px-5 pt-16 pb-10 text-center relative">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative z-10"
+        >
+          <Logo size="lg" className="justify-center" />
+          <h1 className="text-3xl font-display font-bold text-white mt-6">
+            Choose Your Club
+          </h1>
+          <p className="text-white/50 text-sm mt-2 max-w-xs mx-auto">
+            Join a loyalty program and start earning rewards for your fandom
+          </p>
+        </motion.div>
       </header>
 
-      <main className="container py-8 space-y-6">
-        {/* SEARCH + FILTER */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <Input placeholder="Search club or city..." value={search} onChange={(e) => setSearch(e.target.value)} />
-
+      <main className="px-5 py-6 max-w-2xl mx-auto space-y-5">
+        {/* ─── SEARCH & FILTER ─── */}
+        <motion.div
+          className="flex gap-3"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search club or city…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 rounded-xl h-11 bg-card border-border/50"
+            />
+          </div>
           <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by country" />
+            <SelectTrigger className="w-[140px] rounded-xl h-11 bg-card border-border/50">
+              <SelectValue placeholder="Country" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover z-50">
               <SelectItem value="all">All countries</SelectItem>
               {countries.map((c) => (
                 <SelectItem key={c} value={c}>
@@ -236,64 +233,91 @@ export default function JoinClub() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
-        {/* CLUB GRID */}
+        {/* ─── CLUB GRID ─── */}
         {filteredClubs.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">No clubs found</h3>
-            </CardContent>
-          </Card>
+          <motion.div
+            className="card-fan p-12 text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Trophy className="h-16 w-16 text-muted-foreground/15 mx-auto mb-4" />
+            <h3 className="text-lg font-display font-semibold text-foreground">
+              No clubs found
+            </h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+              Try a different search or check back later for new clubs
+            </p>
+          </motion.div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredClubs.map((club) => (
-              <Card key={club.id} className="card-hover">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg">{club.name}</h3>
-
-                  <Button
-                    className="w-full mt-4"
-                    onClick={() => handleJoinClick(club)}
-                    disabled={!club.loyalty_programs?.length || joining === club.id}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <AnimatePresence>
+              {filteredClubs.map((club, i) => {
+                const hasProgram = club.loyalty_programs?.length > 0;
+                return (
+                  <motion.div
+                    key={club.id}
+                    className="card-fan card-press p-5 flex flex-col gap-3"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    layout
                   >
-                    {joining === club.id && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    {club.loyalty_programs?.length ? "Enroll" : "Not Available"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex items-start gap-3">
+                      {/* Club color dot */}
+                      <div
+                        className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: club.primary_color
+                            ? `${club.primary_color}20`
+                            : "hsl(var(--primary) / 0.1)",
+                        }}
+                      >
+                        <Shield
+                          className="h-5 w-5"
+                          style={{
+                            color: club.primary_color || "hsl(var(--primary))",
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm leading-tight">
+                          {club.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <MapPin className="h-3 w-3" />
+                          {club.city}, {club.country}
+                        </p>
+                      </div>
+                    </div>
+
+                    {hasProgram && (
+                      <div className="flex items-center gap-1.5 text-xs text-primary">
+                        <Sparkles className="h-3 w-3" />
+                        <span className="font-medium">
+                          {club.loyalty_programs[0].name}
+                        </span>
+                      </div>
+                    )}
+
+                    <Button
+                      className="w-full rounded-xl h-9 text-xs font-semibold gradient-stadium text-white"
+                      onClick={() => handleJoinClick(club)}
+                      disabled={!hasProgram || joining === club.id}
+                    >
+                      {joining === club.id && (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      )}
+                      {hasProgram ? "Join Club" : "No Program Yet"}
+                    </Button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
-
-        {/* INVITE CLUB */}
-        <Card>
-          <CardContent className="p-6 space-y-3">
-            <h3 className="font-semibold text-lg">Can’t find your club?</h3>
-
-            <Input
-              placeholder="Club name"
-              value={requestClubName}
-              onChange={(e) => setRequestClubName(e.target.value)}
-            />
-            <Input
-              placeholder="Country (optional)"
-              value={requestCountry}
-              onChange={(e) => setRequestCountry(e.target.value)}
-            />
-            <Input
-              placeholder="Club email or website (optional)"
-              value={requestContact}
-              onChange={(e) => setRequestContact(e.target.value)}
-            />
-
-            <Button className="w-full" onClick={handleSendJoinRequest} disabled={requestSending}>
-              {requestSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Send request
-            </Button>
-          </CardContent>
-        </Card>
       </main>
 
       <EnrollmentModal
