@@ -30,9 +30,8 @@ export default function FanLeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  /**
-   * AUTH + ROLE GUARD
-   */
+  /* ---------------- AUTH GUARD ---------------- */
+
   useEffect(() => {
     if (loading) return;
 
@@ -53,11 +52,10 @@ export default function FanLeaderboardPage() {
     }
   }, [loading, user, profile, isPreviewMode, previewPointsBalance]);
 
-  /**
-   * PREVIEW MODE
-   */
+  /* ---------------- PREVIEW ---------------- */
+
   const loadPreview = () => {
-    const PREVIEW_LEADERBOARD = [
+    const PREVIEW = [
       { id: "fan-1", name: "Alex Thompson", points: 2450 },
       { id: "fan-2", name: "Sarah Mitchell", points: 2180 },
       { id: "fan-3", name: "James Wilson", points: 1920 },
@@ -65,7 +63,7 @@ export default function FanLeaderboardPage() {
       { id: "preview-fan", name: "Preview Fan", points: previewPointsBalance },
     ]
       .sort((a, b) => b.points - a.points)
-      .map((fan, idx) => ({ ...fan, rank: idx + 1 }));
+      .map((f, i) => ({ ...f, rank: i + 1 }));
 
     setClub({
       id: "preview",
@@ -94,20 +92,19 @@ export default function FanLeaderboardPage() {
       updated_at: "",
     });
 
-    setLeaderboard(PREVIEW_LEADERBOARD);
+    setLeaderboard(PREVIEW);
     setDataLoading(false);
   };
 
-  /**
-   * FETCH REAL DATA
-   */
+  /* ---------------- REAL DATA ---------------- */
+
   const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      /** Membership */
+      /* membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -121,39 +118,33 @@ export default function FanLeaderboardPage() {
 
       const m = memberships[0] as FanMembership;
 
-      /** Club */
+      /* club */
       const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
 
       setClub(clubData as Club);
 
-      /** Program */
+      /* program */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
-      /** Leaderboard */
-      const { data: allMemberships } = await supabase
-        .from("fan_memberships")
-        .select(
-          `
-          fan_id,
-          points_balance,
-          profiles!fan_memberships_fan_id_fkey(full_name, email)
-        `,
-        )
+      /* leaderboard from SQL view */
+      const { data: rows } = await supabase
+        .from("club_leaderboard")
+        .select("*")
         .eq("club_id", m.club_id)
-        .order("points_balance", { ascending: false })
+        .order("rank", { ascending: true })
         .limit(50);
 
-      if (allMemberships) {
-        const leaderboardData: LeaderboardEntry[] = allMemberships.map((membership: any, index: number) => ({
-          id: membership.fan_id,
-          name: membership.profiles?.full_name || membership.profiles?.email?.split("@")[0] || "Anonymous Fan",
-          points: membership.points_balance ?? 0,
-          rank: index + 1,
+      if (rows) {
+        const mapped: LeaderboardEntry[] = rows.map((r: any) => ({
+          id: r.fan_id,
+          name: r.name,
+          points: r.points_balance ?? 0,
+          rank: r.rank,
         }));
 
-        setLeaderboard(leaderboardData);
+        setLeaderboard(mapped);
       }
     } catch (err) {
       console.error("Leaderboard fetch error:", err);
@@ -162,9 +153,8 @@ export default function FanLeaderboardPage() {
     }
   };
 
-  /**
-   * LOADING
-   */
+  /* ---------------- LOADING ---------------- */
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -172,6 +162,8 @@ export default function FanLeaderboardPage() {
       </div>
     );
   }
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="min-h-screen bg-background">
