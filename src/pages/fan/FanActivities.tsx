@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
@@ -13,8 +13,35 @@ import { QRScannerModal } from "@/components/ui/QRScannerModal";
 import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle } from "lucide-react";
-import type { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod } from "@/types/database";
+import {
+  ArrowLeft,
+  Zap,
+  QrCode,
+  MapPin,
+  Smartphone,
+  FileCheck,
+  Loader2,
+  CheckCircle,
+  Clock,
+  Trophy,
+} from "lucide-react";
+import type {
+  Activity,
+  FanMembership,
+  LoyaltyProgram,
+  ActivityCompletion,
+  VerificationMethod,
+} from "@/types/database";
+
+const verificationMeta: Record<
+  VerificationMethod,
+  { icon: React.ComponentType<{ className?: string }>; label: string; style: string }
+> = {
+  qr_scan: { icon: QrCode, label: "Scan QR", style: "verification-qr" },
+  location_checkin: { icon: MapPin, label: "Check In", style: "verification-location" },
+  in_app_completion: { icon: Smartphone, label: "In-App", style: "verification-poll" },
+  manual_proof: { icon: FileCheck, label: "Submit Proof", style: "verification-proof" },
+};
 
 export default function FanActivities() {
   const navigate = useNavigate();
@@ -22,8 +49,12 @@ export default function FanActivities() {
   const { profile, loading } = useAuth();
   const { toast } = useToast();
 
-  const { previewPointsBalance, addPreviewPoints, completedPreviewActivities, markActivityCompleted } =
-    usePreviewMode();
+  const {
+    previewPointsBalance,
+    addPreviewPoints,
+    completedPreviewActivities,
+    markActivityCompleted,
+  } = usePreviewMode();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
 
@@ -34,83 +65,64 @@ export default function FanActivities() {
   const [pendingClaims, setPendingClaims] = useState<string[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Modal state
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [submittingProof, setSubmittingProof] = useState(false);
-
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [processingQR, setProcessingQR] = useState(false);
-
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [processingLocation, setProcessingLocation] = useState(false);
-
   const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
 
-  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
+  const effectivePointsBalance = isPreviewMode
+    ? previewPointsBalance
+    : membership?.points_balance || 0;
 
   const fetchData = useCallback(async () => {
     if (!profile) return;
-
     setDataLoading(true);
-
     try {
-      // Membership
       const { data: memberships, error: mErr } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
-
       if (mErr) throw mErr;
-
       if (!memberships?.length) {
         navigate("/fan/join");
         return;
       }
-
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // Program
       const { data: prog, error: pErr } = await supabase
         .from("loyalty_programs")
         .select("*")
         .eq("id", m.program_id)
         .limit(1);
-
       if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // Activities
       const { data: acts, error: aErr } = await supabase
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true);
-
       if (aErr) throw aErr;
-
-      // If your generated types say in_app_config is Json, keep it safe:
       setActivities((acts || []) as unknown as Activity[]);
 
-      // Completions
       const { data: comps, error: cErr } = await supabase
         .from("activity_completions")
         .select("*")
         .eq("fan_id", profile.id);
-
       if (cErr) throw cErr;
       setCompletions((comps || []) as ActivityCompletion[]);
 
-      // Pending manual claims
       const { data: claims, error: clErr } = await supabase
         .from("manual_claims")
         .select("activity_id")
         .eq("fan_id", profile.id)
         .eq("status", "pending");
-
       if (clErr) throw clErr;
       setPendingClaims((claims || []).map((c) => c.activity_id));
     } catch (err: any) {
@@ -129,12 +141,10 @@ export default function FanActivities() {
       setDataLoading(false);
       return;
     }
-
     if (!loading && !profile) {
       navigate("/auth");
       return;
     }
-
     if (!loading && profile) {
       fetchData();
     }
@@ -147,7 +157,6 @@ export default function FanActivities() {
 
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
-  // Single source of truth completion
   const completeViaRpc = async (activity: Activity, metadata: Record<string, unknown>) => {
     if (isPreviewMode) {
       addPreviewPoints(activity.points_awarded);
@@ -158,64 +167,51 @@ export default function FanActivities() {
       });
       return;
     }
-
     if (!membership) return;
-
-    // Your Supabase client types might not include "complete_activity" yet
     const { data, error } = await (supabase as any).rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
       p_metadata: metadata,
     });
-
     if (error) throw error;
-
     toast({
       title: "Activity Completed!",
       description: `You earned ${data} ${program?.points_currency_name || "Points"}!`,
     });
-
     await fetchData();
   };
 
-  // Decide what happens when user clicks an activity
   const handleStart = (activity: Activity) => {
     setSelectedActivity(activity);
-
     if (activity.verification_method === "manual_proof") {
       setProofModalOpen(true);
       return;
     }
-
     if (activity.verification_method === "qr_scan") {
       setQrScannerOpen(true);
       return;
     }
-
     if (activity.verification_method === "location_checkin") {
       setLocationModalOpen(true);
       return;
     }
-
     if (activity.verification_method === "in_app_completion" && activity.in_app_config) {
       setPollQuizModalOpen(true);
       return;
     }
-
-    // Fallback (should be rare)
-    completeViaRpc(activity, { verification: activity.verification_method }).catch((err: any) => {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to complete activity.",
-        variant: "destructive",
-      });
-    });
+    completeViaRpc(activity, { verification: activity.verification_method }).catch(
+      (err: any) => {
+        toast({
+          title: "Error",
+          description: err?.message || "Failed to complete activity.",
+          variant: "destructive",
+        });
+      }
+    );
   };
 
-  // Manual proof submit
   const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
     if (!selectedActivity) return;
-
     if (isPreviewMode) {
       toast({
         title: "Proof Submitted!",
@@ -224,9 +220,7 @@ export default function FanActivities() {
       setProofModalOpen(false);
       return;
     }
-
     if (!membership || !profile) return;
-
     setSubmittingProof(true);
     try {
       const { error } = await supabase.from("manual_claims").insert({
@@ -236,14 +230,11 @@ export default function FanActivities() {
         proof_description: proofDescription,
         proof_url: proofUrl,
       });
-
       if (error) throw error;
-
       toast({
         title: "Proof Submitted!",
         description: "The club admin will review it. You earn points once approved.",
       });
-
       setProofModalOpen(false);
       await fetchData();
     } catch (err: any) {
@@ -257,10 +248,8 @@ export default function FanActivities() {
     }
   };
 
-  // QR success
   const handleQRSuccess = async () => {
     if (!selectedActivity) return;
-
     setProcessingQR(true);
     try {
       await completeViaRpc(selectedActivity, { verification: "qr_scan" });
@@ -276,10 +265,8 @@ export default function FanActivities() {
     }
   };
 
-  // Location success
   const handleLocationSuccess = async () => {
     if (!selectedActivity) return;
-
     setProcessingLocation(true);
     try {
       await completeViaRpc(selectedActivity, { verification: "location_checkin" });
@@ -295,20 +282,13 @@ export default function FanActivities() {
     }
   };
 
-  // Poll/Quiz submit
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
     if (!selectedActivity) return;
-
     const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
-
-    // UX rule:
-    // Poll always awards points.
-    // Quiz awards points only if correct (client-gated).
     if (!isPoll && !isCorrect) {
       toast({ title: "Incorrect", description: "Better luck next time!" });
       return;
     }
-
     try {
       await completeViaRpc(selectedActivity, {
         verification: "in_app_completion",
@@ -316,7 +296,6 @@ export default function FanActivities() {
         selected_option: selectedOptionId,
         is_correct: isCorrect,
       });
-
       setPollQuizModalOpen(false);
     } catch (err: any) {
       toast({
@@ -327,13 +306,6 @@ export default function FanActivities() {
     }
   };
 
-  const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
-    qr_scan: QrCode,
-    location_checkin: MapPin,
-    in_app_completion: Smartphone,
-    manual_proof: FileCheck,
-  };
-
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -342,80 +314,148 @@ export default function FanActivities() {
     );
   }
 
+  const completedCount = activities.filter((a) => isCompleted(a.id)).length;
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+      {/* ─── HEADER ─── */}
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/50">
+        <div className="flex items-center justify-between px-5 py-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")
+            }
+            className="gap-2 rounded-full -ml-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-          <Logo />
+
+          <div className="flex items-center gap-2 bg-primary/8 rounded-full px-3 py-1.5">
+            <Trophy className="h-4 w-4 text-primary" />
+            <span className="text-sm font-bold">
+              {effectivePointsBalance}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {program?.points_currency_name || "pts"}
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="container py-8">
-        <div className="flex justify-between mb-6">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary" />
+      <main className="px-5 py-6 max-w-2xl mx-auto">
+        {/* Title area */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-2xl font-display font-bold flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary" />
+            </div>
             Activities
           </h1>
+          {activities.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {completedCount}/{activities.length} completed
+            </p>
+          )}
+        </motion.div>
 
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            {effectivePointsBalance} {program?.points_currency_name || "Points"}
-          </Badge>
-        </div>
-
+        {/* Activity list */}
         {activities.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground">No activities available yet.</p>
-            </CardContent>
-          </Card>
+          <motion.div
+            className="card-fan p-10 text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Zap className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+            <p className="text-muted-foreground font-medium">
+              No activities available yet
+            </p>
+            <p className="text-sm text-muted-foreground/60 mt-1">
+              Check back soon for new challenges!
+            </p>
+          </motion.div>
         ) : (
-          <div className="space-y-4">
-            {activities.map((activity) => {
-              const Icon = icons[activity.verification_method];
-              const completed = isCompleted(activity.id);
-              const pending = hasPendingClaim(activity.id);
+          <div className="space-y-3">
+            <AnimatePresence>
+              {activities.map((activity, i) => {
+                const meta = verificationMeta[activity.verification_method];
+                const Icon = meta.icon;
+                const completed = isCompleted(activity.id);
+                const pending = hasPendingClaim(activity.id);
 
-              return (
-                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
-                  <CardContent className="py-4 flex justify-between items-center gap-4">
+                return (
+                  <motion.div
+                    key={activity.id}
+                    className={`card-fan card-press p-4 ${
+                      completed ? "opacity-60" : ""
+                    }`}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    layout
+                  >
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
+                      <div
+                        className={`h-12 w-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${meta.style}`}
+                      >
+                        <Icon className="h-5 w-5" />
                       </div>
 
-                      <div>
-                        <p className="font-semibold">{activity.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          +{activity.points_awarded} {program?.points_currency_name || "Points"}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm leading-tight">
+                          {activity.name}
                         </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] font-bold bg-primary/8 text-primary border-0 px-2 py-0"
+                          >
+                            +{activity.points_awarded}{" "}
+                            {program?.points_currency_name || "pts"}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {meta.label}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    {completed ? (
-                      <Badge className="bg-success text-success-foreground">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Done
-                      </Badge>
-                    ) : pending ? (
-                      <Badge variant="outline">Pending</Badge>
-                    ) : (
-                      <Button onClick={() => handleStart(activity)}>Start</Button>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                      {completed ? (
+                        <div className="flex items-center gap-1.5 text-success">
+                          <CheckCircle className="h-5 w-5" />
+                          <span className="text-xs font-semibold">Done</span>
+                        </div>
+                      ) : pending ? (
+                        <div className="flex items-center gap-1.5 text-warning">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-xs font-medium">Pending</span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleStart(activity)}
+                          className="rounded-full px-5 h-9 font-semibold text-xs"
+                        >
+                          Start
+                        </Button>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
       </main>
 
-      {/* Manual Proof */}
+      {/* Modals */}
       <ManualProofModal
         open={proofModalOpen}
         onOpenChange={setProofModalOpen}
@@ -425,8 +465,6 @@ export default function FanActivities() {
         onSubmit={handleSubmitProof}
         isLoading={submittingProof}
       />
-
-      {/* QR Scanner */}
       <QRScannerModal
         open={qrScannerOpen}
         onOpenChange={setQrScannerOpen}
@@ -437,8 +475,6 @@ export default function FanActivities() {
         onSuccess={handleQRSuccess}
         isLoading={processingQR}
       />
-
-      {/* Location Check-in */}
       <LocationCheckinModal
         open={locationModalOpen}
         onOpenChange={setLocationModalOpen}
@@ -451,8 +487,6 @@ export default function FanActivities() {
         onSuccess={handleLocationSuccess}
         isLoading={processingLocation}
       />
-
-      {/* Poll/Quiz */}
       {selectedActivity?.in_app_config && (
         <PollQuizParticipation
           isOpen={pollQuizModalOpen}
