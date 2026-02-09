@@ -91,8 +91,6 @@ export default function FanActivities() {
         .eq("is_active", true);
 
       if (aErr) throw aErr;
-
-      // If your generated types say in_app_config is Json, keep it safe:
       setActivities((acts || []) as unknown as Activity[]);
 
       // Completions
@@ -112,7 +110,7 @@ export default function FanActivities() {
         .eq("status", "pending");
 
       if (clErr) throw clErr;
-      setPendingClaims((claims || []).map((c) => c.activity_id));
+      setPendingClaims((claims || []).map((c: any) => c.activity_id));
     } catch (err: any) {
       toast({
         title: "Error",
@@ -161,7 +159,6 @@ export default function FanActivities() {
 
     if (!membership) return;
 
-    // Your Supabase client types might not include "complete_activity" yet
     const { data, error } = await (supabase as any).rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
@@ -180,6 +177,21 @@ export default function FanActivities() {
 
   // Decide what happens when user clicks an activity
   const handleStart = (activity: Activity) => {
+    // Guard: already done
+    if (isCompleted(activity.id)) {
+      toast({ title: "Already completed", description: "You have already completed this activity." });
+      return;
+    }
+
+    // Guard: manual proof already pending
+    if (activity.verification_method === "manual_proof" && hasPendingClaim(activity.id)) {
+      toast({
+        title: "Pending review",
+        description: "You already submitted proof. Wait for the club to review it.",
+      });
+      return;
+    }
+
     setSelectedActivity(activity);
 
     if (activity.verification_method === "manual_proof") {
@@ -202,7 +214,7 @@ export default function FanActivities() {
       return;
     }
 
-    // Fallback (should be rare)
+    // Fallback
     completeViaRpc(activity, { verification: activity.verification_method }).catch((err: any) => {
       toast({
         title: "Error",
@@ -216,12 +228,43 @@ export default function FanActivities() {
   const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
     if (!selectedActivity) return;
 
+    // Validate basic input
+    if (!proofDescription?.trim()) {
+      toast({
+        title: "Add a short description",
+        description: "Please describe your proof briefly so the club can review it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Double guard: pending or completed
+    if (hasPendingClaim(selectedActivity.id)) {
+      toast({
+        title: "Pending review",
+        description: "You already submitted proof for this activity.",
+      });
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+    if (isCompleted(selectedActivity.id)) {
+      toast({
+        title: "Already completed",
+        description: "This activity is already completed.",
+      });
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+
     if (isPreviewMode) {
       toast({
         title: "Proof Submitted!",
         description: "Preview mode: proof would be sent to the club admin for review.",
       });
       setProofModalOpen(false);
+      setSelectedActivity(null);
       return;
     }
 
@@ -233,11 +276,15 @@ export default function FanActivities() {
         activity_id: selectedActivity.id,
         fan_id: profile.id,
         membership_id: membership.id,
-        proof_description: proofDescription,
+        proof_description: proofDescription.trim(),
         proof_url: proofUrl,
+        status: "pending",
       });
 
       if (error) throw error;
+
+      // Optimistic UI: mark as pending immediately
+      setPendingClaims((prev) => (prev.includes(selectedActivity.id) ? prev : [...prev, selectedActivity.id]));
 
       toast({
         title: "Proof Submitted!",
@@ -245,6 +292,9 @@ export default function FanActivities() {
       });
 
       setProofModalOpen(false);
+      setSelectedActivity(null);
+
+      // Sync from DB
       await fetchData();
     } catch (err: any) {
       toast({
@@ -265,6 +315,7 @@ export default function FanActivities() {
     try {
       await completeViaRpc(selectedActivity, { verification: "qr_scan" });
       setQrScannerOpen(false);
+      setSelectedActivity(null);
     } catch (err: any) {
       toast({
         title: "Error",
@@ -284,6 +335,7 @@ export default function FanActivities() {
     try {
       await completeViaRpc(selectedActivity, { verification: "location_checkin" });
       setLocationModalOpen(false);
+      setSelectedActivity(null);
     } catch (err: any) {
       toast({
         title: "Error",
@@ -301,9 +353,6 @@ export default function FanActivities() {
 
     const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
 
-    // UX rule:
-    // Poll always awards points.
-    // Quiz awards points only if correct (client-gated).
     if (!isPoll && !isCorrect) {
       toast({ title: "Incorrect", description: "Better luck next time!" });
       return;
@@ -318,6 +367,7 @@ export default function FanActivities() {
       });
 
       setPollQuizModalOpen(false);
+      setSelectedActivity(null);
     } catch (err: any) {
       toast({
         title: "Error",
@@ -382,7 +432,7 @@ export default function FanActivities() {
               const pending = hasPendingClaim(activity.id);
 
               return (
-                <Card key={activity.id}>
+                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
                   <CardContent className="py-4 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -418,7 +468,10 @@ export default function FanActivities() {
       {/* Manual Proof */}
       <ManualProofModal
         open={proofModalOpen}
-        onOpenChange={setProofModalOpen}
+        onOpenChange={(open) => {
+          setProofModalOpen(open);
+          if (!open) setSelectedActivity(null);
+        }}
         activityName={selectedActivity?.name || ""}
         pointsAwarded={selectedActivity?.points_awarded || 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
@@ -429,7 +482,10 @@ export default function FanActivities() {
       {/* QR Scanner */}
       <QRScannerModal
         open={qrScannerOpen}
-        onOpenChange={setQrScannerOpen}
+        onOpenChange={(open) => {
+          setQrScannerOpen(open);
+          if (!open) setSelectedActivity(null);
+        }}
         activityName={selectedActivity?.name || ""}
         expectedQRData={selectedActivity?.qr_code_data || null}
         pointsAwarded={selectedActivity?.points_awarded || 0}
@@ -441,7 +497,10 @@ export default function FanActivities() {
       {/* Location Check-in */}
       <LocationCheckinModal
         open={locationModalOpen}
-        onOpenChange={setLocationModalOpen}
+        onOpenChange={(open) => {
+          setLocationModalOpen(open);
+          if (!open) setSelectedActivity(null);
+        }}
         activityName={selectedActivity?.name || ""}
         targetLat={selectedActivity?.location_lat ?? null}
         targetLng={selectedActivity?.location_lng ?? null}
@@ -456,7 +515,10 @@ export default function FanActivities() {
       {selectedActivity?.in_app_config && (
         <PollQuizParticipation
           isOpen={pollQuizModalOpen}
-          onClose={() => setPollQuizModalOpen(false)}
+          onClose={() => {
+            setPollQuizModalOpen(false);
+            setSelectedActivity(null);
+          }}
           activityName={selectedActivity.name}
           config={selectedActivity.in_app_config as unknown as InAppConfig}
           pointsAwarded={selectedActivity.points_awarded}
