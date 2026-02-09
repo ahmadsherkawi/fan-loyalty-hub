@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/ui/Logo";
-import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -23,7 +22,6 @@ export default function JoinClub() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { previewEnrolledClub, setPreviewEnrolledClub } = usePreviewMode();
   const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
@@ -34,7 +32,7 @@ export default function JoinClub() {
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
 
-  // NEW — search/filter
+  // Search/filter
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
 
@@ -60,7 +58,7 @@ export default function JoinClub() {
     if (!isPreviewMode && profile?.role === "fan") {
       initRealFlow();
     }
-  }, [loading, profile, isPreviewMode]);
+  }, [loading, profile, isPreviewMode, navigate]);
 
   const initRealFlow = async () => {
     const alreadyMember = await checkMembership();
@@ -71,7 +69,9 @@ export default function JoinClub() {
   const checkMembership = async (): Promise<boolean> => {
     if (!profile) return false;
 
-    const { data } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
+    const { data, error } = await supabase.from("fan_memberships").select("id").eq("fan_id", profile.id).limit(1);
+
+    if (error) return false;
 
     if (data?.length) {
       navigate("/fan/home", { replace: true });
@@ -90,10 +90,10 @@ export default function JoinClub() {
       if (error) throw error;
 
       setClubs((data ?? []) as unknown as ClubWithProgram[]);
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to load clubs.",
+        description: err?.message || "Failed to load clubs.",
         variant: "destructive",
       });
     } finally {
@@ -140,10 +140,10 @@ export default function JoinClub() {
       });
 
       navigate("/fan/home");
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to join.",
+        description: err?.message || "Failed to join.",
         variant: "destructive",
       });
     } finally {
@@ -153,11 +153,12 @@ export default function JoinClub() {
   };
 
   // SEARCH + FILTER
-  const countries = Array.from(new Set(clubs.map((c) => c.country))).sort();
+  const countries = Array.from(new Set(clubs.map((c) => c.country).filter(Boolean))).sort();
 
   const filteredClubs = clubs.filter((c) => {
     const matchSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) || c.city.toLowerCase().includes(search.toLowerCase());
+      (c.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.city || "").toLowerCase().includes(search.toLowerCase());
 
     const matchCountry = countryFilter === "all" || c.country === countryFilter;
 
@@ -171,12 +172,14 @@ export default function JoinClub() {
     setRequestSending(true);
 
     try {
-      await supabase.from("club_join_requests").insert({
+      const { error } = await supabase.from("club_join_requests").insert({
         fan_id: profile.id,
         club_name: requestClubName.trim(),
         country: requestCountry || null,
         club_contact: requestContact || null,
       });
+
+      if (error) throw error;
 
       toast({
         title: "Request sent",
@@ -186,10 +189,10 @@ export default function JoinClub() {
       setRequestClubName("");
       setRequestCountry("");
       setRequestContact("");
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to send request.",
+        description: err?.message || "Failed to send request.",
         variant: "destructive",
       });
     } finally {
