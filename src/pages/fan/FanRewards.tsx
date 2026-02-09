@@ -38,8 +38,6 @@ export default function FanRewards() {
   const [redemptionModalOpen, setRedemptionModalOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
-  /* ---------------- FETCH DATA ---------------- */
-
   useEffect(() => {
     if (isPreviewMode) {
       setDataLoading(false);
@@ -57,7 +55,7 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
-      /* membership */
+      // membership
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -72,12 +70,12 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      /* program */
+      // program
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
-      /* rewards */
+      // rewards
       const { data: rewardsData } = await supabase
         .from("rewards")
         .select("*")
@@ -86,7 +84,7 @@ export default function FanRewards() {
 
       setRewards((rewardsData ?? []) as Reward[]);
 
-      /* redemption history */
+      // redemption history
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
         .select(
@@ -113,8 +111,6 @@ export default function FanRewards() {
       setDataLoading(false);
     }
   };
-
-  /* ---------------- SECURE REDEMPTION ---------------- */
 
   const handleConfirmRedeem = async (): Promise<{
     success: boolean;
@@ -143,9 +139,11 @@ export default function FanRewards() {
         title: "Reward redeemed!",
         description: data ? `Your code: ${data}` : "Your redemption was successful.",
       });
+
       setRedemptionModalOpen(false);
       setSelectedReward(null);
       await fetchData();
+
       return { success: true };
     } catch (err: any) {
       const message = err?.message || "Redemption failed. Please try again.";
@@ -162,8 +160,6 @@ export default function FanRewards() {
     }
   };
 
-  /* ---------------- LOADING ---------------- */
-
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -172,7 +168,8 @@ export default function FanRewards() {
     );
   }
 
-  /* ---------------- UI ---------------- */
+  const balance = membership?.points_balance ?? 0;
+  const currency = program?.points_currency_name ?? "Points";
 
   return (
     <div className="min-h-screen bg-background">
@@ -189,7 +186,6 @@ export default function FanRewards() {
       </header>
 
       <main className="container py-8">
-        {/* HEADER */}
         <div className="flex justify-between mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Gift className="h-8 w-8 text-accent" />
@@ -198,23 +194,21 @@ export default function FanRewards() {
 
           <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
             <Trophy className="h-5 w-5 text-primary" />
-            <span className="font-bold">{membership?.points_balance ?? 0}</span>
-            <span className="text-muted-foreground">{program?.points_currency_name}</span>
+            <span className="font-bold">{balance}</span>
+            <span className="text-muted-foreground">{currency}</span>
           </div>
         </div>
 
-        {/* TABS */}
         <Tabs defaultValue="available">
           <TabsList className="grid grid-cols-2 max-w-md">
             <TabsTrigger value="available">Available</TabsTrigger>
             <TabsTrigger value="history">My Redemptions</TabsTrigger>
           </TabsList>
 
-          {/* AVAILABLE */}
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
-                const canAfford = (membership?.points_balance ?? 0) >= reward.points_cost;
+                const canAfford = balance >= reward.points_cost;
 
                 return (
                   <Card key={reward.id}>
@@ -222,8 +216,12 @@ export default function FanRewards() {
                       <h3 className="font-semibold">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
+                      <Badge className="mt-3">
+                        Cost: {reward.points_cost} {currency}
+                      </Badge>
+
                       <Button
-                        className="mt-4"
+                        className="mt-4 w-full"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
                           setSelectedReward(reward);
@@ -239,7 +237,6 @@ export default function FanRewards() {
             </div>
           </TabsContent>
 
-          {/* HISTORY */}
           <TabsContent value="history">
             <div className="space-y-4 mt-6">
               {redemptions.map((r) => (
@@ -258,13 +255,12 @@ export default function FanRewards() {
         </Tabs>
       </main>
 
-      {/* MODAL */}
       <RewardRedemptionModal
         isOpen={redemptionModalOpen}
         onClose={() => setRedemptionModalOpen(false)}
         reward={selectedReward}
-        pointsBalance={membership?.points_balance ?? 0}
-        pointsCurrency={program?.points_currency_name ?? "Points"}
+        pointsBalance={balance}
+        pointsCurrency={currency}
         onConfirmRedeem={handleConfirmRedeem}
         isPreview={isPreviewMode}
       />
