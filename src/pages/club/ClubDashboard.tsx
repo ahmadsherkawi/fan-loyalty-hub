@@ -3,175 +3,260 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Loader2, ShieldCheck, ShieldAlert, LogOut } from "lucide-react";
-import { Club, LoyaltyProgram } from "@/types/database";
+import { Loader2, Users, Zap, Gift, FileCheck, Trophy, LogOut, ShieldCheck } from "lucide-react";
+
+import type { Club, LoyaltyProgram } from "@/types/database";
+
+interface Stats {
+  fans: number;
+  activities: number;
+  rewards: number;
+  claims: number;
+  points: number;
+}
 
 export default function ClubDashboard() {
-const navigate = useNavigate();
-const [searchParams] = useSearchParams();
-const { user, profile, signOut, loading } = useAuth();
-const { previewClubStatus } = usePreviewMode();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user, profile, signOut, loading } = useAuth();
+  const { previewClubStatus } = usePreviewMode();
 
-const isPreviewMode = searchParams.get("preview") === "club_admin";
+  const isPreview = searchParams.get("preview") === "club_admin";
 
-const [club, setClub] = useState<Club | null>(null);
-const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-const [dataLoading, setDataLoading] = useState(true);
+  const [club, setClub] = useState<Club | null>(null);
+  const [program, setProgram] = useState<LoyaltyProgram | null>(null);
+  const [stats, setStats] = useState<Stats>({
+    fans: 0,
+    activities: 0,
+    rewards: 0,
+    claims: 0,
+    points: 0,
+  });
 
-useEffect(() => {
-if (isPreviewMode) {
-setClub({
-id: "preview",
-admin_id: "preview",
-name: "Demo Club",
-logo_url: null,
-primary_color: "#1a7a4c",
-country: "",
-city: "",
-stadium_name: null,
-season_start: null,
-season_end: null,
-status: previewClubStatus,
-created_at: "",
-updated_at: "",
-});
-setDataLoading(false);
-return;
-}
+  const [dataLoading, setDataLoading] = useState(true);
 
-```
-if (!loading && !user) {
-  navigate("/auth?role=club_admin");
-  return;
-}
+  /* ---------------- LOAD ---------------- */
 
-if (!loading && profile?.role !== "club_admin") {
-  navigate("/fan/home");
-  return;
-}
+  useEffect(() => {
+    if (isPreview) {
+      setClub({
+        id: "preview",
+        admin_id: "preview",
+        name: "Demo FC",
+        logo_url: null,
+        primary_color: "#16a34a",
+        country: "",
+        city: "",
+        stadium_name: null,
+        season_start: null,
+        season_end: null,
+        status: previewClubStatus,
+        created_at: "",
+        updated_at: "",
+      });
+      setDataLoading(false);
+      return;
+    }
 
-if (!loading && profile) {
-  fetchData();
-}
-```
+    if (!loading && !user) navigate("/auth?role=club_admin");
+    if (!loading && profile?.role !== "club_admin") navigate("/fan/home");
+    if (!loading && profile) fetchData();
+  }, [loading, user, profile]);
 
-}, [user, profile, loading, isPreviewMode]);
+  /* ---------------- FETCH ---------------- */
 
-const fetchData = async () => {
-if (!profile) return;
+  const fetchData = async () => {
+    if (!profile) return;
 
-```
-setDataLoading(true);
+    setDataLoading(true);
 
-try {
-  const { data: clubs } = await supabase
-    .from("clubs")
-    .select("*")
-    .eq("admin_id", profile.id)
-    .limit(1);
+    try {
+      /* club */
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
 
-  if (!clubs?.length) {
-    navigate("/club/onboarding");
-    return;
+      if (!clubs?.length) {
+        navigate("/club/onboarding");
+        return;
+      }
+
+      const clubData = clubs[0] as Club;
+      setClub(clubData);
+
+      /* program */
+      const { data: programs } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("club_id", clubData.id)
+        .limit(1);
+
+      if (programs?.length) setProgram(programs[0] as LoyaltyProgram);
+
+      const programId = programs?.[0]?.id;
+
+      /* stats */
+      const { count: fans } = await supabase
+        .from("fan_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("club_id", clubData.id);
+
+      const { count: activities } = await supabase
+        .from("activities")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", programId)
+        .eq("is_active", true);
+
+      const { count: rewards } = await supabase
+        .from("rewards")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", programId)
+        .eq("is_active", true);
+
+      const { count: claims } = await supabase
+        .from("manual_claims")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned, activities!inner(program_id)")
+        .eq("activities.program_id", programId);
+
+      const totalPoints = completions?.reduce((s, c) => s + c.points_earned, 0) ?? 0;
+
+      setStats({
+        fans: fans ?? 0,
+        activities: activities ?? 0,
+        rewards: rewards ?? 0,
+        claims: claims ?? 0,
+        points: totalPoints,
+      });
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  /* ---------------- SIGN OUT ---------------- */
+
+  const handleSignOut = async () => {
+    if (isPreview) navigate("/preview");
+    else {
+      await signOut();
+      navigate("/");
+    }
+  };
+
+  /* ---------------- LOADING ---------------- */
+
+  if (!isPreview && (loading || dataLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
-  const clubData = clubs[0] as Club;
-  setClub(clubData);
+  const verified = club?.status === "verified" || club?.status === "official";
 
-  const { data: programs } = await supabase
-    .from("loyalty_programs")
-    .select("*")
-    .eq("club_id", clubData.id)
-    .limit(1);
+  /* ================= UI ================= */
 
-  if (programs?.length) setProgram(programs[0] as LoyaltyProgram);
-} catch (err) {
-  console.error("Dashboard error:", err);
-} finally {
-  setDataLoading(false);
-}
-```
+  return (
+    <div className="min-h-screen bg-background">
+      {isPreview && <PreviewBanner role="club_admin" />}
 
-};
-
-const handleSignOut = async () => {
-if (isPreviewMode) navigate("/preview");
-else {
-await signOut();
-navigate("/");
-}
-};
-
-if (!isPreviewMode && (loading || dataLoading)) {
-return ( <div className="min-h-screen flex items-center justify-center"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </div>
-);
-}
-
-const isVerified = club?.status === "verified" || club?.status === "official";
-
-return ( <div className="min-h-screen bg-background">
-{isPreviewMode && <PreviewBanner role="club_admin" />}
-
-```
-  <header className="border-b bg-card">
-    <div className="container py-4 flex justify-between items-center">
-      <Logo />
-      <Button variant="ghost" onClick={handleSignOut}>
-        <LogOut className="h-4 w-4 mr-2" />
-        {isPreviewMode ? "Exit" : "Sign Out"}
-      </Button>
-    </div>
-  </header>
-
-  <main className="container py-8 space-y-6">
-    {/* Verification Card */}
-    {club && (
-      <Card className={isVerified ? "border-primary bg-primary/5" : "border-warning bg-warning/5"}>
-        <CardContent className="pt-6 flex items-center gap-4">
-          {isVerified ? (
-            <ShieldCheck className="h-6 w-6 text-primary" />
-          ) : (
-            <ShieldAlert className="h-6 w-6 text-warning" />
-          )}
-
-          <div>
-            <h3 className="font-semibold">
-              {isVerified ? "Club Verified" : "Verification Needed"}
-            </h3>
-
-            <Badge variant={isVerified ? "default" : "secondary"}>
-              {club.status}
-            </Badge>
+      {/* HEADER */}
+      <header className="border-b bg-card">
+        <div className="container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Logo />
+            <span className="font-semibold">{club?.name}</span>
+            {verified && (
+              <Badge className="bg-primary/10 text-primary border-primary/20">
+                <ShieldCheck className="h-3 w-3 mr-1" /> Verified
+              </Badge>
+            )}
           </div>
-        </CardContent>
-      </Card>
-    )}
 
-    {/* Program */}
-    {program ? (
-      <Card>
-        <CardHeader>
-          <CardTitle>{program.name}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          Points currency: <strong>{program.points_currency_name}</strong>
-        </CardContent>
-      </Card>
-    ) : (
-      <Card>
-        <CardContent className="pt-6">
-          No loyalty program yet.
-        </CardContent>
-      </Card>
-    )}
-  </main>
-</div>
-```
+          <Button variant="ghost" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          </Button>
+        </div>
+      </header>
 
-);
+      {/* MAIN */}
+      <main className="container py-8 space-y-8">
+        {/* TITLE */}
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Manage your fan loyalty ecosystem</p>
+        </div>
+
+        {/* STATS */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Stat icon={<Users />} label="Fans" value={stats.fans} />
+          <Stat icon={<Zap />} label="Activities" value={stats.activities} />
+          <Stat icon={<Gift />} label="Rewards" value={stats.rewards} />
+          <Stat icon={<FileCheck />} label="Claims" value={stats.claims} />
+          <Stat icon={<Trophy />} label="Points Issued" value={stats.points} />
+        </div>
+
+        {/* QUICK ACTIONS */}
+        <div className="grid md:grid-cols-3 gap-6">
+          <Action
+            title="Manage Activities"
+            desc="Create and edit fan activities"
+            disabled={!program}
+            onClick={() => navigate("/club/activities")}
+          />
+
+          <Action
+            title="Manage Rewards"
+            desc="Configure redemption rewards"
+            disabled={!program}
+            onClick={() => navigate("/club/rewards")}
+          />
+
+          <Action
+            title="Review Claims"
+            desc="Approve manual submissions"
+            disabled={!program}
+            onClick={() => navigate("/club/claims")}
+          />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ---------- SMALL COMPONENTS ---------- */
+
+function Stat({ icon, label, value }: any) {
+  return (
+    <Card>
+      <CardContent className="pt-6 text-center">
+        <div className="mx-auto mb-2 h-8 w-8 text-primary">{icon}</div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Action({ title, desc, onClick, disabled }: any) {
+  return (
+    <Card
+      onClick={!disabled ? onClick : undefined}
+      className={disabled ? "opacity-50" : "cursor-pointer hover:shadow-md transition"}
+    >
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <p className="text-sm text-muted-foreground">{desc}</p>
+      </CardHeader>
+    </Card>
+  );
 }
