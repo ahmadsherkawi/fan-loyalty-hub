@@ -382,7 +382,7 @@ export default function FanActivities() {
               const pending = hasPendingClaim(activity.id);
 
               return (
-                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
+                <Card key={activity.id}>
                   <CardContent className="py-4 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
