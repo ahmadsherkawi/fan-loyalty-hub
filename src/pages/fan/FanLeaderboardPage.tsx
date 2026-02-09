@@ -30,8 +30,6 @@ export default function FanLeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  /* ---------------- AUTH GUARD ---------------- */
-
   useEffect(() => {
     if (loading) return;
 
@@ -50,9 +48,7 @@ export default function FanLeaderboardPage() {
     } else if (profile?.role === "fan") {
       fetchData();
     }
-  }, [loading, user, profile, isPreviewMode, previewPointsBalance]);
-
-  /* ---------------- PREVIEW ---------------- */
+  }, [loading, user, profile, isPreviewMode, previewPointsBalance, navigate]);
 
   const loadPreview = () => {
     const PREVIEW = [
@@ -96,20 +92,20 @@ export default function FanLeaderboardPage() {
     setDataLoading(false);
   };
 
-  /* ---------------- REAL DATA ---------------- */
-
   const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      /* membership */
-      const { data: memberships } = await supabase
+      // membership
+      const { data: memberships, error: mErr } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
+
+      if (mErr) throw mErr;
 
       if (!memberships?.length) {
         navigate("/fan/join");
@@ -118,42 +114,44 @@ export default function FanLeaderboardPage() {
 
       const m = memberships[0] as FanMembership;
 
-      /* club */
-      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-
+      // club
+      const { data: clubData, error: cErr } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      if (cErr) throw cErr;
       setClub(clubData as Club);
 
-      /* program */
-      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-
+      // program
+      const { data: programData, error: pErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .single();
+      if (pErr) throw pErr;
       setProgram(programData as LoyaltyProgram);
 
-      /* leaderboard from SQL view */
-      const { data: rows } = await supabase
+      // leaderboard from view
+      const { data: rows, error: lErr } = await supabase
         .from("club_leaderboard")
         .select("*")
         .eq("club_id", m.club_id)
         .order("rank", { ascending: true })
         .limit(50);
 
-      if (rows) {
-        const mapped: LeaderboardEntry[] = rows.map((r: any) => ({
-          id: r.fan_id,
-          name: r.name,
-          points: r.points_balance ?? 0,
-          rank: r.rank,
-        }));
+      if (lErr) throw lErr;
 
-        setLeaderboard(mapped);
-      }
+      const mapped: LeaderboardEntry[] = (rows ?? []).map((r: any) => ({
+        id: r.fan_id,
+        name: r.name,
+        points: r.points_balance ?? 0,
+        rank: r.rank,
+      }));
+
+      setLeaderboard(mapped);
     } catch (err) {
       console.error("Leaderboard fetch error:", err);
     } finally {
       setDataLoading(false);
     }
   };
-
-  /* ---------------- LOADING ---------------- */
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
@@ -163,13 +161,10 @@ export default function FanLeaderboardPage() {
     );
   }
 
-  /* ---------------- UI ---------------- */
-
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* HEADER */}
       <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
         <div className="container py-4 flex items-center gap-4">
           <Button
@@ -185,7 +180,6 @@ export default function FanLeaderboardPage() {
         </div>
       </header>
 
-      {/* CONTENT */}
       <main className="container py-8">
         <div className="max-w-2xl mx-auto">
           <FanLeaderboard
