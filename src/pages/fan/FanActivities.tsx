@@ -89,6 +89,7 @@ export default function FanActivities() {
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id);
+        .eq("is_active", true);
 
       if (aErr) throw aErr;
       setActivities((acts || []) as unknown as Activity[]);
