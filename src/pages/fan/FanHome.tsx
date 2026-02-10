@@ -50,7 +50,7 @@ export default function FanHome() {
     if (!profile) return;
     setDataLoading(true);
     try {
-      const { data: memberships, error: mErr } = await supabase
+      const { data: memberships, error: mErr } = await (supabase as any)
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
@@ -62,36 +62,42 @@ export default function FanHome() {
       }
       const m = memberships[0] as FanMembership;
       setMembership(m);
-      const { data: clubData, error: cErr } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      const { data: clubData, error: cErr } = await (supabase as any)
+        .from("clubs")
+        .select("*")
+        .eq("id", m.club_id)
+        .single();
       if (cErr) throw cErr;
       setClub(clubData as Club);
-      const { data: programData, error: pErr } = await supabase
+      const { data: programData, error: pErr } = await (supabase as any)
         .from("loyalty_programs")
         .select("*")
         .eq("id", m.program_id)
         .single();
       if (pErr) throw pErr;
       setProgram(programData as LoyaltyProgram);
-      const { data: acts, error: aErr } = await supabase
+      const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true)
         .limit(3);
       if (aErr) throw aErr;
-      setActivities((acts ?? []) as Activity[]);
-      const { data: rews, error: rErr } = await supabase
+      // Cast to unknown first to avoid TypeScript complaining about Json vs InAppConfig
+      setActivities((acts ?? []) as unknown as Activity[]);
+      const { data: rews, error: rErr } = await (supabase as any)
         .from("rewards")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true)
         .limit(3);
       if (rErr) throw rErr;
-      setRewards((rews ?? []) as Reward[]);
+      // Cast to unknown first to avoid type mismatch for Json vs Reward fields
+      setRewards((rews ?? []) as unknown as Reward[]);
 
       // Fetch count of unread notifications for this fan
       try {
-        const { count: unread } = await supabase
+        const { count: unread } = await (supabase as any)
           .from("notifications")
           .select("*", { count: "exact", head: true })
           .eq("user_id", profile.id)
