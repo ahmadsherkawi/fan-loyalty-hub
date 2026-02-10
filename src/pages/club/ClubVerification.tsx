@@ -433,7 +433,7 @@ export default function ClubVerification() {
                     >
                       {isEmailVerified ? "Email Verified" : "Send Verification"}
                     </Button>
-                    {isEmailVerified && <Badge variant="success">Verified</Badge>}
+                    {isEmailVerified && <Badge className="bg-success text-white">Verified</Badge>}
                   </div>
                 )}
               </div>
