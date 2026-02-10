@@ -117,51 +117,43 @@ export default function FanRewards() {
     code?: string | null;
     error?: string;
   }> => {
-    // Ensure membership and reward are selected
     if (!membership || !selectedReward) {
       return { success: false, error: "Missing required data" };
     }
 
-    // In preview mode, simulate success without performing any RPC call
     if (isPreviewMode) {
       return { success: true };
     }
 
     setRedeeming(true);
+
     try {
-      // Call the secure RPC to create a redemption and deduct points
-      const { error } = await supabase.rpc("redeem_reward", {
+      const { data, error } = await supabase.rpc("redeem_reward", {
         p_membership_id: membership.id,
         p_reward_id: selectedReward.id,
       });
 
       if (error) throw error;
 
-      // Determine if we should show a code to the user based on the reward's redemption method
-      let codeToShow: string | null = null;
-      if (selectedReward.redemption_method === "voucher" || selectedReward.redemption_method === "code_display") {
-        codeToShow = selectedReward.voucher_code || null;
-      }
-
-      // Show a toast summarizing the redemption
       toast({
         title: "Reward redeemed!",
-        description: codeToShow ? `Your code: ${codeToShow}` : "Your redemption was successful.",
+        description: data ? `Your code: ${data}` : "Your redemption was successful.",
       });
 
-      // Close the modal, reset state and refresh data
       setRedemptionModalOpen(false);
       setSelectedReward(null);
       await fetchData();
 
-      return { success: true, code: codeToShow };
+      return { success: true };
     } catch (err: any) {
       const message = err?.message || "Redemption failed. Please try again.";
+
       toast({
         title: "Redemption failed",
         description: message,
         variant: "destructive",
       });
+
       return { success: false, error: message };
     } finally {
       setRedeeming(false);
