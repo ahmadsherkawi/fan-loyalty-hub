@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User } from "lucide-react";
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 
 export default function FanHome() {
@@ -26,43 +26,99 @@ export default function FanHome() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
+  // Unread notifications count for bell icon badge
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
   useEffect(() => {
     if (loading) return;
-    if (!isPreviewMode && !user) { navigate("/auth", { replace: true }); return; }
-    if (!isPreviewMode && profile?.role === "club_admin") { navigate("/club/dashboard", { replace: true }); return; }
-    if (!isPreviewMode && profile?.role === "fan") { fetchData(); }
+    if (!isPreviewMode && !user) {
+      navigate("/auth", { replace: true });
+      return;
+    }
+    if (!isPreviewMode && profile?.role === "club_admin") {
+      navigate("/club/dashboard", { replace: true });
+      return;
+    }
+    if (!isPreviewMode && profile?.role === "fan") {
+      fetchData();
+    }
   }, [loading, user, profile, isPreviewMode, navigate]);
 
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
     try {
-      const { data: memberships, error: mErr } = await supabase.from("fan_memberships").select("*").eq("fan_id", profile.id).limit(1);
+      const { data: memberships, error: mErr } = await supabase
+        .from("fan_memberships")
+        .select("*")
+        .eq("fan_id", profile.id)
+        .limit(1);
       if (mErr) throw mErr;
-      if (!memberships?.length) { navigate("/fan/join"); return; }
+      if (!memberships?.length) {
+        navigate("/fan/join");
+        return;
+      }
       const m = memberships[0] as FanMembership;
       setMembership(m);
       const { data: clubData, error: cErr } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
       if (cErr) throw cErr;
       setClub(clubData as Club);
-      const { data: programData, error: pErr } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      const { data: programData, error: pErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .single();
       if (pErr) throw pErr;
       setProgram(programData as LoyaltyProgram);
-      const { data: acts, error: aErr } = await supabase.from("activities").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
+      const { data: acts, error: aErr } = await supabase
+        .from("activities")
+        .select("*")
+        .eq("program_id", m.program_id)
+        .eq("is_active", true)
+        .limit(3);
       if (aErr) throw aErr;
       setActivities((acts ?? []) as Activity[]);
-      const { data: rews, error: rErr } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
+      const { data: rews, error: rErr } = await supabase
+        .from("rewards")
+        .select("*")
+        .eq("program_id", m.program_id)
+        .eq("is_active", true)
+        .limit(3);
       if (rErr) throw rErr;
       setRewards((rews ?? []) as Reward[]);
-    } catch (err) { console.error("FanHome fetch error:", err); } finally { setDataLoading(false); }
+
+      // Fetch count of unread notifications for this fan
+      try {
+        const { count: unread } = await supabase
+          .from("notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", profile.id)
+          .eq("is_read", false);
+        setUnreadCount(unread ?? 0);
+      } catch (nErr) {
+        // ignore notification count errors (table may not exist yet)
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error("FanHome fetch error:", err);
+    } finally {
+      setDataLoading(false);
+    }
   };
 
-  const handleSignOut = async () => { await signOut(); navigate("/"); };
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   if (!isPreviewMode && (loading || dataLoading)) {
-    return (<div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -70,14 +126,35 @@ export default function FanHome() {
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
-      <header className="relative overflow-hidden" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
+      <header
+        className="relative overflow-hidden"
+        style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
+      >
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 gradient-mesh opacity-40" />
 
         <div className="container relative z-10 py-4 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")} className="text-white hover:bg-white/10 rounded-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/fan/notifications")}
+              className="text-white hover:bg-white/10 rounded-full relative"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 text-white text-[8px] items-center justify-center">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/fan/profile")}
+              className="text-white hover:bg-white/10 rounded-full"
+            >
               <User className="h-5 w-5" />
             </Button>
             <Button variant="ghost" onClick={handleSignOut} className="text-white hover:bg-white/10 rounded-full">
@@ -99,7 +176,12 @@ export default function FanHome() {
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => navigate("/fan/leaderboard")} className="mt-5 text-white/60 hover:text-white hover:bg-white/10 rounded-full">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/fan/leaderboard")}
+            className="mt-5 text-white/60 hover:text-white hover:bg-white/10 rounded-full"
+          >
             <Users className="h-4 w-4 mr-2" />
             View Leaderboard
           </Button>
@@ -128,9 +210,15 @@ export default function FanHome() {
                 <CardContent className="py-4 flex justify-between items-center">
                   <div>
                     <p className="font-semibold">{a.name}</p>
-                    <Badge variant="secondary" className="mt-1 rounded-full">+{a.points_awarded} pts</Badge>
+                    <Badge variant="secondary" className="mt-1 rounded-full">
+                      +{a.points_awarded} pts
+                    </Badge>
                   </div>
-                  <Button size="sm" onClick={() => navigate("/fan/activities")} className="rounded-full gradient-stadium">
+                  <Button
+                    size="sm"
+                    onClick={() => navigate("/fan/activities")}
+                    className="rounded-full gradient-stadium"
+                  >
                     Participate
                   </Button>
                 </CardContent>
@@ -161,8 +249,14 @@ export default function FanHome() {
                   <CardContent className="pt-6">
                     <h3 className="font-bold">{r.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
-                    <Badge variant="secondary" className="mt-3 rounded-full">{r.points_cost} pts</Badge>
-                    <Button disabled={!canAfford} className="mt-4 w-full rounded-xl gradient-golden font-semibold" onClick={() => navigate("/fan/rewards")}>
+                    <Badge variant="secondary" className="mt-3 rounded-full">
+                      {r.points_cost} pts
+                    </Badge>
+                    <Button
+                      disabled={!canAfford}
+                      className="mt-4 w-full rounded-xl gradient-golden font-semibold"
+                      onClick={() => navigate("/fan/rewards")}
+                    >
                       Redeem
                     </Button>
                   </CardContent>
