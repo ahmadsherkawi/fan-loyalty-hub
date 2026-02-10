@@ -216,7 +216,7 @@ export default function ClaimReview() {
       if (claimError) throw claimError;
 
       // Call secure RPC to record the completion and award points atomically.
-      const { error: completeError } = await supabase.rpc("complete_activity", {
+      const { error: completeError } = await (supabase.rpc as any)("complete_activity", {
         p_membership_id: claim.membership_id,
         p_activity_id: claim.activity_id,
       });
