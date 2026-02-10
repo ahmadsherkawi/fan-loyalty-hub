@@ -83,7 +83,6 @@ export default function FanLeaderboardPage() {
       name: "Preview Rewards",
       description: null,
       points_currency_name: "Points",
-      is_active: true,
       created_at: "",
       updated_at: "",
     });
