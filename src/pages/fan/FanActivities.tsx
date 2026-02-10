@@ -147,7 +147,6 @@ export default function FanActivities() {
 
   // Single source of truth completion
   const completeViaRpc = async (activity: Activity, metadata: Record<string, unknown>) => {
-    // In preview mode, update the mock state and show a toast
     if (isPreviewMode) {
       addPreviewPoints(activity.points_awarded);
       markActivityCompleted(activity.id);
@@ -158,23 +157,21 @@ export default function FanActivities() {
       return;
     }
 
-    // Guard: membership must be loaded
     if (!membership) return;
 
-    // Call the secure RPC with only membership and activity IDs. Metadata can be logged separately if needed.
-    const { error } = await supabase.rpc("complete_activity", {
+    const { data, error } = await (supabase as any).rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
+      p_metadata: metadata,
     });
+
     if (error) throw error;
 
-    // Show a toast with the points awarded from the activity record
     toast({
       title: "Activity Completed!",
-      description: `You earned ${activity.points_awarded} ${program?.points_currency_name || "Points"}!`,
+      description: `You earned ${data} ${program?.points_currency_name || "Points"}!`,
     });
 
-    // Refresh data to update balances and completion lists
     await fetchData();
   };
 
