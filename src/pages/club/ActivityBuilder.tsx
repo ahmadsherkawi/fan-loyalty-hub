@@ -23,7 +23,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { QRCodeDisplay } from "@/components/ui/QRCodeDisplay";
 import { VenueMapPreview } from "@/components/ui/VenueMapPreview";
-import { PollQuizBuilder, InAppConfig } from "@/components/ui/PollQuizBuilder";
+import { PollQuizBuilder, type InAppConfig } from "@/components/ui/PollQuizBuilder";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -39,8 +39,9 @@ import {
   HelpCircle,
   Calendar,
 } from "lucide-react";
-import { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from "@/types/database";
+import type { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from "@/types/database";
 
+// Labels and descriptions for frequency settings
 const frequencyLabels: Record<ActivityFrequency, string> = {
   once_ever: "Once Ever",
   once_per_match: "Once Per Match",
@@ -55,6 +56,7 @@ const frequencyDescriptions: Record<ActivityFrequency, string> = {
   unlimited: "No limit on how often fans can complete this",
 };
 
+// Labels and descriptions for verification methods
 const verificationLabels: Record<VerificationMethod, string> = {
   qr_scan: "QR Code Scan",
   location_checkin: "Location Check-in",
@@ -76,6 +78,12 @@ const verificationIcons: Record<VerificationMethod, React.ReactNode> = {
   manual_proof: <FileCheck className="h-4 w-4" />,
 };
 
+/**
+ * ActivityBuilder allows club administrators to create and edit fan activities.
+ * It handles different verification methods (QR scan, location, in-app, manual) and
+ * validates input before saving to Supabase. When using QR codes, it ensures that
+ * existing codes are preserved on edit instead of regenerating a new UUID each time.
+ */
 export default function ActivityBuilder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -84,6 +92,7 @@ export default function ActivityBuilder() {
 
   const isPreviewMode = searchParams.get("preview") === "club_admin";
 
+  // Current program and list of activities
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -114,8 +123,10 @@ export default function ActivityBuilder() {
   const [timeWindowStart, setTimeWindowStart] = useState("");
   const [timeWindowEnd, setTimeWindowEnd] = useState("");
 
+  // Fetch program and activities on mount
   useEffect(() => {
     if (isPreviewMode) {
+      // In preview mode, use dummy data and skip network requests
       setProgram({
         id: "preview-program",
         club_id: "preview-club",
@@ -139,41 +150,39 @@ export default function ActivityBuilder() {
     }
   }, [user, profile, loading, navigate, isPreviewMode]);
 
+  /**
+   * Loads the current club’s program and existing activities. Redirects if no program exists.
+   */
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
 
     try {
-      // Get club
+      // Get the club owned by this admin
       const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
-
       if (!clubs || clubs.length === 0) {
         navigate("/club/onboarding");
         return;
       }
 
-      // Get program
+      // Get the loyalty program associated with this club
       const { data: programs } = await supabase
         .from("loyalty_programs")
         .select("*")
         .eq("club_id", clubs[0].id)
         .limit(1);
-
       if (!programs || programs.length === 0) {
         navigate("/club/dashboard");
         return;
       }
-
       setProgram(programs[0] as LoyaltyProgram);
 
-      // Get activities
-      // NOTE: Cast to any to avoid supabase-js type instantiation depth issues.
+      // Fetch activities for this program
       const activitiesTable = supabase.from("activities") as any;
       const { data: activitiesData } = await activitiesTable
         .select("*")
         .eq("program_id", programs[0].id)
         .order("created_at", { ascending: false });
-
       setActivities((activitiesData || []) as unknown as Activity[]);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -182,6 +191,9 @@ export default function ActivityBuilder() {
     }
   };
 
+  /**
+   * Resets form state to defaults when closing the dialog or after saving.
+   */
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -199,6 +211,9 @@ export default function ActivityBuilder() {
     setTimeWindowEnd("");
   };
 
+  /**
+   * Populates the form with existing data when editing an activity and opens the modal.
+   */
   const openEditDialog = (activity: Activity) => {
     setEditingActivity(activity);
     setTitle(activity.name);
@@ -212,7 +227,7 @@ export default function ActivityBuilder() {
     setLocationRadius(activity.location_radius_meters?.toString() || "500");
     setInAppConfig(activity.in_app_config || null);
 
-    // Time window
+    // Determine if the activity has a time window and set form values
     const hasWindow = !!(activity.time_window_start || activity.time_window_end);
     setHasTimeWindow(hasWindow);
     setTimeWindowStart(
@@ -223,6 +238,9 @@ export default function ActivityBuilder() {
     setIsDialogOpen(true);
   };
 
+  /**
+   * Use browser geolocation to set the latitude and longitude for a location check-in.
+   */
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast({
@@ -239,10 +257,7 @@ export default function ActivityBuilder() {
         setLocationLat(position.coords.latitude.toFixed(6));
         setLocationLng(position.coords.longitude.toFixed(6));
         setIsLocating(false);
-        toast({
-          title: "Location Set",
-          description: "Your current location has been set as the venue.",
-        });
+        toast({ title: "Location Set", description: "Your current location has been set as the venue." });
       },
       (error) => {
         setIsLocating(false);
@@ -256,16 +271,16 @@ export default function ActivityBuilder() {
     );
   };
 
+  /**
+   * Handles form submission for creating or updating an activity. Performs validation and persists
+   * data via Supabase RPC. When editing a QR-verified activity, it preserves the existing QR code.
+   */
   const handleSubmit = async () => {
     if (!program) return;
 
     const points = parseInt(pointsAwarded);
     if (isNaN(points) || points <= 0) {
-      toast({
-        title: "Invalid Points",
-        description: "Points must be a positive number.",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid Points", description: "Points must be a positive number.", variant: "destructive" });
       return;
     }
 
@@ -274,7 +289,6 @@ export default function ActivityBuilder() {
       const lat = parseFloat(locationLat);
       const lng = parseFloat(locationLng);
       const radius = parseInt(locationRadius);
-
       if (isNaN(lat) || lat < -90 || lat > 90) {
         toast({
           title: "Invalid Latitude",
@@ -368,8 +382,8 @@ export default function ActivityBuilder() {
     const parsedTimeWindowStart = hasTimeWindow && timeWindowStart ? new Date(timeWindowStart).toISOString() : null;
     const parsedTimeWindowEnd = hasTimeWindow && timeWindowEnd ? new Date(timeWindowEnd).toISOString() : null;
 
+    // If in preview mode, just simulate the creation/edit and avoid DB writes
     if (isPreviewMode) {
-      // Simulate activity creation
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
         program_id: program.id,
@@ -389,7 +403,6 @@ export default function ActivityBuilder() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
       if (editingActivity) {
         setActivities(activities.map((a) => (a.id === editingActivity.id ? newActivity : a)));
         toast({ title: "Activity Updated" });
@@ -397,7 +410,6 @@ export default function ActivityBuilder() {
         setActivities([newActivity, ...activities]);
         toast({ title: "Activity Created", description: "Your new activity is ready for fans." });
       }
-
       setIsDialogOpen(false);
       resetForm();
       return;
@@ -406,6 +418,26 @@ export default function ActivityBuilder() {
     setIsSubmitting(true);
 
     try {
+      // Determine QR code data: preserve existing code if editing and verification hasn't changed.
+      let qrCodeData: string | null = null;
+      if (verificationMethod === "qr_scan") {
+        if (editingActivity && editingActivity.verification_method === "qr_scan" && editingActivity.qr_code_data) {
+          // Keep existing QR code when editing an existing QR activity
+          qrCodeData = editingActivity.qr_code_data;
+        } else {
+          // Generate a new UUID for new QR activities or when switching to QR
+          // Use crypto.randomUUID if available; fall back to a simple generator
+          const generator =
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID.bind(crypto)
+              : () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          qrCodeData = generator();
+        }
+      } else {
+        // Not a QR activity; remove qr_code_data
+        qrCodeData = null;
+      }
+
       const activityData = {
         program_id: program.id,
         name: title,
@@ -414,7 +446,7 @@ export default function ActivityBuilder() {
         frequency,
         verification_method: verificationMethod,
         is_active: isActive,
-        qr_code_data: verificationMethod === "qr_scan" ? crypto.randomUUID() : null,
+        qr_code_data: qrCodeData,
         location_lat: parsedLat,
         location_lng: parsedLng,
         location_radius_meters: parsedRadius,
@@ -425,65 +457,42 @@ export default function ActivityBuilder() {
 
       if (editingActivity) {
         const { error } = await supabase.from("activities").update(activityData).eq("id", editingActivity.id);
-
         if (error) throw error;
-
-        toast({
-          title: "Activity Updated",
-          description: "The activity has been updated successfully.",
-        });
+        toast({ title: "Activity Updated", description: "The activity has been updated successfully." });
       } else {
         const { error } = await supabase.from("activities").insert(activityData);
-
         if (error) throw error;
-
-        toast({
-          title: "Activity Created",
-          description: "Your new activity is ready for fans.",
-        });
+        toast({ title: "Activity Created", description: "Your new activity is ready for fans." });
       }
-
       setIsDialogOpen(false);
       resetForm();
       fetchData();
     } catch (error: unknown) {
       const err = error as Error;
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save activity",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err.message || "Failed to save activity", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /**
+   * Deletes an activity after confirmation.
+   */
   const handleDelete = async (activityId: string) => {
     if (!confirm("Are you sure you want to delete this activity?")) return;
-
     if (isPreviewMode) {
       setActivities(activities.filter((a) => a.id !== activityId));
       toast({ title: "Activity Deleted" });
       return;
     }
-
     try {
       const { error } = await supabase.from("activities").delete().eq("id", activityId);
-
       if (error) throw error;
-
-      toast({
-        title: "Activity Deleted",
-        description: "The activity has been removed.",
-      });
+      toast({ title: "Activity Deleted", description: "The activity has been removed." });
       fetchData();
     } catch (error: unknown) {
       const err = error as Error;
-      toast({
-        title: "Error",
-        description: err.message || "Failed to delete activity",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err.message || "Failed to delete activity", variant: "destructive" });
     }
   };
 
@@ -498,7 +507,6 @@ export default function ActivityBuilder() {
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
-
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
@@ -514,7 +522,6 @@ export default function ActivityBuilder() {
           </div>
         </div>
       </header>
-
       <main className="container py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -526,7 +533,6 @@ export default function ActivityBuilder() {
               Create activities for fans to earn {program?.points_currency_name || "points"}
             </p>
           </div>
-
           <Dialog
             open={isDialogOpen}
             onOpenChange={(open) => {
@@ -547,7 +553,6 @@ export default function ActivityBuilder() {
                   Define how fans earn {program?.points_currency_name || "points"} for this activity
                 </DialogDescription>
               </DialogHeader>
-
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Activity Name *</Label>
@@ -558,7 +563,6 @@ export default function ActivityBuilder() {
                     placeholder="e.g., Attend Home Match"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
@@ -569,7 +573,6 @@ export default function ActivityBuilder() {
                     rows={2}
                   />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="points">Points Awarded *</Label>
@@ -581,7 +584,6 @@ export default function ActivityBuilder() {
                       onChange={(e) => setPointsAwarded(e.target.value)}
                     />
                   </div>
-
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1">
                       Frequency
@@ -602,7 +604,6 @@ export default function ActivityBuilder() {
                     <p className="text-xs text-muted-foreground">{frequencyDescriptions[frequency]}</p>
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     Verification Method *
@@ -630,7 +631,6 @@ export default function ActivityBuilder() {
                     {verificationDescriptions[verificationMethod]}
                   </p>
                 </div>
-
                 {/* Location Configuration for Location Check-in */}
                 {verificationMethod === "location_checkin" && (
                   <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
@@ -654,7 +654,6 @@ export default function ActivityBuilder() {
                         Use My Location
                       </Button>
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="locationLat" className="text-xs">
@@ -683,7 +682,6 @@ export default function ActivityBuilder() {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <Label htmlFor="locationRadius" className="text-xs">
                         Check-in Radius (meters) *
@@ -700,7 +698,6 @@ export default function ActivityBuilder() {
                         Fans must be within this distance to check in (50-5000m)
                       </p>
                     </div>
-
                     {/* Map Preview */}
                     {locationLat &&
                       locationLng &&
@@ -720,12 +717,10 @@ export default function ActivityBuilder() {
                       )}
                   </div>
                 )}
-
                 {/* In-App Activity Configuration (Poll/Quiz) */}
                 {verificationMethod === "in_app_completion" && (
                   <PollQuizBuilder value={inAppConfig} onChange={setInAppConfig} />
                 )}
-
                 {/* Time Window Configuration */}
                 <div className="space-y-3 p-4 border border-muted rounded-lg">
                   <div className="flex items-center justify-between">
@@ -738,7 +733,6 @@ export default function ActivityBuilder() {
                   <p className="text-xs text-muted-foreground">
                     Restrict this activity to specific dates and times (e.g., match days only)
                   </p>
-
                   {hasTimeWindow && (
                     <div className="space-y-3 pt-2">
                       <div className="grid grid-cols-2 gap-3">
@@ -777,12 +771,10 @@ export default function ActivityBuilder() {
                     </div>
                   )}
                 </div>
-
                 <div className="flex items-center justify-between">
                   <Label htmlFor="isActive">Active</Label>
                   <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
                 </div>
-
                 <Button onClick={handleSubmit} disabled={!title || isSubmitting} className="w-full gradient-stadium">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {editingActivity ? "Update Activity" : "Create Activity"}
@@ -791,7 +783,6 @@ export default function ActivityBuilder() {
             </DialogContent>
           </Dialog>
         </div>
-
         {/* Activities List */}
         {activities.length === 0 ? (
           <Card>
@@ -864,7 +855,6 @@ export default function ActivityBuilder() {
             ))}
           </div>
         )}
-
         {/* QR Code Display Modal */}
         {qrActivity && qrActivity.qr_code_data && (
           <QRCodeDisplay
