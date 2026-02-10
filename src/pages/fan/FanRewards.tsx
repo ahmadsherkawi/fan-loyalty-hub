@@ -128,7 +128,7 @@ export default function FanRewards() {
     setRedeeming(true);
 
     try {
-      const { data, error } = await supabase.rpc("redeem_reward", {
+      const { data, error } = await (supabase.rpc as any)("redeem_reward", {
         p_membership_id: membership.id,
         p_reward_id: selectedReward.id,
       });
