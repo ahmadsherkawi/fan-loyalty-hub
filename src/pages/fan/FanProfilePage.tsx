@@ -78,6 +78,11 @@ export default function FanProfilePage() {
 
   const [dataLoading, setDataLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("badges");
+  // Tier and season state
+  // tierState holds the membership_tier_state row for this fan's membership. tiersList holds
+  // the tier definitions for the current loyalty program, ordered by ascending threshold_points.
+  const [tierState, setTierState] = useState<any | null>(null);
+  const [tiersList, setTiersList] = useState<any[]>([]);
 
   /* ---------- PREVIEW ---------- */
 
@@ -135,6 +140,12 @@ export default function FanProfilePage() {
     });
 
     setBadges(fanBadges);
+    // Simulate a tier state in preview: assign all points to preview tier and define tiers
+    setTierState({ points_this_season: previewPointsBalance, tier_id: "preview-tier" });
+    setTiersList([
+      { id: "preview-tier", name: "Silver", threshold_points: 1000 },
+      { id: "preview-tier-2", name: "Gold", threshold_points: 2000 },
+    ]);
     setDataLoading(false);
   };
 
@@ -219,6 +230,32 @@ export default function FanProfilePage() {
       });
 
       setBadges(fanBadges);
+
+      // Fetch current tier state and tier definitions
+      try {
+        const { data: tierStateData, error: tsErr } = await supabase
+          .from("membership_tier_state")
+          .select("*")
+          .eq("membership_id", m.id)
+          .maybeSingle();
+        if (!tsErr && tierStateData) {
+          setTierState(tierStateData);
+        }
+      } catch (e) {
+        // ignore tier fetch errors
+      }
+      try {
+        const { data: tierRows, error: tiersErr } = await supabase
+          .from("tiers")
+          .select("*")
+          .eq("program_id", m.program_id)
+          .order("threshold_points", { ascending: true });
+        if (!tiersErr && tierRows) {
+          setTiersList(tierRows);
+        }
+      } catch (e) {
+        // ignore tier fetch errors
+      }
     } catch (err) {
       console.error("FanProfile fetch error:", err);
     } finally {
@@ -253,6 +290,29 @@ export default function FanProfilePage() {
   }
 
   const displayName = isPreviewMode ? "Preview Fan" : profile?.full_name || profile?.email?.split("@")[0] || "Fan";
+
+  // Derive current tier and progress to next tier. Use the ordered tiersList to
+  // find the current tier and the next tier threshold. If there is no next
+  // tier, progress is 1 (complete).
+  let currentTier: any | null = null;
+  let nextTier: any | null = null;
+  let seasonPoints = 0;
+  let tierProgress = 0;
+  if (tiersList.length && tierState) {
+    currentTier = tiersList.find((t: any) => t.id === tierState.tier_id) || null;
+    const currentIndex = tiersList.findIndex((t: any) => t.id === tierState.tier_id);
+    if (currentIndex >= 0) {
+      nextTier = tiersList[currentIndex + 1] || null;
+    }
+    // Some schemas use points_this_season, others use points_season
+    seasonPoints = tierState.points_this_season ?? tierState.points_season ?? 0;
+    if (nextTier) {
+      const nextThreshold = nextTier.threshold_points || 1;
+      tierProgress = Math.min(seasonPoints / nextThreshold, 1);
+    } else {
+      tierProgress = 1;
+    }
+  }
 
   /* ---------- UI ---------- */
 
@@ -292,7 +352,27 @@ export default function FanProfilePage() {
               </Badge>
               {leaderboardRank && <Badge variant="secondary">Rank #{leaderboardRank}</Badge>}
               <Badge variant="secondary">🏅 {badges.filter((b) => b.earned).length} badges</Badge>
+              {currentTier && (
+                <Badge variant="secondary">{(currentTier.name || currentTier.tier_name) + " Tier"}</Badge>
+              )}
             </div>
+            {/* Show tier progress if there is a current tier */}
+            {currentTier &&
+              (nextTier ? (
+                <div className="mt-2">
+                  <div className="flex justify-between items-center text-xs text-primary-foreground/80">
+                    <span>
+                      {seasonPoints} / {nextTier.threshold_points} points to {nextTier.name || nextTier.tier_name}
+                    </span>
+                    <span>{Math.round(tierProgress * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden mt-1">
+                    <div className="bg-accent h-full" style={{ width: `${(tierProgress * 100).toFixed(2)}%` }}></div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-primary-foreground/80 mt-2">You have reached the highest tier.</p>
+              ))}
           </div>
         </div>
       </header>
