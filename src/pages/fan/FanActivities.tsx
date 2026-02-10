@@ -88,7 +88,7 @@ export default function FanActivities() {
       const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
-        .eq("program_id", m.program_id);
+        .eq("program_id", m.program_id)
         .eq("is_active", true);
 
       if (aErr) throw aErr;
