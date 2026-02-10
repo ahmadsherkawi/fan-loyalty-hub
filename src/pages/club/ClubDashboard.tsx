@@ -103,19 +103,17 @@ export default function ClubDashboard() {
         .select("*", { count: "exact", head: true })
         .eq("club_id", clubData.id);
 
-      // 4. Activities: count active activities for this program
+      // 4. Activities: count activities for this program (no is_active filter)
       const { count: activities } = await supabase
         .from("activities")
         .select("*", { count: "exact", head: true })
-        .eq("program_id", programId)
-        .eq("is_active", true);
+        .eq("program_id", programId);
 
-      // 5. Rewards: count active rewards for this program
+      // 5. Rewards: count rewards for this program (no is_active filter)
       const { count: rewards } = await supabase
         .from("rewards")
         .select("*", { count: "exact", head: true })
-        .eq("program_id", programId)
-        .eq("is_active", true);
+        .eq("program_id", programId);
 
       // 6. Pending claims: count manual claims for activities in this program
       // Join to activities to scope by program
