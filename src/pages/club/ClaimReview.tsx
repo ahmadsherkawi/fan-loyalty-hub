@@ -14,6 +14,16 @@ import { ArrowLeft, FileCheck, CheckCircle, XCircle, Clock, Loader2, ExternalLin
 
 import type { ManualClaim, Activity, Profile, LoyaltyProgram, RewardRedemption, Reward } from "@/types/database";
 
+/**
+ * ClaimReview handles manual activity claim approval/rejection and manual reward redemption fulfillment.
+ *
+ * It fetches pending manual claims and reward redemptions for the current club admin’s program and
+ * provides UI actions to approve, reject, or mark fulfillment. Approval of a manual claim will
+ * update the claim status, then call the `complete_activity` RPC to insert a completion row and
+ * award points atomically. Rejecting a claim records the rejection reason. Reward fulfillment
+ * simply updates the `fulfilled_at` timestamp on the redemption row; RLS enforces that only
+ * the correct club admin can perform this action.
+ */
 interface ClaimWithDetails extends ManualClaim {
   activity: Activity;
   fan_profile: Profile;
@@ -40,12 +50,12 @@ export default function ClaimReview() {
   const [dataLoading, setDataLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // manual claim rejection reason (per-row would be nicer, but keeping simple)
+  // Manual claim rejection reason. This could be stored per‑row but is global here for simplicity.
   const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
     if (isPreviewMode) {
-      // Preview mode: keep empty and fast
+      // Preview mode: populate with demo data and avoid real queries.
       setProgram({
         id: "preview-program",
         club_id: "preview-club",
@@ -65,10 +75,12 @@ export default function ClaimReview() {
     if (loading) return;
 
     if (!user) {
+      // Not logged in as admin, redirect to admin auth screen
       navigate("/auth?role=club_admin");
       return;
     }
 
+    // Enforce that only club admins can access this page
     if (profile?.role !== "club_admin") {
       navigate("/fan/home");
       return;
@@ -78,12 +90,15 @@ export default function ClaimReview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreviewMode, loading, user, profile]);
 
+  /**
+   * Fetches the current club’s program, pending manual claims and reward redemptions.
+   */
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
 
     try {
-      // Get club
+      // 1. Find the club owned by this admin
       const { data: clubs, error: clubErr } = await supabase
         .from("clubs")
         .select("id")
@@ -91,15 +106,14 @@ export default function ClaimReview() {
         .limit(1);
 
       if (clubErr) throw clubErr;
-
       if (!clubs?.length) {
+        // Admin has not created a club yet; redirect to onboarding
         navigate("/club/onboarding");
         return;
       }
-
       const clubId = clubs[0].id;
 
-      // Get program
+      // 2. Fetch the loyalty program for this club
       const { data: programs, error: progErr } = await supabase
         .from("loyalty_programs")
         .select("*")
@@ -107,16 +121,15 @@ export default function ClaimReview() {
         .limit(1);
 
       if (progErr) throw progErr;
-
       if (!programs?.length) {
+        // No program yet; redirect to dashboard until one is created
         navigate("/club/dashboard");
         return;
       }
-
       const p = programs[0] as LoyaltyProgram;
       setProgram(p);
 
-      // 1) Manual proof claims (activity claims)
+      // 3. Fetch manual proof claims for activities in this program
       const { data: claimsData, error: claimsErr } = await supabase
         .from("manual_claims")
         .select(
@@ -130,7 +143,6 @@ export default function ClaimReview() {
         .order("created_at", { ascending: false });
 
       if (claimsErr) throw claimsErr;
-
       const formattedClaims = (claimsData ?? []).map((row: any) => {
         const c = row as ManualClaim & { activities: Activity; profiles: Profile };
         return {
@@ -139,11 +151,9 @@ export default function ClaimReview() {
           fan_profile: c.profiles,
         } as ClaimWithDetails;
       });
-
       setActivityClaims(formattedClaims);
 
-      // 2) Reward redemptions that require manual fulfillment
-      // Pending = fulfilled_at is null
+      // 4. Fetch reward redemptions requiring manual fulfillment (pending only)
       const { data: redemptionsData, error: redsErr } = await supabase
         .from("reward_redemptions")
         .select(
@@ -158,7 +168,6 @@ export default function ClaimReview() {
         .order("redeemed_at", { ascending: false });
 
       if (redsErr) throw redsErr;
-
       const formattedRedemptions = (redemptionsData ?? []).map((row: any) => {
         const r = row as RewardRedemption & { rewards: Reward; profiles: Profile };
         return {
@@ -167,7 +176,6 @@ export default function ClaimReview() {
           fan_profile: r.profiles,
         } as RedemptionWithDetails;
       });
-
       setRewardRedemptions(formattedRedemptions);
     } catch (error: any) {
       console.error("ClaimReview fetch error:", error);
@@ -181,17 +189,22 @@ export default function ClaimReview() {
     }
   };
 
-  // APPROVE manual proof claim
+  /**
+   * Approve a manual activity claim.
+   *
+   * Updates the claim’s status, then calls the secure `complete_activity` RPC to
+   * insert a completion record and award points in a single transaction. This
+   * avoids manually inserting into activity_completions and calling award_points
+   * separately on the client, reducing the risk of partial updates when RLS is enabled.
+   */
   const handleApproveActivityClaim = async (claim: ClaimWithDetails) => {
     if (isPreviewMode) {
       toast({ title: "Preview Mode", description: "Approval is simulated in preview mode." });
       return;
     }
-
     setProcessingId(claim.id);
-
     try {
-      // Update claim status
+      // Mark the claim as approved by this admin
       const { error: claimError } = await supabase
         .from("manual_claims")
         .update({
@@ -200,32 +213,19 @@ export default function ClaimReview() {
           reviewed_at: new Date().toISOString(),
         })
         .eq("id", claim.id);
-
       if (claimError) throw claimError;
 
-      // Create completion row
-      const { error: completionError } = await supabase.from("activity_completions").insert({
-        activity_id: claim.activity_id,
-        fan_id: claim.fan_id,
-        membership_id: claim.membership_id,
-        points_earned: claim.activity.points_awarded,
-      });
-
-      if (completionError) throw completionError;
-
-      // Award points (RPC must exist)
-      const { error: pointsError } = await supabase.rpc("award_points", {
+      // Call secure RPC to record the completion and award points atomically.
+      const { error: completeError } = await supabase.rpc("complete_activity", {
         p_membership_id: claim.membership_id,
-        p_points: claim.activity.points_awarded,
+        p_activity_id: claim.activity_id,
       });
-
-      if (pointsError) throw pointsError;
+      if (completeError) throw completeError;
 
       toast({
         title: "Claim Approved",
         description: `Awarded ${claim.activity.points_awarded} ${program?.points_currency_name || "Points"} to the fan.`,
       });
-
       await fetchData();
     } catch (err: any) {
       toast({
@@ -238,13 +238,14 @@ export default function ClaimReview() {
     }
   };
 
-  // REJECT manual proof claim
+  /**
+   * Reject a manual activity claim.
+   */
   const handleRejectActivityClaim = async (claim: ClaimWithDetails) => {
     if (isPreviewMode) {
       toast({ title: "Preview Mode", description: "Rejection is simulated in preview mode." });
       return;
     }
-
     if (!rejectionReason.trim()) {
       toast({
         title: "Rejection Reason Required",
@@ -253,9 +254,7 @@ export default function ClaimReview() {
       });
       return;
     }
-
     setProcessingId(claim.id);
-
     try {
       const { error } = await supabase
         .from("manual_claims")
@@ -266,14 +265,11 @@ export default function ClaimReview() {
           rejection_reason: rejectionReason.trim(),
         })
         .eq("id", claim.id);
-
       if (error) throw error;
-
       toast({
         title: "Claim Rejected",
         description: "Saved rejection reason.",
       });
-
       setRejectionReason("");
       await fetchData();
     } catch (err: any) {
@@ -287,15 +283,16 @@ export default function ClaimReview() {
     }
   };
 
-  // MARK reward redemption fulfilled
+  /**
+   * Mark a reward redemption as fulfilled.
+   * Relies on RLS to ensure the current admin owns the redemption’s club.
+   */
   const handleMarkFulfilled = async (redemption: RedemptionWithDetails) => {
     if (isPreviewMode) {
       toast({ title: "Preview Mode", description: "Fulfillment is simulated in preview mode." });
       return;
     }
-
     setProcessingId(redemption.id);
-
     try {
       const { error } = await supabase
         .from("reward_redemptions")
@@ -303,14 +300,11 @@ export default function ClaimReview() {
           fulfilled_at: new Date().toISOString(),
         })
         .eq("id", redemption.id);
-
       if (error) throw error;
-
       toast({
         title: "Marked fulfilled",
         description: `${redemption.reward?.name || "Reward"} was marked as fulfilled.`,
       });
-
       await fetchData();
     } catch (err: any) {
       toast({
@@ -323,15 +317,16 @@ export default function ClaimReview() {
     }
   };
 
+  // Derived lists for rendering
   const pendingActivityClaims = useMemo(() => activityClaims.filter((c) => c.status === "pending"), [activityClaims]);
   const reviewedActivityClaims = useMemo(() => activityClaims.filter((c) => c.status !== "pending"), [activityClaims]);
-
   const pendingRewardRedemptions = useMemo(() => rewardRedemptions.filter((r) => !r.fulfilled_at), [rewardRedemptions]);
   const fulfilledRewardRedemptions = useMemo(
     () => rewardRedemptions.filter((r) => !!r.fulfilled_at),
     [rewardRedemptions],
   );
 
+  // Loading screen
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -340,10 +335,10 @@ export default function ClaimReview() {
     );
   }
 
+  // Main render
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
-
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -358,7 +353,6 @@ export default function ClaimReview() {
           </div>
         </div>
       </header>
-
       <main className="container py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
@@ -367,7 +361,6 @@ export default function ClaimReview() {
           </h1>
           <p className="text-muted-foreground">Approve activity proof claims and fulfill manual rewards</p>
         </div>
-
         <Tabs defaultValue="rewards">
           <TabsList className="grid grid-cols-2 max-w-md">
             <TabsTrigger value="rewards">
@@ -389,7 +382,6 @@ export default function ClaimReview() {
               </span>
             </TabsTrigger>
           </TabsList>
-
           {/* REWARDS TAB */}
           <TabsContent value="rewards" className="mt-6 space-y-6">
             <div>
@@ -397,7 +389,6 @@ export default function ClaimReview() {
                 <Clock className="h-5 w-5 text-warning" />
                 Pending Fulfillment ({pendingRewardRedemptions.length})
               </h2>
-
               {pendingRewardRedemptions.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
@@ -419,16 +410,13 @@ export default function ClaimReview() {
                                 -{r.points_spent} {program?.points_currency_name || "Points"}
                               </Badge>
                             </div>
-
                             <p className="text-sm text-muted-foreground mb-2">
                               Fan: {r.fan_profile?.full_name || r.fan_profile?.email || "Unknown"}
                             </p>
-
                             <p className="text-xs text-muted-foreground">
                               Redeemed: {new Date(r.redeemed_at).toLocaleString()}
                             </p>
                           </div>
-
                           <div className="flex flex-col gap-2 min-w-[200px]">
                             <Button
                               onClick={() => handleMarkFulfilled(r)}
@@ -450,7 +438,6 @@ export default function ClaimReview() {
                 </div>
               )}
             </div>
-
             {fulfilledRewardRedemptions.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold text-foreground mb-4">Recently Fulfilled</h2>
@@ -472,7 +459,6 @@ export default function ClaimReview() {
               </div>
             )}
           </TabsContent>
-
           {/* ACTIVITIES TAB */}
           <TabsContent value="activities" className="mt-6 space-y-6">
             <div>
@@ -480,7 +466,6 @@ export default function ClaimReview() {
                 <Clock className="h-5 w-5 text-warning" />
                 Pending Claims ({pendingActivityClaims.length})
               </h2>
-
               {pendingActivityClaims.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
@@ -508,17 +493,14 @@ export default function ClaimReview() {
                                 {claim.activity.points_awarded} {program?.points_currency_name || "Points"}
                               </Badge>
                             </div>
-
                             <p className="text-sm text-muted-foreground mb-2">
                               Submitted by: {claim.fan_profile?.full_name || claim.fan_profile?.email || "Unknown"}
                             </p>
-
                             {claim.proof_description && (
                               <p className="text-sm text-foreground mb-2">
                                 <strong>Description:</strong> {claim.proof_description}
                               </p>
                             )}
-
                             {claim.proof_url && (
                               <a
                                 href={claim.proof_url}
@@ -530,12 +512,10 @@ export default function ClaimReview() {
                                 View Proof
                               </a>
                             )}
-
                             <p className="text-xs text-muted-foreground mt-2">
                               Submitted: {new Date(claim.created_at).toLocaleString()}
                             </p>
                           </div>
-
                           <div className="flex flex-col gap-2 min-w-[220px]">
                             <Button
                               onClick={() => handleApproveActivityClaim(claim)}
@@ -549,7 +529,6 @@ export default function ClaimReview() {
                               )}
                               Approve
                             </Button>
-
                             <Textarea
                               placeholder="Rejection reason..."
                               value={rejectionReason}
@@ -557,7 +536,6 @@ export default function ClaimReview() {
                               rows={2}
                               className="text-sm"
                             />
-
                             <Button
                               variant="destructive"
                               onClick={() => handleRejectActivityClaim(claim)}
@@ -574,7 +552,6 @@ export default function ClaimReview() {
                 </div>
               )}
             </div>
-
             {reviewedActivityClaims.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold text-foreground mb-4">Recently Reviewed</h2>
