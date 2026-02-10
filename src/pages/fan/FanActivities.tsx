@@ -83,12 +83,12 @@ export default function FanActivities() {
       if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // Activities
-      const { data: acts, error: aErr } = await supabase
+      // Activities: fetch all activities for the program. Some databases may not have an
+      // is_active column. Frontend will handle active/inactive display if present.
+      const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
-        .eq("program_id", m.program_id)
-        .eq("is_active", true);
+        .eq("program_id", m.program_id);
 
       if (aErr) throw aErr;
       setActivities((acts || []) as unknown as Activity[]);
