@@ -158,7 +158,7 @@ export default function FanProfilePage() {
 
     try {
       /* membership */
-      const { data: memberships } = await supabase
+      const { data: memberships } = await (supabase as any)
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
@@ -173,15 +173,19 @@ export default function FanProfilePage() {
       setMembership(m);
 
       /* club */
-      const { data: clubs } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
+      const { data: clubs } = await (supabase as any).from("clubs").select("*").eq("id", m.club_id).limit(1);
       if (clubs?.length) setClub(clubs[0] as Club);
 
       /* program */
-      const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
+      const { data: programs } = await (supabase as any)
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .limit(1);
       if (programs?.length) setProgram(programs[0] as LoyaltyProgram);
 
       /* completions */
-      const { data: comps } = await supabase
+      const { data: comps } = await (supabase as any)
         .from("activity_completions")
         .select(`*, activities(name, verification_method, points_awarded)`)
         .eq("fan_id", profile.id)
@@ -192,7 +196,7 @@ export default function FanProfilePage() {
       setCompletions(completionsData);
 
       /* redemptions */
-      const { data: reds } = await supabase
+      const { data: reds } = await (supabase as any)
         .from("reward_redemptions")
         .select(`*, rewards(name, redemption_method)`)
         .eq("fan_id", profile.id)
@@ -207,7 +211,7 @@ export default function FanProfilePage() {
       setTotalPointsEarned(totalEarned);
 
       /* leaderboard rank */
-      const { data: allMemberships } = await supabase
+      const { data: allMemberships } = await (supabase as any)
         .from("fan_memberships")
         .select("fan_id, points_balance")
         .eq("club_id", m.club_id)
@@ -233,7 +237,7 @@ export default function FanProfilePage() {
 
       // Fetch current tier state and tier definitions
       try {
-        const { data: tierStateData, error: tsErr } = await supabase
+        const { data: tierStateData, error: tsErr } = await (supabase as any)
           .from("membership_tier_state")
           .select("*")
           .eq("membership_id", m.id)
@@ -245,7 +249,7 @@ export default function FanProfilePage() {
         // ignore tier fetch errors
       }
       try {
-        const { data: tierRows, error: tiersErr } = await supabase
+        const { data: tierRows, error: tiersErr } = await (supabase as any)
           .from("tiers")
           .select("*")
           .eq("program_id", m.program_id)
