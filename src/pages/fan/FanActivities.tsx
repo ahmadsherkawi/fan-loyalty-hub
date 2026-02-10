@@ -159,19 +159,17 @@ export default function FanActivities() {
 
     if (!membership) return;
 
-    const { data, error } = await (supabase as any).rpc("complete_activity", {
+    // Call secure RPC without metadata. Points earned are known from the activity object.
+    const { error } = await (supabase.rpc as any)("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
-      p_metadata: metadata,
     });
-
     if (error) throw error;
 
     toast({
       title: "Activity Completed!",
-      description: `You earned ${data} ${program?.points_currency_name || "Points"}!`,
+      description: `You earned ${activity.points_awarded} ${program?.points_currency_name || "Points"}!`,
     });
-
     await fetchData();
   };
 
