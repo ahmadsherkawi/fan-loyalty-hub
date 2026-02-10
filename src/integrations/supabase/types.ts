@@ -11,6 +11,7 @@ export type Database = {
       activities: {
         Row: {
           created_at: string;
+          is_active: boolean | null;
           description: string | null;
           frequency: Database["public"]["Enums"]["activity_frequency"];
           id: string;
@@ -29,6 +30,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          is_active: boolean | null;
           description?: string | null;
           frequency: Database["public"]["Enums"]["activity_frequency"];
           id?: string;
@@ -47,6 +49,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          is_active: boolean | null;
           description?: string | null;
           frequency?: Database["public"]["Enums"]["activity_frequency"];
           id?: string;
