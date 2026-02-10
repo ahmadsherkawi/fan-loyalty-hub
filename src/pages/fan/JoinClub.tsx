@@ -85,7 +85,10 @@ export default function JoinClub() {
     setDataLoading(true);
 
     try {
-      const { data, error } = await supabase.from("clubs").select("*, loyalty_programs(*)").eq("is_verified", true);
+      const { data, error } = await (supabase as any)
+        .from("clubs")
+        .select("*, loyalty_programs(*)")
+        .eq("is_verified", true);
 
       if (error) throw error;
 
@@ -172,12 +175,12 @@ export default function JoinClub() {
     setRequestSending(true);
 
     try {
-      const { error } = await supabase.from("club_join_requests").insert({
+      const { error } = await (supabase as any).from("club_join_requests").insert({
         fan_id: profile.id,
         club_name: requestClubName.trim(),
         country: requestCountry || null,
         club_contact: requestContact || null,
-      });
+      } as any);
 
       if (error) throw error;
 
