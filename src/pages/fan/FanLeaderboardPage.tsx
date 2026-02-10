@@ -99,7 +99,7 @@ export default function FanLeaderboardPage() {
 
     try {
       // membership
-      const { data: memberships, error: mErr } = await supabase
+      const { data: memberships, error: mErr } = await (supabase as any)
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
@@ -115,12 +115,16 @@ export default function FanLeaderboardPage() {
       const m = memberships[0] as FanMembership;
 
       // club
-      const { data: clubData, error: cErr } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      const { data: clubData, error: cErr } = await (supabase as any)
+        .from("clubs")
+        .select("*")
+        .eq("id", m.club_id)
+        .single();
       if (cErr) throw cErr;
       setClub(clubData as Club);
 
       // program
-      const { data: programData, error: pErr } = await supabase
+      const { data: programData, error: pErr } = await (supabase as any)
         .from("loyalty_programs")
         .select("*")
         .eq("id", m.program_id)
@@ -129,7 +133,7 @@ export default function FanLeaderboardPage() {
       setProgram(programData as LoyaltyProgram);
 
       // leaderboard from view
-      const { data: rows, error: lErr } = await supabase
+      const { data: rows, error: lErr } = await (supabase as any)
         .from("club_leaderboard")
         .select("*")
         .eq("club_id", m.club_id)
