@@ -76,11 +76,7 @@ export default function FanRewards() {
       setProgram(programData as LoyaltyProgram);
 
       // rewards
-      const { data: rewardsData } = await supabase
-        .from("rewards")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .eq("is_active", true);
+      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
 
       setRewards((rewardsData ?? []) as Reward[]);
 
