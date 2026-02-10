@@ -80,7 +80,6 @@ export default function FanHome() {
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id)
-        .eq("is_active", true)
         .limit(3);
       if (aErr) throw aErr;
       // Cast to unknown first to avoid TypeScript complaining about Json vs InAppConfig
@@ -89,7 +88,6 @@ export default function FanHome() {
         .from("rewards")
         .select("*")
         .eq("program_id", m.program_id)
-        .eq("is_active", true)
         .limit(3);
       if (rErr) throw rErr;
       // Cast to unknown first to avoid type mismatch for Json vs Reward fields
