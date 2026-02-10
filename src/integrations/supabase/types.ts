@@ -11,23 +11,29 @@ export type Database = {
       activities: {
         Row: {
           created_at: string;
-          is_active: boolean | null;
           description: string | null;
+          end_at: string | null;
           frequency: Database["public"]["Enums"]["activity_frequency"];
           id: string;
           in_app_config: Json | null;
+          is_active: boolean | null;
           location_lat: number | null;
           location_lng: number | null;
+          location_radius: number | null;
           location_radius_meters: number | null;
+          loyalty_program_id: string | null;
           name: string;
           points_awarded: number;
           program_id: string;
           qr_code_data: string | null;
+          start_at: string | null;
           time_window_end: string | null;
           time_window_start: string | null;
+          title: string | null;
           updated_at: string;
           verification_method: Database["public"]["Enums"]["verification_method"];
         };
+
         Insert: {
           created_at?: string;
           is_active: boolean | null;
