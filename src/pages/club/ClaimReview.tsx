@@ -1,4 +1,3 @@
-// FINAL FILE — ClaimReview.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,13 +33,11 @@ export default function ClaimReview() {
   const isPreviewMode = searchParams.get("preview") === "club_admin";
 
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-
   const [activityClaims, setActivityClaims] = useState<ClaimWithDetails[]>([]);
   const [rewardRedemptions, setRewardRedemptions] = useState<RedemptionWithDetails[]>([]);
 
   const [dataLoading, setDataLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
-
   const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
@@ -111,7 +108,7 @@ export default function ClaimReview() {
       const p = programs[0] as LoyaltyProgram;
       setProgram(p);
 
-      // Manual activity claims (all statuses for tabs)
+      // Manual activity claims
       const { data: claimsData, error: claimsErr } = await supabase
         .from("manual_claims")
         .select(
@@ -133,7 +130,7 @@ export default function ClaimReview() {
 
       setActivityClaims(formattedClaims);
 
-      // 🔴 IMPORTANT FIX — ONLY pending reward fulfillments
+      // 🔴 Corrected reward redemption query (MATCHES DASHBOARD LOGIC)
       const { data: redemptionsData, error: redsErr } = await supabase
         .from("reward_redemptions")
         .select(
@@ -145,7 +142,7 @@ export default function ClaimReview() {
         )
         .eq("rewards.program_id", p.id)
         .eq("rewards.redemption_method", "manual_fulfillment")
-        .is("fulfilled_at", null) // ← MATCHES DASHBOARD LOGIC
+        .is("fulfilled_at", null) // ← REQUIRED FIX
         .order("redeemed_at", { ascending: false });
 
       if (redsErr) throw redsErr;
@@ -169,11 +166,6 @@ export default function ClaimReview() {
   };
 
   const handleApproveActivityClaim = async (claim: ClaimWithDetails) => {
-    if (isPreviewMode) {
-      toast({ title: "Preview Mode", description: "Approval simulated." });
-      return;
-    }
-
     setProcessingId(claim.id);
 
     try {
@@ -251,7 +243,6 @@ export default function ClaimReview() {
       if (error) throw error;
 
       toast({ title: "Marked fulfilled" });
-
       await fetchData();
     } catch (err: any) {
       toast({ title: "Error", description: err?.message, variant: "destructive" });
@@ -261,7 +252,6 @@ export default function ClaimReview() {
   };
 
   const pendingActivityClaims = useMemo(() => activityClaims.filter((c) => c.status === "pending"), [activityClaims]);
-  const reviewedActivityClaims = useMemo(() => activityClaims.filter((c) => c.status !== "pending"), [activityClaims]);
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
@@ -291,7 +281,7 @@ export default function ClaimReview() {
           Review
         </h1>
 
-        {/* REWARDS */}
+        {/* Pending Rewards */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Gift className="h-5 w-5" />
@@ -314,7 +304,7 @@ export default function ClaimReview() {
           ))}
         </div>
 
-        {/* ACTIVITY CLAIMS */}
+        {/* Pending Activity Claims */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Pending Activity Claims ({pendingActivityClaims.length})</h2>
 
