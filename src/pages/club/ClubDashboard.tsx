@@ -119,9 +119,9 @@ export default function ClubDashboard() {
       // Join to activities to scope by program
       const { count: claims } = await supabase
         .from("manual_claims")
-        .select("id, activities!inner(program_id)", { count: "exact", head: true })
-        .eq("status", "pending")
-        .eq("activities.program_id", programId);
+        .select("id, rewards!inner(program_id)", { count: "exact", head: true })
+        .eq("rewards.program_id", programId)
+        .is("fulfilled_at", null);
 
       // 7. Total points issued: sum points_earned for completions in this program
       const { data: completions } = await supabase
