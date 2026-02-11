@@ -1,3 +1,4 @@
+// FINAL FILE — ClaimReview.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,16 +15,6 @@ import { ArrowLeft, FileCheck, CheckCircle, XCircle, Clock, Loader2, ExternalLin
 
 import type { ManualClaim, Activity, Profile, LoyaltyProgram, RewardRedemption, Reward } from "@/types/database";
 
-/**
- * ClaimReview handles manual activity claim approval/rejection and manual reward redemption fulfillment.
- *
- * It fetches pending manual claims and reward redemptions for the current club admin’s program and
- * provides UI actions to approve, reject, or mark fulfillment. Approval of a manual claim will
- * update the claim status, then call the `complete_activity` RPC to insert a completion row and
- * award points atomically. Rejecting a claim records the rejection reason. Reward fulfillment
- * simply updates the `fulfilled_at` timestamp on the redemption row; RLS enforces that only
- * the correct club admin can perform this action.
- */
 interface ClaimWithDetails extends ManualClaim {
   activity: Activity;
   fan_profile: Profile;
@@ -50,12 +41,10 @@ export default function ClaimReview() {
   const [dataLoading, setDataLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Manual claim rejection reason. This could be stored per‑row but is global here for simplicity.
   const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
     if (isPreviewMode) {
-      // Preview mode: populate with demo data and avoid real queries.
       setProgram({
         id: "preview-program",
         club_id: "preview-club",
@@ -75,30 +64,24 @@ export default function ClaimReview() {
     if (loading) return;
 
     if (!user) {
-      // Not logged in as admin, redirect to admin auth screen
       navigate("/auth?role=club_admin");
       return;
     }
 
-    // Enforce that only club admins can access this page
     if (profile?.role !== "club_admin") {
       navigate("/fan/home");
       return;
     }
 
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreviewMode, loading, user, profile]);
 
-  /**
-   * Fetches the current club’s program, pending manual claims and reward redemptions.
-   */
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
 
     try {
-      // 1. Find the club owned by this admin
+      // Club
       const { data: clubs, error: clubErr } = await supabase
         .from("clubs")
         .select("id")
@@ -107,13 +90,12 @@ export default function ClaimReview() {
 
       if (clubErr) throw clubErr;
       if (!clubs?.length) {
-        // Admin has not created a club yet; redirect to onboarding
         navigate("/club/onboarding");
         return;
       }
       const clubId = clubs[0].id;
 
-      // 2. Fetch the loyalty program for this club
+      // Program
       const { data: programs, error: progErr } = await supabase
         .from("loyalty_programs")
         .select("*")
@@ -122,14 +104,14 @@ export default function ClaimReview() {
 
       if (progErr) throw progErr;
       if (!programs?.length) {
-        // No program yet; redirect to dashboard until one is created
         navigate("/club/dashboard");
         return;
       }
+
       const p = programs[0] as LoyaltyProgram;
       setProgram(p);
 
-      // 3. Fetch manual proof claims for activities in this program
+      // Manual activity claims (all statuses for tabs)
       const { data: claimsData, error: claimsErr } = await supabase
         .from("manual_claims")
         .select(
@@ -143,17 +125,15 @@ export default function ClaimReview() {
         .order("created_at", { ascending: false });
 
       if (claimsErr) throw claimsErr;
+
       const formattedClaims = (claimsData ?? []).map((row: any) => {
         const c = row as ManualClaim & { activities: Activity; profiles: Profile };
-        return {
-          ...c,
-          activity: c.activities,
-          fan_profile: c.profiles,
-        } as ClaimWithDetails;
+        return { ...c, activity: c.activities, fan_profile: c.profiles } as ClaimWithDetails;
       });
+
       setActivityClaims(formattedClaims);
 
-      // 4. Fetch reward redemptions requiring manual fulfillment (pending only)
+      // 🔴 IMPORTANT FIX — ONLY pending reward fulfillments
       const { data: redemptionsData, error: redsErr } = await supabase
         .from("reward_redemptions")
         .select(
@@ -165,17 +145,16 @@ export default function ClaimReview() {
         )
         .eq("rewards.program_id", p.id)
         .eq("rewards.redemption_method", "manual_fulfillment")
+        .is("fulfilled_at", null) // ← MATCHES DASHBOARD LOGIC
         .order("redeemed_at", { ascending: false });
 
       if (redsErr) throw redsErr;
+
       const formattedRedemptions = (redemptionsData ?? []).map((row: any) => {
         const r = row as RewardRedemption & { rewards: Reward; profiles: Profile };
-        return {
-          ...r,
-          reward: r.rewards,
-          fan_profile: r.profiles,
-        } as RedemptionWithDetails;
+        return { ...r, reward: r.rewards, fan_profile: r.profiles } as RedemptionWithDetails;
       });
+
       setRewardRedemptions(formattedRedemptions);
     } catch (error: any) {
       console.error("ClaimReview fetch error:", error);
@@ -189,22 +168,15 @@ export default function ClaimReview() {
     }
   };
 
-  /**
-   * Approve a manual activity claim.
-   *
-   * Updates the claim’s status, then calls the secure `complete_activity` RPC to
-   * insert a completion record and award points in a single transaction. This
-   * avoids manually inserting into activity_completions and calling award_points
-   * separately on the client, reducing the risk of partial updates when RLS is enabled.
-   */
   const handleApproveActivityClaim = async (claim: ClaimWithDetails) => {
     if (isPreviewMode) {
-      toast({ title: "Preview Mode", description: "Approval is simulated in preview mode." });
+      toast({ title: "Preview Mode", description: "Approval simulated." });
       return;
     }
+
     setProcessingId(claim.id);
+
     try {
-      // Mark the claim as approved by this admin
       const { error: claimError } = await supabase
         .from("manual_claims")
         .update({
@@ -213,48 +185,37 @@ export default function ClaimReview() {
           reviewed_at: new Date().toISOString(),
         })
         .eq("id", claim.id);
+
       if (claimError) throw claimError;
 
-      // Call secure RPC to record the completion and award points atomically.
       const { error: completeError } = await (supabase.rpc as any)("complete_activity", {
         p_membership_id: claim.membership_id,
         p_activity_id: claim.activity_id,
       });
+
       if (completeError) throw completeError;
 
       toast({
         title: "Claim Approved",
-        description: `Awarded ${claim.activity.points_awarded} ${program?.points_currency_name || "Points"} to the fan.`,
+        description: `Awarded ${claim.activity.points_awarded} ${program?.points_currency_name || "Points"}.`,
       });
+
       await fetchData();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to approve claim",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err?.message, variant: "destructive" });
     } finally {
       setProcessingId(null);
     }
   };
 
-  /**
-   * Reject a manual activity claim.
-   */
   const handleRejectActivityClaim = async (claim: ClaimWithDetails) => {
-    if (isPreviewMode) {
-      toast({ title: "Preview Mode", description: "Rejection is simulated in preview mode." });
-      return;
-    }
     if (!rejectionReason.trim()) {
-      toast({
-        title: "Rejection Reason Required",
-        description: "Please provide a reason for rejection.",
-        variant: "destructive",
-      });
+      toast({ title: "Rejection reason required", variant: "destructive" });
       return;
     }
+
     setProcessingId(claim.id);
+
     try {
       const { error } = await supabase
         .from("manual_claims")
@@ -265,68 +226,43 @@ export default function ClaimReview() {
           rejection_reason: rejectionReason.trim(),
         })
         .eq("id", claim.id);
+
       if (error) throw error;
-      toast({
-        title: "Claim Rejected",
-        description: "Saved rejection reason.",
-      });
+
+      toast({ title: "Claim Rejected" });
       setRejectionReason("");
       await fetchData();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to reject claim",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err?.message, variant: "destructive" });
     } finally {
       setProcessingId(null);
     }
   };
 
-  /**
-   * Mark a reward redemption as fulfilled.
-   * Relies on RLS to ensure the current admin owns the redemption’s club.
-   */
   const handleMarkFulfilled = async (redemption: RedemptionWithDetails) => {
-    if (isPreviewMode) {
-      toast({ title: "Preview Mode", description: "Fulfillment is simulated in preview mode." });
-      return;
-    }
     setProcessingId(redemption.id);
+
     try {
       const { error } = await supabase
         .from("reward_redemptions")
-        .update({
-          fulfilled_at: new Date().toISOString(),
-        })
+        .update({ fulfilled_at: new Date().toISOString() })
         .eq("id", redemption.id);
+
       if (error) throw error;
-      toast({
-        title: "Marked fulfilled",
-        description: `${redemption.reward?.name || "Reward"} was marked as fulfilled.`,
-      });
+
+      toast({ title: "Marked fulfilled" });
+
       await fetchData();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to mark fulfilled",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err?.message, variant: "destructive" });
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Derived lists for rendering
   const pendingActivityClaims = useMemo(() => activityClaims.filter((c) => c.status === "pending"), [activityClaims]);
   const reviewedActivityClaims = useMemo(() => activityClaims.filter((c) => c.status !== "pending"), [activityClaims]);
-  const pendingRewardRedemptions = useMemo(() => rewardRedemptions.filter((r) => !r.fulfilled_at), [rewardRedemptions]);
-  const fulfilledRewardRedemptions = useMemo(
-    () => rewardRedemptions.filter((r) => !!r.fulfilled_at),
-    [rewardRedemptions],
-  );
 
-  // Loading screen
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -335,254 +271,79 @@ export default function ClaimReview() {
     );
   }
 
-  // Main render
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
+
       <header className="border-b bg-card">
-        <div className="container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <Logo />
-          </div>
+        <div className="container py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate("/club/dashboard")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Logo />
         </div>
       </header>
-      <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
-            <FileCheck className="h-8 w-8 text-primary" />
-            Review
-          </h1>
-          <p className="text-muted-foreground">Approve activity proof claims and fulfill manual rewards</p>
+
+      <main className="container py-8 space-y-8">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <FileCheck className="h-8 w-8 text-primary" />
+          Review
+        </h1>
+
+        {/* REWARDS */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            Pending Reward Fulfillment ({rewardRedemptions.length})
+          </h2>
+
+          {rewardRedemptions.map((r) => (
+            <Card key={r.id}>
+              <CardContent className="flex justify-between items-center py-4">
+                <div>
+                  <p className="font-medium">{r.reward?.name}</p>
+                  <p className="text-sm text-muted-foreground">{r.fan_profile?.full_name}</p>
+                </div>
+
+                <Button onClick={() => handleMarkFulfilled(r)} disabled={processingId === r.id}>
+                  {processingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Mark Fulfilled"}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <Tabs defaultValue="rewards">
-          <TabsList className="grid grid-cols-2 max-w-md">
-            <TabsTrigger value="rewards">
-              <span className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                Rewards
-                <Badge variant="secondary" className="ml-1">
-                  {pendingRewardRedemptions.length}
-                </Badge>
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="activities">
-              <span className="flex items-center gap-2">
-                <FileCheck className="h-4 w-4" />
-                Activities
-                <Badge variant="secondary" className="ml-1">
-                  {pendingActivityClaims.length}
-                </Badge>
-              </span>
-            </TabsTrigger>
-          </TabsList>
-          {/* REWARDS TAB */}
-          <TabsContent value="rewards" className="mt-6 space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-warning" />
-                Pending Fulfillment ({pendingRewardRedemptions.length})
-              </h2>
-              {pendingRewardRedemptions.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground mb-2">All Caught Up</h3>
-                    <p className="text-muted-foreground">No pending reward fulfillments.</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {pendingRewardRedemptions.map((r) => (
-                    <Card key={r.id} className="border-l-4 border-l-warning">
-                      <CardContent className="py-4">
-                        <div className="flex flex-col md:flex-row md:items-start gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold text-foreground">{r.reward?.name || "Reward"}</h3>
-                              <Badge variant="secondary">
-                                -{r.points_spent} {program?.points_currency_name || "Points"}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              Fan: {r.fan_profile?.full_name || r.fan_profile?.email || "Unknown"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Redeemed: {new Date(r.redeemed_at).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-2 min-w-[200px]">
-                            <Button
-                              onClick={() => handleMarkFulfilled(r)}
-                              disabled={processingId === r.id}
-                              className="bg-success hover:bg-success/90"
-                            >
-                              {processingId === r.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              ) : (
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                              )}
-                              Mark Fulfilled
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+
+        {/* ACTIVITY CLAIMS */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Pending Activity Claims ({pendingActivityClaims.length})</h2>
+
+          {pendingActivityClaims.map((claim) => (
+            <Card key={claim.id}>
+              <CardContent className="space-y-3 py-4">
+                <div className="flex justify-between">
+                  <p className="font-medium">{claim.activity.name}</p>
+                  <Badge>{claim.activity.points_awarded} pts</Badge>
                 </div>
-              )}
-            </div>
-            {fulfilledRewardRedemptions.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-4">Recently Fulfilled</h2>
-                <div className="space-y-2">
-                  {fulfilledRewardRedemptions.slice(0, 10).map((r) => (
-                    <Card key={r.id} className="border-l-4 border-l-success">
-                      <CardContent className="py-3 flex items-center justify-between">
-                        <div>
-                          <span className="font-medium text-foreground">{r.reward?.name || "Reward"}</span>
-                          <span className="text-sm text-muted-foreground ml-2">
-                            by {r.fan_profile?.full_name || "Unknown"}
-                          </span>
-                        </div>
-                        <Badge variant="default">Fulfilled</Badge>
-                      </CardContent>
-                    </Card>
-                  ))}
+
+                <Textarea
+                  placeholder="Rejection reason..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+
+                <div className="flex gap-2">
+                  <Button onClick={() => handleApproveActivityClaim(claim)} disabled={processingId === claim.id}>
+                    Approve
+                  </Button>
+                  <Button variant="destructive" onClick={() => handleRejectActivityClaim(claim)}>
+                    Reject
+                  </Button>
                 </div>
-              </div>
-            )}
-          </TabsContent>
-          {/* ACTIVITIES TAB */}
-          <TabsContent value="activities" className="mt-6 space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-warning" />
-                Pending Claims ({pendingActivityClaims.length})
-              </h2>
-              {pendingActivityClaims.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      {isPreviewMode ? "No Pending Claims" : "All Caught Up"}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {isPreviewMode
-                        ? "When fans submit proof for activities, they will appear here."
-                        : "No pending activity claims to review."}
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {pendingActivityClaims.map((claim) => (
-                    <Card key={claim.id} className="border-l-4 border-l-warning">
-                      <CardContent className="py-4">
-                        <div className="flex flex-col md:flex-row md:items-start gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold text-foreground">{claim.activity.name}</h3>
-                              <Badge variant="secondary">
-                                {claim.activity.points_awarded} {program?.points_currency_name || "Points"}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              Submitted by: {claim.fan_profile?.full_name || claim.fan_profile?.email || "Unknown"}
-                            </p>
-                            {claim.proof_description && (
-                              <p className="text-sm text-foreground mb-2">
-                                <strong>Description:</strong> {claim.proof_description}
-                              </p>
-                            )}
-                            {claim.proof_url && (
-                              <a
-                                href={claim.proof_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                View Proof
-                              </a>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Submitted: {new Date(claim.created_at).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-2 min-w-[220px]">
-                            <Button
-                              onClick={() => handleApproveActivityClaim(claim)}
-                              disabled={processingId === claim.id}
-                              className="bg-success hover:bg-success/90"
-                            >
-                              {processingId === claim.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              ) : (
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                              )}
-                              Approve
-                            </Button>
-                            <Textarea
-                              placeholder="Rejection reason..."
-                              value={rejectionReason}
-                              onChange={(e) => setRejectionReason(e.target.value)}
-                              rows={2}
-                              className="text-sm"
-                            />
-                            <Button
-                              variant="destructive"
-                              onClick={() => handleRejectActivityClaim(claim)}
-                              disabled={processingId === claim.id}
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-            {reviewedActivityClaims.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-4">Recently Reviewed</h2>
-                <div className="space-y-2">
-                  {reviewedActivityClaims.slice(0, 10).map((claim) => (
-                    <Card
-                      key={claim.id}
-                      className={
-                        claim.status === "approved" ? "border-l-4 border-l-success" : "border-l-4 border-l-destructive"
-                      }
-                    >
-                      <CardContent className="py-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium text-foreground">{claim.activity.name}</span>
-                            <span className="text-sm text-muted-foreground ml-2">
-                              by {claim.fan_profile?.full_name || "Unknown"}
-                            </span>
-                          </div>
-                          <Badge variant={claim.status === "approved" ? "default" : "destructive"}>
-                            {claim.status === "approved" ? "Approved" : "Rejected"}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </main>
     </div>
   );
