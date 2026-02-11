@@ -1,248 +1,172 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Logo } from "@/components/ui/Logo";
-import {
-  ArrowLeft,
-  BarChart3,
-  TrendingUp,
-  Users,
-  Trophy,
-  Zap,
-  Gift,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { Loader2, ArrowLeft } from "lucide-react";
+// Import Recharts components (optional) for future analytics
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line } from "recharts";
 
-interface StatCard {
-  label: string;
-  value: string;
-  change: string;
-  positive: boolean;
-  icon: React.ReactNode;
-  gradient: string;
-}
+import type { Club } from "@/types/database";
 
-const stats: StatCard[] = [
-  {
-    label: "Total Fans",
-    value: "1,247",
-    change: "+12%",
-    positive: true,
-    icon: <Users className="h-5 w-5" />,
-    gradient: "from-primary/20 to-primary/5",
-  },
-  {
-    label: "Points Issued",
-    value: "84,320",
-    change: "+23%",
-    positive: true,
-    icon: <Trophy className="h-5 w-5" />,
-    gradient: "from-accent/20 to-accent/5",
-  },
-  {
-    label: "Activities Done",
-    value: "3,891",
-    change: "+8%",
-    positive: true,
-    icon: <Zap className="h-5 w-5" />,
-    gradient: "from-blue-500/20 to-blue-500/5",
-  },
-  {
-    label: "Rewards Redeemed",
-    value: "412",
-    change: "-3%",
-    positive: false,
-    icon: <Gift className="h-5 w-5" />,
-    gradient: "from-purple-500/20 to-purple-500/5",
-  },
-];
-
-const topActivities = [
-  { name: "Match Day Check-in", completions: 1240, points: 62000 },
-  { name: "Half-time Quiz", completions: 890, points: 26700 },
-  { name: "Social Share", completions: 654, points: 13080 },
-  { name: "Merch Store Visit", completions: 412, points: 8240 },
-  { name: "Fan Survey", completions: 310, points: 9300 },
-];
-
-const weeklyData = [
-  { day: "Mon", value: 65 },
-  { day: "Tue", value: 42 },
-  { day: "Wed", value: 78 },
-  { day: "Thu", value: 55 },
-  { day: "Fri", value: 90 },
-  { day: "Sat", value: 120 },
-  { day: "Sun", value: 95 },
-];
-
-const maxWeekly = Math.max(...weeklyData.map((d) => d.value));
-
+/**
+ * ClubAnalytics displays high-level analytics for a club's loyalty program.
+ * This is a placeholder page that can be extended with Recharts once
+ * backend aggregation endpoints or queries are available. It currently
+ * shows sample data in preview mode and a coming-soon message otherwise.
+ */
 export default function ClubAnalytics() {
   const navigate = useNavigate();
-  const [period] = useState("week");
+  const [searchParams] = useSearchParams();
+  const { user, profile, loading } = useAuth();
+  const isPreviewMode = searchParams.get("preview") === "club_admin";
+
+  const [club, setClub] = useState<Club | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Example sample data for preview mode
+  const sampleFansGrowth = [
+    { month: "Jan", fans: 120 },
+    { month: "Feb", fans: 150 },
+    { month: "Mar", fans: 200 },
+    { month: "Apr", fans: 300 },
+  ];
+  const samplePointsFlow = [
+    { month: "Jan", issued: 5000, spent: 1200 },
+    { month: "Feb", issued: 4500, spent: 900 },
+    { month: "Mar", issued: 6000, spent: 2000 },
+    { month: "Apr", issued: 8000, spent: 3500 },
+  ];
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isPreviewMode && !user) {
+      navigate("/auth?role=club_admin");
+      return;
+    }
+    if (!isPreviewMode && profile?.role !== "club_admin") {
+      navigate("/fan/home");
+      return;
+    }
+    if (isPreviewMode) {
+      // Set dummy club in preview mode
+      setClub({
+        id: "preview",
+        admin_id: "preview",
+        name: "Demo FC",
+        logo_url: null,
+        primary_color: "#16a34a",
+        country: "",
+        city: "",
+        stadium_name: null,
+        season_start: null,
+        season_end: null,
+        status: "verified",
+        created_at: "",
+        updated_at: "",
+      });
+      setDataLoading(false);
+    } else if (profile) {
+      fetchData();
+    }
+  }, [loading, user, profile, isPreviewMode]);
+
+  const fetchData = async () => {
+    if (!profile) return;
+    setDataLoading(true);
+    try {
+      // Load club info
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
+      if (clubs && clubs.length > 0) setClub(clubs[0] as Club);
+      // TODO: fetch real analytics data here using RPCs or aggregations
+    } catch (err) {
+      console.error("ClubAnalytics fetch error:", err);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  if (!isPreviewMode && (loading || dataLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
       {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-30">
+      <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button
             variant="ghost"
-            onClick={() => navigate("/club/dashboard")}
-            className="rounded-full"
+            onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Dashboard
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Logo />
         </div>
+        <div className="container pb-6">
+          <h1 className="text-3xl font-display font-bold tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground mt-1">Understand how fans interact with your loyalty program</p>
+        </div>
       </header>
-
+      {/* Main */}
       <main className="container py-10 space-y-10">
-        {/* Title */}
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-            <BarChart3 className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-display font-bold tracking-tight">
-              Analytics
-            </h1>
-            <p className="text-muted-foreground mt-0.5">
-              Track your program performance
-            </p>
-          </div>
-        </div>
-
-        {/* Stat Cards — Bento */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((s) => (
-            <Card
-              key={s.label}
-              className="rounded-2xl border-border/50 overflow-hidden"
-            >
-              <CardContent className="pt-6">
-                <div
-                  className={`mb-3 h-10 w-10 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center text-foreground`}
-                >
-                  {s.icon}
-                </div>
-                <p className="text-2xl font-display font-bold tracking-tight">
-                  {s.value}
-                </p>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs text-muted-foreground font-medium">
-                    {s.label}
-                  </p>
-                  <span
-                    className={`flex items-center text-xs font-semibold ${
-                      s.positive ? "text-primary" : "text-destructive"
-                    }`}
-                  >
-                    {s.positive ? (
-                      <ArrowUpRight className="h-3 w-3" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3" />
-                    )}
-                    {s.change}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Tabs: Engagement / Activities */}
-        <Tabs defaultValue="engagement">
-          <TabsList className="rounded-full bg-muted/50 p-1 max-w-sm">
-            <TabsTrigger value="engagement" className="rounded-full text-xs">
-              Engagement
-            </TabsTrigger>
-            <TabsTrigger value="activities" className="rounded-full text-xs">
-              Top Activities
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Engagement — Simple bar chart */}
-          <TabsContent value="engagement" className="mt-6">
-            <Card className="rounded-2xl border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-display flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Weekly Activity
-                </CardTitle>
+        {isPreviewMode ? (
+          <>
+            {/* Fans Growth Chart */}
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitle>Fans Growth</CardTitle>
+                <CardDescription>New fans joining your club over time</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-3 h-48 pt-4">
-                  {weeklyData.map((d) => (
-                    <div
-                      key={d.day}
-                      className="flex-1 flex flex-col items-center gap-2"
-                    >
-                      <span className="text-xs font-semibold text-foreground">
-                        {d.value}
-                      </span>
-                      <div
-                        className="w-full rounded-xl bg-gradient-to-t from-primary to-primary/60 transition-all duration-500"
-                        style={{
-                          height: `${(d.value / maxWeekly) * 100}%`,
-                          minHeight: "8px",
-                        }}
-                      />
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {d.day}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sampleFansGrowth} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <XAxis dataKey="month" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="fans" stroke="#10b981" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Top Activities */}
-          <TabsContent value="activities" className="mt-6">
-            <Card className="rounded-2xl border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-display flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  Top Activities
-                </CardTitle>
+            {/* Points Issued vs Spent */}
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitle>Points Issued vs Spent</CardTitle>
+                <CardDescription>Compare points awarded to points redeemed</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {topActivities.map((a, i) => {
-                  const barPct =
-                    (a.completions / topActivities[0].completions) * 100;
-                  return (
-                    <div key={a.name}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-muted-foreground w-5">
-                            #{i + 1}
-                          </span>
-                          <span className="text-sm font-semibold">
-                            {a.name}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {a.completions.toLocaleString()} completions
-                        </span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-700"
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={samplePointsFlow} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <XAxis dataKey="month" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="issued" fill="#3b82f6" name="Issued" />
+                    <Bar dataKey="spent" fill="#f97316" name="Spent" />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-lg font-semibold text-foreground mb-2">Analytics Coming Soon</p>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                We’re working on a comprehensive analytics dashboard to help you track fans growth, points issuance and
+                redemption, activity completion rates, reward redemption rates, and more.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
