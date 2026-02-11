@@ -141,7 +141,7 @@ export default function ClaimReview() {
         `,
         )
         .eq("rewards.program_id", p.id)
-        .eq("rewards.redemption_method", "manual_fulfillment")
+        .in("rewards.redemption_method", ["manual_fulfillment", "voucher", "code_display"])
         .is("fulfilled_at", null) // ← REQUIRED FIX
         .order("redeemed_at", { ascending: false });
 
