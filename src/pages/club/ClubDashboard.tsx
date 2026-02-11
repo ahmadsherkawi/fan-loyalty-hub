@@ -1,4 +1,3 @@
-// FINAL FILE — ClubDashboard.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Loader2, Users, Zap, Gift, FileCheck, Trophy, LogOut, ShieldCheck } from "lucide-react";
+import {
+  Loader2,
+  Users,
+  Zap,
+  Gift,
+  FileCheck,
+  Trophy,
+  LogOut,
+  ShieldCheck,
+  CalendarRange,
+  BarChart3,
+} from "lucide-react";
 
 import type { Club, LoyaltyProgram } from "@/types/database";
 
@@ -22,6 +32,13 @@ interface Stats {
   points: number;
 }
 
+/**
+ * ClubDashboard shows key statistics and actions for the club_admin. It
+ * summarizes fan count, active activities, rewards, pending claims and total
+ * points issued. It also links to the activities manager, rewards manager
+ * and claim review screens. Counts are filtered to the current club’s
+ * loyalty program to ensure accurate numbers.
+ */
 export default function ClubDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -32,17 +49,12 @@ export default function ClubDashboard() {
 
   const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-  const [stats, setStats] = useState<Stats>({
-    fans: 0,
-    activities: 0,
-    rewards: 0,
-    claims: 0,
-    points: 0,
-  });
+  const [stats, setStats] = useState<Stats>({ fans: 0, activities: 0, rewards: 0, claims: 0, points: 0 });
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
     if (isPreview) {
+      // Populate with demo data in preview mode
       setClub({
         id: "preview",
         admin_id: "preview",
@@ -61,72 +73,69 @@ export default function ClubDashboard() {
       setDataLoading(false);
       return;
     }
-
+    // Redirect unauthenticated users to admin auth
     if (!loading && !user) navigate("/auth?role=club_admin");
+    // Redirect non-admin profiles to fan home
     if (!loading && profile?.role !== "club_admin") navigate("/fan/home");
+    // Fetch data once the profile is loaded
     if (!loading && profile) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, profile]);
 
+  /**
+   * Fetches the club, program and counts for the dashboard. Counts are scoped
+   * to the current program so they reflect only this club’s data.
+   */
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
-
     try {
-      // 1. Club
+      // 1. Get the club owned by this admin
       const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
-
       if (!clubs?.length) {
         navigate("/club/onboarding");
         return;
       }
-
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      // 2. Program
+      // 2. Get the loyalty program for this club
       const { data: programs } = await supabase
         .from("loyalty_programs")
         .select("*")
         .eq("club_id", clubData.id)
         .limit(1);
-
       const programRecord = programs?.[0] as LoyaltyProgram | undefined;
       if (programRecord) setProgram(programRecord);
       const programId = programRecord?.id;
 
-      // 3. Fans
+      // 3. Fans: count fan memberships for this club
       const { count: fans } = await supabase
         .from("fan_memberships")
         .select("*", { count: "exact", head: true })
         .eq("club_id", clubData.id);
 
-      // 4. Activities
+      // 4. Activities: count activities for this program (no is_active filter)
       const { count: activities } = await supabase
         .from("activities")
         .select("*", { count: "exact", head: true })
         .eq("program_id", programId);
 
-      // 5. Rewards
+      // 5. Rewards: count rewards for this program (no is_active filter)
       const { count: rewards } = await supabase
         .from("rewards")
         .select("*", { count: "exact", head: true })
         .eq("program_id", programId);
 
-      // 6A. Pending activity proof claims
-      const { count: pendingActivityClaims } = await supabase
+      // 6. Pending claims: count manual claims for activities in this program
+      // Join to activities to scope by program
+      const { count: claims } = await supabase
         .from("manual_claims")
         .select("id, activities!inner(program_id)", { count: "exact", head: true })
         .eq("status", "pending")
         .eq("activities.program_id", programId);
 
-      // 6B. Pending reward fulfillments
-      const { count: pendingRewardFulfillments } = await supabase
-        .from("reward_redemptions")
-        .select("id, rewards!inner(program_id)", { count: "exact", head: true })
-        .is("fulfilled_at", null)
-        .eq("rewards.program_id", programId);
-
-      // 7. Total points issued
+      // 7. Total points issued: sum points_earned for completions in this program
       const { data: completions } = await supabase
         .from("activity_completions")
         .select("points_earned, activities!inner(program_id)")
@@ -138,7 +147,7 @@ export default function ClubDashboard() {
         fans: fans ?? 0,
         activities: activities ?? 0,
         rewards: rewards ?? 0,
-        claims: (pendingActivityClaims ?? 0) + (pendingRewardFulfillments ?? 0),
+        claims: claims ?? 0,
         points: totalPoints,
       });
     } finally {
@@ -146,6 +155,10 @@ export default function ClubDashboard() {
     }
   };
 
+  /**
+   * Sign out the current user. In preview mode, navigate back to the preview page
+   * instead of invalidating the session.
+   */
   const handleSignOut = async () => {
     if (isPreview) navigate("/preview");
     else {
@@ -211,6 +224,12 @@ export default function ClubDashboard() {
     },
   ];
 
+  // ✅ Correct routes for your pages:
+  // - /club/seasons   => ClubSeasons
+  // - /club/analytics => ClubAnalytics
+  const goToSeasons = () => navigate(isPreview ? "/club/seasons?preview=club_admin" : "/club/seasons");
+  const goToAnalytics = () => navigate(isPreview ? "/club/analytics?preview=club_admin" : "/club/analytics");
+
   return (
     <div className="min-h-screen bg-background">
       {isPreview && <PreviewBanner role="club_admin" />}
@@ -228,9 +247,28 @@ export default function ClubDashboard() {
             )}
           </div>
 
-          <Button variant="ghost" onClick={handleSignOut} className="rounded-full">
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
-          </Button>
+          {/* ✅ TOP-RIGHT: Links BEFORE Sign out (as requested) */}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={goToSeasons} className="rounded-full" title="Seasons" aria-label="Seasons">
+              <CalendarRange className="h-4 w-4 mr-2" />
+              Seasons
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={goToAnalytics}
+              className="rounded-full"
+              title="Analytics"
+              aria-label="Analytics"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </Button>
+
+            <Button variant="ghost" onClick={handleSignOut} className="rounded-full">
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -240,13 +278,13 @@ export default function ClubDashboard() {
           <p className="text-muted-foreground mt-1">Manage your fan loyalty ecosystem</p>
         </div>
 
-        {/* STATS GRID */}
+        {/* STATS — Bento Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {statItems.map((s) => (
             <Card key={s.label} className="rounded-2xl border-border/50 overflow-hidden">
               <CardContent className="pt-6 text-center relative">
                 <div
-                  className={`mx-auto mb-3 h-11 w-11 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center`}
+                  className={`mx-auto mb-3 h-11 w-11 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-foreground`}
                 >
                   {s.icon}
                 </div>
