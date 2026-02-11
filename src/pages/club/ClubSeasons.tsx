@@ -1,236 +1,297 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { useToast } from "@/hooks/use-toast";
 import {
+  Loader2,
+  CalendarPlus,
+  CalendarCheck,
+  CalendarX2,
   ArrowLeft,
-  Calendar,
-  Trophy,
-  Users,
-  Zap,
-  ChevronRight,
   Plus,
-  Clock,
-  CheckCircle2,
-  Circle,
+  CheckCircle,
+  RefreshCw,
 } from "lucide-react";
+import type { Club } from "@/types/database";
 
 interface Season {
   id: string;
+  club_id: string;
   name: string;
-  startDate: string;
-  endDate: string;
-  status: "active" | "upcoming" | "completed";
-  fans: number;
-  pointsIssued: number;
-  activitiesCount: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-const demoSeasons: Season[] = [
-  {
-    id: "1",
-    name: "2025/26 Season",
-    startDate: "Aug 2025",
-    endDate: "May 2026",
-    status: "active",
-    fans: 1247,
-    pointsIssued: 84320,
-    activitiesCount: 18,
-  },
-  {
-    id: "2",
-    name: "2024/25 Season",
-    startDate: "Aug 2024",
-    endDate: "May 2025",
-    status: "completed",
-    fans: 980,
-    pointsIssued: 62100,
-    activitiesCount: 14,
-  },
-  {
-    id: "3",
-    name: "Summer 2025 Special",
-    startDate: "Jun 2025",
-    endDate: "Jul 2025",
-    status: "completed",
-    fans: 540,
-    pointsIssued: 12400,
-    activitiesCount: 5,
-  },
-  {
-    id: "4",
-    name: "2026/27 Season",
-    startDate: "Aug 2026",
-    endDate: "May 2027",
-    status: "upcoming",
-    fans: 0,
-    pointsIssued: 0,
-    activitiesCount: 3,
-  },
-];
-
-const statusConfig: Record<
-  Season["status"],
-  { label: string; className: string; icon: React.ReactNode }
-> = {
-  active: {
-    label: "Active",
-    className:
-      "bg-primary/10 text-primary border-primary/20",
-    icon: <Circle className="h-2 w-2 fill-primary text-primary" />,
-  },
-  upcoming: {
-    label: "Upcoming",
-    className:
-      "bg-accent/10 text-accent border-accent/20",
-    icon: <Clock className="h-3 w-3" />,
-  },
-  completed: {
-    label: "Completed",
-    className:
-      "bg-muted text-muted-foreground border-border",
-    icon: <CheckCircle2 className="h-3 w-3" />,
-  },
-};
-
+/**
+ * ClubSeasons allows club administrators to manage their seasons. They can
+ * create new seasons and set which season is currently active. This page
+ * relies on the season functions defined in seasons_and_tiers.sql. It
+ * fetches existing seasons for the club and provides a simple form to
+ * create a new one.
+ */
 export default function ClubSeasons() {
   const navigate = useNavigate();
-  const [seasons] = useState(demoSeasons);
+  const [searchParams] = useSearchParams();
+  const { user, profile, loading } = useAuth();
+  const { toast } = useToast();
 
-  const activeSeason = seasons.find((s) => s.status === "active");
-  const otherSeasons = seasons.filter((s) => s.status !== "active");
+  const isPreviewMode = searchParams.get("preview") === "club_admin";
+
+  const [club, setClub] = useState<Club | null>(null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [creatingDialogOpen, setCreatingDialogOpen] = useState(false);
+  const [seasonName, setSeasonName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  // Load club and seasons on mount
+  useEffect(() => {
+    if (isPreviewMode) {
+      // Use dummy data in preview mode
+      setClub({
+        id: "preview",
+        admin_id: "preview-admin",
+        name: "Demo FC",
+        logo_url: null,
+        primary_color: "#16a34a",
+        country: "",
+        city: "",
+        stadium_name: null,
+        season_start: null,
+        season_end: null,
+        status: "verified",
+        created_at: "",
+        updated_at: "",
+      });
+      setSeasons([
+        {
+          id: "preview-season-1",
+          club_id: "preview",
+          name: "2025 Season",
+          start_date: "2025-01-01",
+          end_date: "2025-12-31",
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+      setDataLoading(false);
+    } else {
+      if (!loading && !user) {
+        navigate("/auth?role=club_admin");
+        return;
+      }
+      if (!loading && profile?.role !== "club_admin") {
+        navigate("/fan/home");
+        return;
+      }
+      if (!loading && profile) {
+        fetchData();
+      }
+    }
+  }, [loading, user, profile, isPreviewMode]);
+
+  const fetchData = async () => {
+    if (!profile) return;
+    setDataLoading(true);
+    try {
+      // Get the club owned by this admin
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
+      if (!clubs?.length) {
+        navigate("/club/onboarding");
+        return;
+      }
+      const c = clubs[0] as Club;
+      setClub(c);
+      // Fetch seasons for this club
+      const { data: seasonRows, error: seasonErr } = await supabase
+        .from("club_seasons")
+        .select("*")
+        .eq("club_id", c.id)
+        .order("start_date", { ascending: false });
+      if (seasonErr) throw seasonErr;
+      setSeasons((seasonRows ?? []) as Season[]);
+    } catch (err: any) {
+      console.error("ClubSeasons fetch error:", err);
+      toast({ title: "Error", description: err?.message || "Failed to load seasons.", variant: "destructive" });
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  const handleCreateSeason = async () => {
+    if (!club) return;
+    // Basic validation
+    if (!seasonName.trim()) {
+      toast({ title: "Name required", description: "Please enter a season name.", variant: "destructive" });
+      return;
+    }
+    if (!startDate || !endDate) {
+      toast({ title: "Dates required", description: "Please select start and end dates.", variant: "destructive" });
+      return;
+    }
+    if (new Date(startDate) >= new Date(endDate)) {
+      toast({ title: "Invalid dates", description: "End date must be after start date.", variant: "destructive" });
+      return;
+    }
+    setCreating(true);
+    try {
+      // Call RPC to create the season
+      const { error } = await supabase.rpc("create_season", {
+        p_club_id: club.id,
+        p_name: seasonName.trim(),
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+      if (error) throw error;
+      toast({ title: "Season Created", description: "Your new season has been created." });
+      setCreatingDialogOpen(false);
+      setSeasonName("");
+      setStartDate("");
+      setEndDate("");
+      await fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to create season.", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleSetActive = async (seasonId: string) => {
+    if (!club) return;
+    try {
+      const { error } = await supabase.rpc("set_current_season", {
+        p_club_id: club.id,
+        p_season_id: seasonId,
+      });
+      if (error) throw error;
+      toast({ title: "Season Activated", description: "This season is now the current active season." });
+      await fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to activate season.", variant: "destructive" });
+    }
+  };
+
+  if (!isPreviewMode && (loading || dataLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+
       {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-30">
+      <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button
             variant="ghost"
-            onClick={() => navigate("/club/dashboard")}
-            className="rounded-full"
+            onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Dashboard
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Logo />
         </div>
       </header>
 
-      <main className="container py-10 space-y-10">
-        {/* Title + Action */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-accent" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-display font-bold tracking-tight">
-                Seasons
-              </h1>
-              <p className="text-muted-foreground mt-0.5">
-                Manage your loyalty program seasons
-              </p>
-            </div>
+      {/* Main */}
+      <main className="container py-8 max-w-3xl">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold flex items-center gap-2">
+              <CalendarPlus className="h-8 w-8 text-primary" /> Seasons
+            </h1>
+            <p className="text-muted-foreground">Manage your club’s seasons and set the current one.</p>
           </div>
-          <Button className="rounded-full gap-2">
-            <Plus className="h-4 w-4" />
-            New Season
-          </Button>
+          <Dialog open={creatingDialogOpen} onOpenChange={setCreatingDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-stadium">
+                <Plus className="h-4 w-4 mr-2" /> Create Season
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Season</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="seasonName">Name *</Label>
+                  <Input
+                    id="seasonName"
+                    value={seasonName}
+                    onChange={(e) => setSeasonName(e.target.value)}
+                    placeholder="e.g., 2025 Season"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="endDate">End Date *</Label>
+                  <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+                <Button onClick={handleCreateSeason} disabled={creating} className="w-full gradient-stadium">
+                  {creating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Create Season
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-
-        {/* Active Season Hero */}
-        {activeSeason && (
-          <Card className="rounded-2xl border-primary/20 overflow-hidden relative">
-            <div className="absolute inset-0 gradient-mesh opacity-50 pointer-events-none" />
-            <CardHeader className="relative z-10 pb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge
-                  className={`rounded-full text-xs ${statusConfig.active.className}`}
-                >
-                  {statusConfig.active.icon}
-                  <span className="ml-1">{statusConfig.active.label}</span>
-                </Badge>
-              </div>
-              <CardTitle className="text-2xl font-display">
-                {activeSeason.name}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {activeSeason.startDate} — {activeSeason.endDate}
+        {/* Seasons list */}
+        {seasons.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <CalendarX2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No seasons created</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first season to begin tracking tiers and progress.
               </p>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="grid grid-cols-3 gap-4 mt-2">
-                <div className="rounded-xl bg-card/50 border border-border/50 p-4 text-center">
-                  <Users className="h-5 w-5 mx-auto mb-2 text-primary" />
-                  <p className="text-xl font-display font-bold">
-                    {activeSeason.fans.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Fans</p>
-                </div>
-                <div className="rounded-xl bg-card/50 border border-border/50 p-4 text-center">
-                  <Trophy className="h-5 w-5 mx-auto mb-2 text-accent" />
-                  <p className="text-xl font-display font-bold">
-                    {activeSeason.pointsIssued.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Points</p>
-                </div>
-                <div className="rounded-xl bg-card/50 border border-border/50 p-4 text-center">
-                  <Zap className="h-5 w-5 mx-auto mb-2 text-blue-400" />
-                  <p className="text-xl font-display font-bold">
-                    {activeSeason.activitiesCount}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Activities</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Other Seasons */}
-        <div>
-          <h2 className="text-lg font-display font-semibold mb-4">
-            All Seasons
-          </h2>
-          <div className="space-y-3">
-            {otherSeasons.map((season) => {
-              const cfg = statusConfig[season.status];
-              return (
-                <Card
-                  key={season.id}
-                  className="rounded-2xl border-border/50 transition-all duration-300 cursor-pointer hover:shadow-md hover:-translate-y-0.5 hover:border-primary/20"
-                >
-                  <CardContent className="py-5 px-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="font-semibold text-sm">{season.name}</p>
-                          <Badge
-                            className={`rounded-full text-[10px] px-2 py-0 ${cfg.className}`}
-                          >
-                            {cfg.icon}
-                            <span className="ml-1">{cfg.label}</span>
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {season.startDate} — {season.endDate} ·{" "}
-                          {season.fans.toLocaleString()} fans ·{" "}
-                          {season.pointsIssued.toLocaleString()} pts
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              );
-            })}
+        ) : (
+          <div className="space-y-4">
+            {seasons.map((s) => (
+              <Card key={s.id} className="border-border/50">
+                <CardContent className="py-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      {s.name}
+                      {s.is_active && <Badge variant="default">Current</Badge>}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(s.start_date).toLocaleDateString()} – {new Date(s.end_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!s.is_active && (
+                      <Button variant="outline" size="sm" onClick={() => handleSetActive(s.id)}>
+                        <CheckCircle className="h-4 w-4 mr-1" /> Set Active
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
