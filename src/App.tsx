@@ -22,6 +22,8 @@ import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import FanProfilePage from "./pages/fan/FanProfilePage";
 import JoinClub from "./pages/fan/JoinClub";
 import NotFound from "./pages/NotFound";
+import ClubAnalytics from "@/pages/club/ClubAnalytics";
+import ClubSeasons from "@/pages/club/ClubSeasons";
 
 const queryClient = new QueryClient();
 
@@ -38,7 +40,7 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/preview" element={<PreviewHub />} />
-              
+
               {/* Club Admin Routes */}
               <Route path="/club/onboarding" element={<ClubOnboarding />} />
               <Route path="/club/dashboard" element={<ClubDashboard />} />
@@ -46,7 +48,7 @@ const App = () => (
               <Route path="/club/activities" element={<ActivityBuilder />} />
               <Route path="/club/rewards" element={<RewardsBuilder />} />
               <Route path="/club/claims" element={<ClaimReview />} />
-              
+
               {/* Fan Routes */}
               <Route path="/fan/home" element={<FanHome />} />
               <Route path="/fan/activities" element={<FanActivities />} />
@@ -54,7 +56,7 @@ const App = () => (
               <Route path="/fan/leaderboard" element={<FanLeaderboardPage />} />
               <Route path="/fan/profile" element={<FanProfilePage />} />
               <Route path="/fan/join" element={<JoinClub />} />
-              
+
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
