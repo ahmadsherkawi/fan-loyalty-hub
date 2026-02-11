@@ -14,7 +14,13 @@ import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle } from "lucide-react";
-import type { Activity, FanMembership, LoyaltyProgram, ActivityCompletion, VerificationMethod } from "@/types/database";
+import type { Database } from "@/integrations/supabase/types";
+
+type Activity = Database["public"]["Tables"]["activities"]["Row"];
+type FanMembership = Database["public"]["Tables"]["fan_memberships"]["Row"];
+type LoyaltyProgram = Database["public"]["Tables"]["loyalty_programs"]["Row"];
+type ActivityCompletion = Database["public"]["Tables"]["activity_completions"]["Row"];
+type VerificationMethod = Database["public"]["Enums"]["verification_method"];
 
 export default function FanActivities() {
   const navigate = useNavigate();
