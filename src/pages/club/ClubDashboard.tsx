@@ -1,4 +1,4 @@
-// FINAL FILE — ClubDashboard.tsx
+// ClubDashboard.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Loader2, Users, Zap, Gift, FileCheck, Trophy, LogOut, ShieldCheck } from "lucide-react";
+
+import { Loader2, Users, Zap, Gift, FileCheck, Trophy, LogOut, ShieldCheck, Calendar, BarChart3 } from "lucide-react";
 
 import type { Club, LoyaltyProgram } from "@/types/database";
 
@@ -215,32 +216,61 @@ export default function ClubDashboard() {
     <div className="min-h-screen bg-background">
       {isPreview && <PreviewBanner role="club_admin" />}
 
+      {/* HEADER */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl">
         <div className="container py-4 flex items-center justify-between">
+          {/* LEFT SIDE */}
           <div className="flex items-center gap-4">
             <Logo />
             <div className="h-6 w-px bg-border" />
+
             <span className="font-semibold text-foreground">{club?.name}</span>
+
             {verified && (
               <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full">
                 <ShieldCheck className="h-3 w-3 mr-1" /> Verified
               </Badge>
             )}
+
+            {/* NEW LINKS */}
+            <div className="flex items-center gap-2 ml-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/club/seasons")}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Seasons
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/club/analytics")}
+                className="flex items-center gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Analytics
+              </Button>
+            </div>
           </div>
 
+          {/* SIGN OUT */}
           <Button variant="ghost" onClick={handleSignOut} className="rounded-full">
             <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
         </div>
       </header>
 
+      {/* MAIN */}
       <main className="container py-10 space-y-10">
         <div>
           <h1 className="text-3xl font-display font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage your fan loyalty ecosystem</p>
         </div>
 
-        {/* STATS GRID */}
+        {/* STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {statItems.map((s) => (
             <Card key={s.label} className="rounded-2xl border-border/50 overflow-hidden">
