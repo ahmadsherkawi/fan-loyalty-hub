@@ -21,6 +21,8 @@ import FanRewards from "./pages/fan/FanRewards";
 import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import FanProfilePage from "./pages/fan/FanProfilePage";
 import JoinClub from "./pages/fan/JoinClub";
+import ClubAnalytics from "@/pages/club/ClubAnalytics";
+import ClubSeasons from "@/pages/club/ClubSeasons";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
