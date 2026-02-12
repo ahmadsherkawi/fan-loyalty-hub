@@ -124,57 +124,48 @@ export default function ClubAnalytics() {
   };
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      // 1) Find club using auth UID first (most reliable)
-      let clubsRes = await fetchClubForAdmin(user.id);
+      // 1️⃣ Get club exactly like dashboard
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
 
-      // 2) Fallback to profile.id only if needed
-      if ((!clubsRes.data || clubsRes.data.length === 0) && profile?.id) {
-        clubsRes = await fetchClubForAdmin(profile.id);
-      }
-
-      const clubs = clubsRes.data;
-
-      if (!clubs?.length) {
-        console.error("ClubAnalytics: No club found for this admin. Tried user.id and profile.id.", {
-          userId: user.id,
-          profileId: profile?.id,
-        });
-        // keep zeros, but at least it is now explained in console
-        return;
-      }
+      if (!clubs?.length) return;
 
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      // 3) RPC analytics (your SQL is done)
-      const { data: analytics, error: analyticsError } = await supabase.rpc("get_club_analytics", {
-        p_club_id: clubData.id,
-      });
+      // 2️⃣ Fans count (same as dashboard)
+      const { count: fans } = await supabase
+        .from("fan_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("club_id", clubData.id);
 
-      if (analyticsError) {
-        console.error("ClubAnalytics: RPC failed", analyticsError);
-        return;
-      }
+      // 3️⃣ Points issued/spent via completions (dashboard truth)
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned, activities!inner(program_id)")
+        .eq("activities.club_id", clubData.id); // ← important fix
 
-      // analytics is jsonb, so it should be an object
-      const a = analytics as AnalyticsResponse;
+      const totalIssued = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
 
-      const fans = Number(a?.total_fans ?? 0);
-      const issued = Number(a?.total_issued ?? 0);
-      const spent = Number(a?.total_spent ?? 0);
+      // Spent = reward redemptions
+      const { data: redemptions } = await supabase
+        .from("reward_redemptions")
+        .select("points_spent, rewards!inner(program_id)")
+        .eq("rewards.club_id", clubData.id);
 
-      setTotalFans(fans);
-      setTotalIssued(issued);
-      setTotalSpent(spent);
+      const totalSpent = redemptions?.reduce((s, r: any) => s + (r.points_spent || 0), 0) ?? 0;
 
-      // Charts are placeholders until you add timeseries to RPC
-      setFansGrowth([{ month: "Now", fans }]);
-      setPointsFlow([{ month: "Now", issued, spent }]);
+      setTotalFans(fans ?? 0);
+      setTotalIssued(totalIssued);
+      setTotalSpent(totalSpent);
+
+      // Charts placeholder
+      setFansGrowth([{ month: "Now", fans: fans ?? 0 }]);
+      setPointsFlow([{ month: "Now", issued: totalIssued, spent: totalSpent }]);
     } finally {
       setDataLoading(false);
     }
