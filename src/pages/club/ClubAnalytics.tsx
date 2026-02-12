@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,12 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, L
 
 import type { Club } from "@/types/database";
 
+type AnalyticsResponse = {
+  total_fans: number;
+  total_issued: number;
+  total_spent: number;
+};
+
 export default function ClubAnalytics() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,17 +31,32 @@ export default function ClubAnalytics() {
   const [dataLoading, setDataLoading] = useState(true);
 
   const [totalFans, setTotalFans] = useState(0);
+  const [totalIssued, setTotalIssued] = useState(0);
+  const [totalSpent, setTotalSpent] = useState(0);
+
+  // Optional chart placeholders (until you extend RPC to return timeseries)
   const [fansGrowth, setFansGrowth] = useState<any[]>([]);
   const [pointsFlow, setPointsFlow] = useState<any[]>([]);
 
   useEffect(() => {
     if (loading) return;
 
-    if (!isPreviewMode && !user) navigate("/auth?role=club_admin");
-    if (!isPreviewMode && profile?.role !== "club_admin") navigate("/fan/home");
+    if (!isPreviewMode && !user) {
+      navigate("/auth?role=club_admin");
+      return;
+    }
+
+    if (!isPreviewMode && profile?.role !== "club_admin") {
+      navigate("/fan/home");
+      return;
+    }
 
     if (isPreviewMode) {
+      setClub({} as Club);
+
       setTotalFans(420);
+      setTotalIssued(2300);
+      setTotalSpent(1100);
 
       setFansGrowth([
         { month: "Jan", fans: 100 },
@@ -66,67 +87,52 @@ export default function ClubAnalytics() {
     setDataLoading(true);
 
     try {
-      // Get club
-      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
+      // 1) Get the club for this admin
+      const { data: clubs, error: clubsError } = await supabase
+        .from("clubs")
+        .select("*")
+        .eq("admin_id", profile.id)
+        .limit(1);
 
-      if (!clubs?.length) return;
+      if (clubsError) {
+        console.error("Failed to fetch club:", clubsError);
+        return;
+      }
+
+      if (!clubs?.length) {
+        console.warn("No club found for admin_id:", profile.id);
+        return;
+      }
 
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      // ===== TOTAL FANS (direct count — production correct) =====
-      const { count: fanCount } = await supabase
-        .from("fan_memberships")
-        .select("*", { count: "exact", head: true })
-        .eq("club_id", clubData.id);
-
-      setTotalFans(fanCount ?? 0);
-
-      // ===== FAN GROWTH (monthly) =====
-      const { data: memberships } = await supabase
-        .from("fan_memberships")
-        .select("created_at")
-        .eq("club_id", clubData.id)
-        .not("created_at", "is", null);
-
-      const growthMap: Record<string, number> = {};
-
-      memberships?.forEach((m: any) => {
-        const month = new Date(m.created_at).toLocaleString("default", {
-          month: "short",
-        });
-        growthMap[month] = (growthMap[month] || 0) + 1;
+      // 2) Fetch analytics from RPC
+      const { data: analytics, error: analyticsError } = await supabase.rpc("get_club_analytics", {
+        p_club_id: clubData.id,
       });
 
-      setFansGrowth(Object.entries(growthMap).map(([month, fans]) => ({ month, fans })));
+      if (analyticsError) {
+        console.error("Failed to fetch analytics:", analyticsError);
+        return;
+      }
 
-      // ===== POINTS FLOW =====
-      const { data: ledger } = await supabase
-        .from("points_ledger")
-        .select("delta_points, created_at")
-        .eq("club_id", clubData.id);
+      const a = analytics as AnalyticsResponse;
 
-      const issuedMap: Record<string, number> = {};
-      const spentMap: Record<string, number> = {};
+      setTotalFans(a?.total_fans ?? 0);
+      setTotalIssued(a?.total_issued ?? 0);
+      setTotalSpent(a?.total_spent ?? 0);
 
-      ledger?.forEach((l: any) => {
-        const month = new Date(l.created_at).toLocaleString("default", {
-          month: "short",
-        });
+      // 3) Charts (until you add timeseries to the RPC)
+      setFansGrowth([{ month: "Now", fans: a?.total_fans ?? 0 }]);
 
-        if (l.delta_points > 0) issuedMap[month] = (issuedMap[month] || 0) + l.delta_points;
-        else spentMap[month] = (spentMap[month] || 0) + Math.abs(l.delta_points);
-      });
-
-      const months = Array.from(new Set([...Object.keys(issuedMap), ...Object.keys(spentMap)]));
-
-      setPointsFlow(
-        months.map((m) => ({
-          month: m,
-          issued: issuedMap[m] || 0,
-          spent: spentMap[m] || 0,
-        })),
-      );
+      setPointsFlow([
+        {
+          month: "Now",
+          issued: a?.total_issued ?? 0,
+          spent: a?.total_spent ?? 0,
+        },
+      ]);
     } finally {
       setDataLoading(false);
     }
@@ -140,41 +146,44 @@ export default function ClubAnalytics() {
     );
   }
 
-  const totalIssued = pointsFlow.reduce((s, p) => s + p.issued, 0);
-  const totalSpent = pointsFlow.reduce((s, p) => s + p.spent, 0);
+  const engagementRate = useMemo(() => {
+    if (totalIssued <= 0) return 0;
+    return Math.round((totalSpent / totalIssued) * 100);
+  }, [totalIssued, totalSpent]);
 
-  const engagementRate = totalIssued > 0 ? Math.round((totalSpent / totalIssued) * 100) : 0;
-
-  const summaryStats = [
-    {
-      label: "Active Fans",
-      value: totalFans,
-      icon: <Users className="h-4 w-4" />,
-      change: "+18%",
-      color: "text-primary",
-    },
-    {
-      label: "Points Issued",
-      value: totalIssued.toLocaleString(),
-      icon: <Zap className="h-4 w-4" />,
-      change: "+24%",
-      color: "text-blue-400",
-    },
-    {
-      label: "Points Spent",
-      value: totalSpent.toLocaleString(),
-      icon: <Activity className="h-4 w-4" />,
-      change: "+32%",
-      color: "text-accent",
-    },
-    {
-      label: "Engagement",
-      value: `${engagementRate}%`,
-      icon: <TrendingUp className="h-4 w-4" />,
-      change: "+5%",
-      color: "text-purple-400",
-    },
-  ];
+  const summaryStats = useMemo(
+    () => [
+      {
+        label: "Active Fans",
+        value: totalFans,
+        icon: <Users className="h-4 w-4" />,
+        change: "+18%",
+        color: "text-primary",
+      },
+      {
+        label: "Points Issued",
+        value: totalIssued.toLocaleString(),
+        icon: <Zap className="h-4 w-4" />,
+        change: "+24%",
+        color: "text-blue-400",
+      },
+      {
+        label: "Points Spent",
+        value: totalSpent.toLocaleString(),
+        icon: <Activity className="h-4 w-4" />,
+        change: "+32%",
+        color: "text-accent",
+      },
+      {
+        label: "Engagement",
+        value: `${engagementRate}%`,
+        icon: <TrendingUp className="h-4 w-4" />,
+        change: "+5%",
+        color: "text-purple-400",
+      },
+    ],
+    [totalFans, totalIssued, totalSpent, engagementRate],
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -200,7 +209,9 @@ export default function ClubAnalytics() {
             <BarChart3 className="h-4 w-4" />
             Insights
           </div>
+
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Club Analytics</h1>
+
           <p className="text-muted-foreground max-w-md">
             Track fan growth, engagement trends, and loyalty point activity in real time.
           </p>
@@ -269,6 +280,17 @@ export default function ClubAnalytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
+
+        {/* FOOTER NOTE (optional) */}
+        <div className="text-xs text-muted-foreground">
+          {club?.name ? (
+            <span>
+              Showing analytics for <span className="font-medium">{club.name}</span>.
+            </span>
+          ) : (
+            <span>Showing club analytics.</span>
+          )}
         </div>
       </main>
     </div>
