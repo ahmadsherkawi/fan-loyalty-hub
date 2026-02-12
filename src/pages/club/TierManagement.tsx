@@ -1,270 +1,548 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+// src/pages/club/TierManagement.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/ui/Logo";
 import {
-  ArrowLeft,
-  Crown,
-  Star,
-  Shield,
-  Zap,
-  ChevronRight,
-  TrendingUp,
-  Users,
-  Sparkles,
-  Award,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Logo } from "@/components/ui/Logo";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { useToast } from "@/hooks/use-toast";
 
-interface Tier {
+import { ArrowLeft, Loader2, Plus, Trophy, Trash2, Edit, ShieldCheck } from "lucide-react";
+
+import type { Club, LoyaltyProgram } from "@/types/database";
+
+type TierRow = {
   id: string;
+  program_id: string;
   name: string;
-  icon: React.ReactNode;
-  minPoints: number;
-  maxPoints: number | null;
-  color: string;
-  gradient: string;
-  perks: string[];
-  fanCount: number;
-}
-
-const demoTiers: Tier[] = [
-  {
-    id: "1",
-    name: "Rookie",
-    icon: <Shield className="h-6 w-6" />,
-    minPoints: 0,
-    maxPoints: 499,
-    color: "text-muted-foreground",
-    gradient: "from-muted/60 to-muted/30",
-    perks: ["Access to basic activities", "Community feed"],
-    fanCount: 842,
-  },
-  {
-    id: "2",
-    name: "Rising Star",
-    icon: <Star className="h-6 w-6" />,
-    minPoints: 500,
-    maxPoints: 1499,
-    color: "text-primary",
-    gradient: "from-primary/20 to-primary/5",
-    perks: ["Early event access", "Exclusive polls", "Monthly newsletter"],
-    fanCount: 356,
-  },
-  {
-    id: "3",
-    name: "Elite",
-    icon: <Zap className="h-6 w-6" />,
-    minPoints: 1500,
-    maxPoints: 4999,
-    color: "text-accent",
-    gradient: "from-accent/20 to-accent/5",
-    perks: ["VIP match-day perks", "Signed merch drops", "Priority rewards"],
-    fanCount: 124,
-  },
-  {
-    id: "4",
-    name: "Legend",
-    icon: <Crown className="h-6 w-6" />,
-    minPoints: 5000,
-    maxPoints: null,
-    color: "text-amber-400",
-    gradient: "from-amber-400/20 to-amber-400/5",
-    perks: ["Meet & greet", "Season ticket upgrade", "All lower-tier perks", "Hall of Fame"],
-    fanCount: 28,
-  },
-];
+  rank: number;
+  points_required: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 export default function TierManagement() {
   const navigate = useNavigate();
-  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const { user, profile, loading } = useAuth();
+  const { toast } = useToast();
 
-  const totalFans = demoTiers.reduce((s, t) => s + t.fanCount, 0);
+  const isPreviewMode = searchParams.get("preview") === "club_admin";
+
+  const [club, setClub] = useState<Club | null>(null);
+  const [program, setProgram] = useState<LoyaltyProgram | null>(null);
+  const [tiers, setTiers] = useState<TierRow[]>([]);
+
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [editingTier, setEditingTier] = useState<TierRow | null>(null);
+
+  // form
+  const [name, setName] = useState("");
+  const [rank, setRank] = useState("1");
+  const [pointsRequired, setPointsRequired] = useState("0");
+  const [isActive, setIsActive] = useState(true);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (isPreviewMode) {
+      setClub({
+        id: "preview",
+        admin_id: "preview",
+        name: "Demo FC",
+        logo_url: null,
+        primary_color: "#16a34a",
+        country: "",
+        city: "",
+        stadium_name: null,
+        season_start: null,
+        season_end: null,
+        status: "verified",
+        created_at: "",
+        updated_at: "",
+      });
+
+      setProgram({
+        id: "preview-program",
+        club_id: "preview",
+        name: "Demo Program",
+        description: null,
+        points_currency_name: "Points",
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      setTiers([
+        {
+          id: "t1",
+          program_id: "preview-program",
+          name: "Bronze",
+          rank: 1,
+          points_required: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "t2",
+          program_id: "preview-program",
+          name: "Silver",
+          rank: 2,
+          points_required: 500,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "t3",
+          program_id: "preview-program",
+          name: "Gold",
+          rank: 3,
+          points_required: 1500,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+
+      setDataLoading(false);
+      return;
+    }
+
+    if (!user) {
+      navigate("/auth?role=club_admin");
+      return;
+    }
+
+    if (profile?.role !== "club_admin") {
+      navigate("/fan/home");
+      return;
+    }
+
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, isPreviewMode, user, profile]);
+
+  const resetForm = () => {
+    setEditingTier(null);
+    setName("");
+    setRank("1");
+    setPointsRequired("0");
+    setIsActive(true);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const openEdit = (t: TierRow) => {
+    setEditingTier(t);
+    setName(t.name);
+    setRank(String(t.rank));
+    setPointsRequired(String(t.points_required));
+    setIsActive(!!t.is_active);
+    setDialogOpen(true);
+  };
+
+  const fetchData = async () => {
+    if (!profile) return;
+    setDataLoading(true);
+
+    try {
+      // 1) Club
+      const { data: clubs, error: clubErr } = await supabase
+        .from("clubs")
+        .select("*")
+        .eq("admin_id", profile.id)
+        .limit(1);
+
+      if (clubErr) throw clubErr;
+      if (!clubs?.length) {
+        navigate("/club/onboarding");
+        return;
+      }
+      const clubData = clubs[0] as Club;
+      setClub(clubData);
+
+      // 2) Program
+      const { data: programs, error: progErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("club_id", clubData.id)
+        .limit(1);
+
+      if (progErr) throw progErr;
+      if (!programs?.length) {
+        navigate("/club/dashboard");
+        return;
+      }
+      const programData = programs[0] as LoyaltyProgram;
+      setProgram(programData);
+
+      // 3) Tiers via RPC (ordered)
+      const { data: tierRows, error: tierErr } = await (supabase.rpc as any)("list_tiers", {
+        p_program_id: programData.id,
+      });
+
+      if (tierErr) throw tierErr;
+      setTiers((tierRows ?? []) as TierRow[]);
+    } catch (err: any) {
+      console.error("TierManagement fetch error:", err);
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to load tiers.",
+        variant: "destructive",
+      });
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!program) return;
+
+    const r = parseInt(rank, 10);
+    const p = parseInt(pointsRequired, 10);
+
+    if (!name.trim()) {
+      toast({ title: "Name required", description: "Please enter a tier name.", variant: "destructive" });
+      return;
+    }
+    if (Number.isNaN(r) || r < 1) {
+      toast({ title: "Invalid rank", description: "Rank must be an integer ≥ 1.", variant: "destructive" });
+      return;
+    }
+    if (Number.isNaN(p) || p < 0) {
+      toast({ title: "Invalid points", description: "Points required must be ≥ 0.", variant: "destructive" });
+      return;
+    }
+
+    // extra client-side duplicate checks (server already enforces uniques)
+    const other = tiers.filter((t) => t.id !== editingTier?.id);
+    if (other.some((t) => t.rank === r)) {
+      toast({ title: "Duplicate rank", description: "Another tier already uses this rank.", variant: "destructive" });
+      return;
+    }
+    if (other.some((t) => t.points_required === p)) {
+      toast({
+        title: "Duplicate points threshold",
+        description: "Another tier already uses this points required value.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isPreviewMode) {
+      if (editingTier) {
+        setTiers(
+          tiers.map((t) =>
+            t.id === editingTier.id
+              ? {
+                  ...t,
+                  name: name.trim(),
+                  rank: r,
+                  points_required: p,
+                  is_active: isActive,
+                  updated_at: new Date().toISOString(),
+                }
+              : t,
+          ),
+        );
+        toast({ title: "Tier updated (preview)" });
+      } else {
+        setTiers([
+          ...tiers,
+          {
+            id: `preview-${Date.now()}`,
+            program_id: program.id,
+            name: name.trim(),
+            rank: r,
+            points_required: p,
+            is_active: isActive,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]);
+        toast({ title: "Tier created (preview)" });
+      }
+      setDialogOpen(false);
+      resetForm();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingTier) {
+        const { data, error } = await (supabase.rpc as any)("update_tier", {
+          p_tier_id: editingTier.id,
+          p_name: name.trim(),
+          p_rank: r,
+          p_points_required: p,
+          p_is_active: isActive,
+        });
+
+        if (error) throw error;
+
+        toast({ title: "Tier updated", description: "Changes saved successfully." });
+        setDialogOpen(false);
+        resetForm();
+        await fetchData();
+        return;
+      }
+
+      const { data, error } = await (supabase.rpc as any)("create_tier", {
+        p_program_id: program.id,
+        p_name: name.trim(),
+        p_rank: r,
+        p_points_required: p,
+        p_is_active: isActive,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Tier created", description: "Your new tier is ready." });
+      setDialogOpen(false);
+      resetForm();
+      await fetchData();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to save tier.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (t: TierRow) => {
+    const ok = confirm(`Delete tier "${t.name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    if (isPreviewMode) {
+      setTiers(tiers.filter((x) => x.id !== t.id));
+      toast({ title: "Tier deleted (preview)" });
+      return;
+    }
+
+    try {
+      const { error } = await (supabase.rpc as any)("delete_tier", { p_tier_id: t.id });
+      if (error) throw error;
+
+      toast({ title: "Tier deleted" });
+      await fetchData();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to delete tier.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sortedTiers = useMemo(() => {
+    return [...tiers].sort((a, b) => a.rank - b.rank);
+  }, [tiers]);
+
+  if (!isPreviewMode && (loading || dataLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const verified = club?.status === "verified" || club?.status === "official";
 
   return (
     <div className="min-h-screen bg-background">
-      {/* HEADER */}
-      <header className="relative border-b border-border/40 overflow-hidden">
-        <div className="absolute inset-0 gradient-mesh opacity-60" />
-        <div className="relative container py-5 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/club/dashboard")}
-            className="rounded-full hover:bg-card/60"
+      {isPreviewMode && <PreviewBanner role="club_admin" />}
+
+      {/* Header */}
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl">
+        <div className="container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")}
+              className="rounded-full"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+            </Button>
+
+            <Logo />
+
+            <div className="h-6 w-px bg-border" />
+
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-foreground">{club?.name}</span>
+              {verified && (
+                <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full">
+                  <ShieldCheck className="h-3 w-3 mr-1" /> Verified
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back
-          </Button>
-          <div className="h-5 w-px bg-border/60" />
-          <Logo size="sm" />
+            <DialogTrigger asChild>
+              <Button onClick={openCreate} className="gradient-stadium rounded-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tier
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{editingTier ? "Edit Tier" : "Create Tier"}</DialogTitle>
+                <DialogDescription>
+                  Define tier rank (order) and the points required to reach it. Ranks and points must be unique per
+                  program.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="tierName">Tier Name *</Label>
+                  <Input
+                    id="tierName"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g., Bronze / Silver / Gold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="tierRank">Rank *</Label>
+                    <Input id="tierRank" type="number" min={1} value={rank} onChange={(e) => setRank(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">1 = lowest tier, higher rank = higher tier</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="tierPoints">Points Required *</Label>
+                    <Input
+                      id="tierPoints"
+                      type="number"
+                      min={0}
+                      value={pointsRequired}
+                      onChange={(e) => setPointsRequired(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Fans reach this tier once their points meet/exceed this value
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Active</p>
+                    <p className="text-xs text-muted-foreground">
+                      Inactive tiers won’t be considered by logic (if you choose to enforce later)
+                    </p>
+                  </div>
+                  <Switch checked={isActive} onCheckedChange={setIsActive} />
+                </div>
+
+                <Button onClick={handleSave} disabled={saving} className="w-full gradient-stadium">
+                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {editingTier ? "Save Changes" : "Create Tier"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 
-      <main className="container py-10 max-w-5xl space-y-10">
-        {/* HERO */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40 p-8 md:p-10">
-          <div className="absolute inset-0 gradient-hero opacity-90" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-40" />
+      {/* Main */}
+      <main className="container py-10 space-y-6">
+        <div>
+          <h1 className="text-3xl font-display font-bold tracking-tight flex items-center gap-2">
+            <Trophy className="h-7 w-7 text-primary" />
+            Tier Management
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Create and maintain your tier ladder for <span className="font-medium">{program?.name}</span>.
+          </p>
+        </div>
 
-          <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-xl gradient-golden flex items-center justify-center shadow-golden">
-                  <Award className="h-5 w-5 text-accent-foreground" />
-                </div>
-                <Badge className="bg-primary/20 text-primary border-primary/30 rounded-full text-xs">
-                  {demoTiers.length} Tiers Active
-                </Badge>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
-                Tier Management
-              </h1>
-              <p className="text-white/60 mt-2 max-w-md">
-                Design your loyalty ladder. Reward your most passionate fans with exclusive perks at every level.
+        {sortedTiers.length === 0 ? (
+          <Card className="rounded-2xl border-border/50">
+            <CardContent className="py-12 text-center">
+              <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-semibold text-foreground mb-2">No tiers yet</p>
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                Add your first tier (example: Bronze rank 1, points 0) to start tier tracking.
               </p>
-            </div>
+              <Button onClick={openCreate} className="gradient-stadium">
+                <Plus className="h-4 w-4 mr-2" /> Add Tier
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedTiers.map((t) => (
+              <Card key={t.id} className={`rounded-2xl border-border/50 ${t.is_active ? "" : "opacity-60"}`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="truncate">{t.name}</span>
+                    <Badge variant="secondary">Rank {t.rank}</Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Requires <span className="font-medium">{t.points_required}</span>{" "}
+                    {program?.points_currency_name || "Points"}
+                  </CardDescription>
+                </CardHeader>
 
-            <div className="flex gap-6">
-              <div className="text-center">
-                <p className="text-2xl font-display font-bold text-white">{totalFans.toLocaleString()}</p>
-                <p className="text-xs text-white/50 mt-1">Total Fans</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-display font-bold text-gradient-accent">{demoTiers.length}</p>
-                <p className="text-xs text-white/50 mt-1">Tiers</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* TIER PROGRESS BAR */}
-        <div className="relative">
-          <div className="flex items-center gap-0">
-            {demoTiers.map((tier, i) => {
-              const pct = (tier.fanCount / totalFans) * 100;
-              return (
-                <div
-                  key={tier.id}
-                  className="relative group cursor-pointer"
-                  style={{ width: `${Math.max(pct, 8)}%` }}
-                  onClick={() => setSelectedTier(selectedTier === tier.id ? null : tier.id)}
-                >
-                  <div
-                    className={`h-3 transition-all duration-300 group-hover:h-4 ${
-                      i === 0 ? "rounded-l-full" : ""
-                    } ${i === demoTiers.length - 1 ? "rounded-r-full" : ""} bg-gradient-to-r ${tier.gradient.replace("/20", "/60").replace("/5", "/30")}`}
-                    style={{
-                      background:
-                        i === 0
-                          ? "hsl(var(--muted))"
-                          : i === 1
-                          ? "hsl(var(--primary) / 0.5)"
-                          : i === 2
-                          ? "hsl(var(--accent) / 0.5)"
-                          : "hsl(40 95% 54% / 0.7)",
-                    }}
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1.5 text-center font-medium truncate">
-                    {tier.name}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* TIER CARDS */}
-        <div className="grid gap-4">
-          {demoTiers.map((tier, i) => {
-            const isExpanded = selectedTier === tier.id;
-            return (
-              <Card
-                key={tier.id}
-                onClick={() => setSelectedTier(isExpanded ? null : tier.id)}
-                className={`relative overflow-hidden rounded-2xl border-border/40 cursor-pointer transition-all duration-500 ${
-                  isExpanded ? "ring-1 ring-primary/30 shadow-stadium" : "hover:border-primary/20 hover:shadow-md"
-                }`}
-              >
-                {/* Subtle gradient backdrop */}
-                <div className={`absolute inset-0 bg-gradient-to-r ${tier.gradient} opacity-40 pointer-events-none`} />
-
-                <CardContent className="relative z-10 py-5 px-6">
-                  <div className="flex items-center justify-between">
-                    {/* Left */}
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`h-12 w-12 rounded-2xl flex items-center justify-center bg-gradient-to-br ${tier.gradient} border border-border/30 ${tier.color}`}
-                      >
-                        {tier.icon}
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-display font-bold tracking-tight">{tier.name}</h3>
-                          <Badge variant="outline" className="rounded-full text-[10px] border-border/50">
-                            Tier {i + 1}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {tier.minPoints.toLocaleString()}
-                          {tier.maxPoints ? ` – ${tier.maxPoints.toLocaleString()}` : "+"} pts
-                        </p>
-                      </div>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(t)}>
+                        <Edit className="h-4 w-4 mr-1" /> Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(t)}>
+                        <Trash2 className="h-4 w-4 mr-1" /> Delete
+                      </Button>
                     </div>
 
-                    {/* Right */}
-                    <div className="flex items-center gap-6">
-                      <div className="text-right hidden sm:block">
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm font-semibold">{tier.fanCount.toLocaleString()}</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">fans</p>
-                      </div>
-
-                      <div className="text-right hidden md:block">
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-sm font-semibold text-primary">
-                            {Math.round((tier.fanCount / totalFans) * 100)}%
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">of base</p>
-                      </div>
-
-                      <ChevronRight
-                        className={`h-5 w-5 text-muted-foreground transition-transform duration-300 ${
-                          isExpanded ? "rotate-90" : ""
-                        }`}
-                      />
-                    </div>
+                    {!t.is_active ? <Badge variant="secondary">Inactive</Badge> : <Badge>Active</Badge>}
                   </div>
 
-                  {/* Expanded perks */}
-                  {isExpanded && (
-                    <div className="mt-5 pt-5 border-t border-border/40">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-accent" /> Perks & Benefits
-                      </p>
-                      <div className="grid sm:grid-cols-2 gap-2">
-                        {tier.perks.map((perk) => (
-                          <div
-                            key={perk}
-                            className="flex items-center gap-2 rounded-xl bg-card/60 border border-border/30 px-3 py-2"
-                          >
-                            <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                            <span className="text-sm">{perk}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Tip: Keep points_required increasing with rank to avoid confusing tier jumps.
+                  </p>
                 </CardContent>
               </Card>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
