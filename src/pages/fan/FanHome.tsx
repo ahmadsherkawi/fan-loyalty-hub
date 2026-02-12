@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star } from "lucide-react";
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 
@@ -40,6 +40,9 @@ export default function FanHome() {
   const [earnedPoints, setEarnedPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
+
+  /** NEW: Tier benefits */
+  const [tierBenefits, setTierBenefits] = useState<any[]>([]);
 
   const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -141,6 +144,13 @@ export default function FanHome() {
       setCurrentTier(current);
       setNextTier(next);
 
+      /** 🔹 LOAD TIER BENEFITS */
+      if (current?.id) {
+        const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
+
+        setTierBenefits(benefits ?? []);
+      }
+
       /** Notifications */
       const { count } = await supabase
         .from("notifications")
@@ -166,6 +176,31 @@ export default function FanHome() {
       </div>
     );
   }
+
+  /** ---------- Tier Effects Engine ---------- */
+  const tierEffects = {
+    multiplier: 1,
+    discountPercent: 0,
+    vipAccess: false,
+    monthlyBonus: 0,
+  };
+
+  tierBenefits.forEach((b) => {
+    switch (b.benefit_type) {
+      case "points_multiplier":
+        tierEffects.multiplier = Number(b.benefit_value || 1);
+        break;
+      case "reward_discount_percent":
+        tierEffects.discountPercent = Number(b.benefit_value || 0);
+        break;
+      case "vip_access":
+        tierEffects.vipAccess = true;
+        break;
+      case "monthly_bonus_points":
+        tierEffects.monthlyBonus = Number(b.benefit_value || 0);
+        break;
+    }
+  });
 
   /** Progress to next tier */
   const progress =
@@ -236,7 +271,7 @@ export default function FanHome() {
 
               {/* CURRENT TIER */}
               {currentTier && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Badge className="bg-white/20 text-white border-white/30 rounded-full">
                     <Star className="h-3 w-3 mr-1" />
                     {currentTier.name}
@@ -253,6 +288,23 @@ export default function FanHome() {
                 </div>
               )}
             </div>
+
+            {/* 🔹 BENEFITS CARD */}
+            {currentTier && tierBenefits.length > 0 && (
+              <Card className="w-full max-w-md rounded-2xl border-border/40 bg-gradient-to-br from-primary/5 to-accent/5">
+                <CardContent className="py-5 space-y-2 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm font-semibold text-primary">
+                    <Sparkles className="h-4 w-4" />
+                    Your Tier Benefits
+                  </div>
+
+                  {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× points on activities</p>}
+                  {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
+                  {tierEffects.vipAccess && <p>🏟 VIP access unlocked</p>}
+                  {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly bonus points</p>}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* LEADERBOARD */}
@@ -283,7 +335,7 @@ export default function FanHome() {
               <InfoCard
                 key={a.id}
                 title={a.name}
-                badge={`+${a.points_awarded} pts`}
+                badge={`+${Math.round(a.points_awarded * tierEffects.multiplier)} pts`}
                 onClick={() => navigate("/fan/activities")}
               />
             ))}
@@ -300,7 +352,9 @@ export default function FanHome() {
 
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
-              const canAfford = effectivePointsBalance >= r.points_cost;
+              const discountedCost = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
+
+              const canAfford = effectivePointsBalance >= discountedCost;
 
               return (
                 <Card key={r.id} className="rounded-2xl border-border/50">
@@ -308,7 +362,7 @@ export default function FanHome() {
                     <h3 className="font-bold">{r.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
 
-                    <Badge className="mt-3 rounded-full">{r.points_cost} pts</Badge>
+                    <Badge className="mt-3 rounded-full">{discountedCost} pts</Badge>
 
                     <Button
                       disabled={!canAfford}
