@@ -3,13 +3,24 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell } from "lucide-react";
+
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star } from "lucide-react";
+
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
+
+interface Tier {
+  id: string;
+  name: string;
+  rank: number;
+  points_threshold: number;
+}
 
 export default function FanHome() {
   const navigate = useNavigate();
@@ -24,89 +35,120 @@ export default function FanHome() {
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [tiers, setTiers] = useState<Tier[]>([]);
 
-  // Unread notifications count for bell icon badge
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [currentTier, setCurrentTier] = useState<Tier | null>(null);
+  const [nextTier, setNextTier] = useState<Tier | null>(null);
+
+  const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
+  // ---------- AUTH ----------
   useEffect(() => {
     if (loading) return;
+
     if (!isPreviewMode && !user) {
       navigate("/auth", { replace: true });
       return;
     }
+
     if (!isPreviewMode && profile?.role === "club_admin") {
       navigate("/club/dashboard", { replace: true });
       return;
     }
+
     if (!isPreviewMode && profile?.role === "fan") {
       fetchData();
     }
-  }, [loading, user, profile, isPreviewMode, navigate]);
+  }, [loading, user, profile, isPreviewMode]);
 
+  // ---------- FETCH ----------
   const fetchData = async () => {
     if (!profile) return;
+
     setDataLoading(true);
+
     try {
-      const { data: memberships, error: mErr } = await (supabase as any)
+      /** Membership */
+      const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
-      if (mErr) throw mErr;
+
       if (!memberships?.length) {
         navigate("/fan/join");
         return;
       }
+
       const m = memberships[0] as FanMembership;
       setMembership(m);
-      const { data: clubData, error: cErr } = await (supabase as any)
-        .from("clubs")
-        .select("*")
-        .eq("id", m.club_id)
-        .single();
-      if (cErr) throw cErr;
-      setClub(clubData as Club);
-      const { data: programData, error: pErr } = await (supabase as any)
-        .from("loyalty_programs")
-        .select("*")
-        .eq("id", m.program_id)
-        .single();
-      if (pErr) throw pErr;
-      setProgram(programData as LoyaltyProgram);
-      const { data: acts, error: aErr } = await (supabase as any)
-        .from("activities")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .limit(3);
-      if (aErr) throw aErr;
-      // Cast to unknown first to avoid TypeScript complaining about Json vs InAppConfig
-      setActivities((acts ?? []) as unknown as Activity[]);
-      const { data: rews, error: rErr } = await (supabase as any)
-        .from("rewards")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .limit(3);
-      if (rErr) throw rErr;
-      // Cast to unknown first to avoid type mismatch for Json vs Reward fields
-      setRewards((rews ?? []) as unknown as Reward[]);
 
-      // Fetch count of unread notifications for this fan
-      try {
-        const { count: unread } = await (supabase as any)
-          .from("notifications")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", profile.id)
-          .eq("is_read", false);
-        setUnreadCount(unread ?? 0);
-      } catch (nErr) {
-        // ignore notification count errors (table may not exist yet)
-        setUnreadCount(0);
+      /** Club */
+      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+
+      setClub(clubData as Club);
+
+      /** Program */
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+
+      setProgram(programData as LoyaltyProgram);
+
+      /** Activities */
+      const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
+
+      setActivities((acts ?? []) as Activity[]);
+
+      /** Rewards */
+      const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
+
+      setRewards((rews ?? []) as Reward[]);
+
+      /** 🔹 TIERS */
+      const { data: tiersData } = await supabase
+        .from("tiers")
+        .select("*")
+        .eq("program_id", m.program_id)
+        .order("rank", { ascending: true });
+
+      const tierList = (tiersData ?? []) as Tier[];
+      setTiers(tierList);
+
+      /** 🔹 EARNED POINTS (ignore spent) */
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned")
+        .eq("fan_id", profile.id);
+
+      const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+
+      setEarnedPoints(totalEarned);
+
+      /** 🔹 CURRENT + NEXT TIER */
+      let current: Tier | null = null;
+      let next: Tier | null = null;
+
+      for (let i = 0; i < tierList.length; i++) {
+        if (totalEarned >= tierList[i].points_threshold) {
+          current = tierList[i];
+          next = tierList[i + 1] ?? null;
+        }
       }
-    } catch (err) {
-      console.error("FanHome fetch error:", err);
+
+      setCurrentTier(current);
+      setNextTier(next);
+
+      /** Notifications */
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_read", false);
+
+      setUnreadCount(count ?? 0);
     } finally {
       setDataLoading(false);
     }
@@ -125,20 +167,29 @@ export default function FanHome() {
     );
   }
 
+  /** Progress to next tier */
+  const progress =
+    currentTier && nextTier
+      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
+        100
+      : 100;
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* HEADER */}
+      {/* ================= HERO ================= */}
       <header
-        className="relative overflow-hidden"
+        className="relative overflow-hidden text-white"
         style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
       >
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-black/25" />
         <div className="absolute inset-0 gradient-mesh opacity-40" />
 
-        <div className="container relative z-10 py-4 flex items-center justify-between">
+        {/* TOP BAR */}
+        <div className="container relative z-10 py-4 flex justify-between items-center">
           <Logo />
+
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -148,11 +199,12 @@ export default function FanHome() {
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 text-white text-[8px] items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 text-[8px] items-center justify-center">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -161,30 +213,54 @@ export default function FanHome() {
             >
               <User className="h-5 w-5" />
             </Button>
+
             <Button variant="ghost" onClick={handleSignOut} className="text-white hover:bg-white/10 rounded-full">
               <LogOut className="h-4 w-4 mr-2" /> Sign Out
             </Button>
           </div>
         </div>
 
-        {/* POINTS HERO */}
-        <div className="container relative z-10 py-10 text-center text-white">
-          <h1 className="text-2xl font-display font-bold tracking-tight">{club?.name}</h1>
-          <p className="text-white/60 text-sm mt-1">{program?.name}</p>
+        {/* HERO CONTENT */}
+        <div className="container relative z-10 py-12 text-center">
+          <h1 className="text-3xl font-display font-bold">{club?.name}</h1>
+          <p className="text-white/60 mt-1">{program?.name}</p>
 
-          <div className="mt-8 inline-flex flex-col items-center gap-3">
-            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md rounded-2xl px-8 py-5 border border-white/10">
-              <Trophy className="h-7 w-7 text-accent" />
-              <span className="text-5xl font-display font-bold tracking-tight">{effectivePointsBalance}</span>
-              <span className="text-white/60 font-medium">{program?.points_currency_name ?? "Points"}</span>
+          {/* POINTS + TIER CARD */}
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl px-10 py-6 space-y-4">
+              <div className="flex items-center justify-center gap-3">
+                <Trophy className="h-7 w-7 text-accent" />
+                <span className="text-5xl font-bold">{effectivePointsBalance}</span>
+                <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
+              </div>
+
+              {/* CURRENT TIER */}
+              {currentTier && (
+                <div className="space-y-2">
+                  <Badge className="bg-white/20 text-white border-white/30 rounded-full">
+                    <Star className="h-3 w-3 mr-1" />
+                    {currentTier.name}
+                  </Badge>
+
+                  {nextTier && (
+                    <>
+                      <Progress value={progress} className="h-2 bg-white/20" />
+                      <p className="text-xs text-white/70">
+                        {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
+          {/* LEADERBOARD */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate("/fan/leaderboard")}
-            className="mt-5 text-white/60 hover:text-white hover:bg-white/10 rounded-full"
+            className="mt-6 text-white/70 hover:text-white hover:bg-white/10 rounded-full"
           >
             <Users className="h-4 w-4 mr-2" />
             View Leaderboard
@@ -192,73 +268,51 @@ export default function FanHome() {
         </div>
       </header>
 
-      {/* CONTENT */}
+      {/* ================= CONTENT ================= */}
       <main className="container py-10 space-y-12">
         {/* ACTIVITIES */}
         <section>
-          <div className="flex justify-between items-center mb-5">
-            <h2 className="text-xl font-display font-bold flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-primary" />
-              </div>
-              Activities
-            </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/activities")} className="rounded-full">
-              View all <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+          <SectionHeader
+            title="Activities"
+            icon={<Zap className="h-4 w-4 text-primary" />}
+            onClick={() => navigate("/fan/activities")}
+          />
 
           <div className="space-y-3">
             {activities.map((a) => (
-              <Card key={a.id} className="rounded-2xl border-border/50 hover:border-primary/20 transition-colors">
-                <CardContent className="py-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{a.name}</p>
-                    <Badge variant="secondary" className="mt-1 rounded-full">
-                      +{a.points_awarded} pts
-                    </Badge>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => navigate("/fan/activities")}
-                    className="rounded-full gradient-stadium"
-                  >
-                    Participate
-                  </Button>
-                </CardContent>
-              </Card>
+              <InfoCard
+                key={a.id}
+                title={a.name}
+                badge={`+${a.points_awarded} pts`}
+                onClick={() => navigate("/fan/activities")}
+              />
             ))}
           </div>
         </section>
 
         {/* REWARDS */}
         <section>
-          <div className="flex justify-between items-center mb-5">
-            <h2 className="text-xl font-display font-bold flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-xl bg-accent/10 flex items-center justify-center">
-                <Gift className="h-4 w-4 text-accent" />
-              </div>
-              Rewards
-            </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/rewards")} className="rounded-full">
-              View all <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+          <SectionHeader
+            title="Rewards"
+            icon={<Gift className="h-4 w-4 text-accent" />}
+            onClick={() => navigate("/fan/rewards")}
+          />
 
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
               const canAfford = effectivePointsBalance >= r.points_cost;
+
               return (
-                <Card key={r.id} className="rounded-2xl border-border/50 hover:border-accent/20 transition-colors">
+                <Card key={r.id} className="rounded-2xl border-border/50">
                   <CardContent className="pt-6">
                     <h3 className="font-bold">{r.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
-                    <Badge variant="secondary" className="mt-3 rounded-full">
-                      {r.points_cost} pts
-                    </Badge>
+
+                    <Badge className="mt-3 rounded-full">{r.points_cost} pts</Badge>
+
                     <Button
                       disabled={!canAfford}
-                      className="mt-4 w-full rounded-xl gradient-golden font-semibold"
+                      className="mt-4 w-full rounded-xl gradient-golden"
                       onClick={() => navigate("/fan/rewards")}
                     >
                       Redeem
@@ -271,5 +325,41 @@ export default function FanHome() {
         </section>
       </main>
     </div>
+  );
+}
+
+/* ---------- Small reusable components ---------- */
+
+function SectionHeader({ title, icon, onClick }: any) {
+  return (
+    <div className="flex justify-between items-center mb-5">
+      <h2 className="text-xl font-display font-bold flex items-center gap-2.5">
+        <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">{icon}</div>
+        {title}
+      </h2>
+
+      <Button variant="ghost" size="sm" onClick={onClick} className="rounded-full">
+        View all <ChevronRight className="h-4 w-4 ml-1" />
+      </Button>
+    </div>
+  );
+}
+
+function InfoCard({ title, badge, onClick }: any) {
+  return (
+    <Card className="rounded-2xl border-border/50 hover:border-primary/20 transition-colors">
+      <CardContent className="py-4 flex justify-between items-center">
+        <div>
+          <p className="font-semibold">{title}</p>
+          <Badge variant="secondary" className="mt-1 rounded-full">
+            {badge}
+          </Badge>
+        </div>
+
+        <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium">
+          Participate
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
