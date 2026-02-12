@@ -124,7 +124,7 @@ export default function TierManagement() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveTier = async () => {
     if (!programId) return;
 
     const rankNum = parseInt(rank);
@@ -232,10 +232,49 @@ export default function TierManagement() {
       </header>
 
       <main className="container py-8 space-y-6">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Trophy className="h-7 w-7 text-primary" /> Tier Management
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Trophy className="h-7 w-7 text-primary" /> Tier Management
+          </h1>
 
+          {/* ADD / EDIT TIER DIALOG */}
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" /> Add Tier
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingTier ? "Edit Tier" : "Create Tier"}</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div>
+                  <Label>Name</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+
+                <div>
+                  <Label>Rank</Label>
+                  <Input type="number" value={rank} onChange={(e) => setRank(e.target.value)} />
+                </div>
+
+                <div>
+                  <Label>Points Threshold</Label>
+                  <Input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+                </div>
+
+                <Button className="w-full" onClick={handleSaveTier}>
+                  Save Tier
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* TIERS LIST */}
         {tiers.map((tier) => (
           <Card key={tier.id}>
             <CardHeader>
@@ -256,6 +295,7 @@ export default function TierManagement() {
                 </div>
               ))}
 
+              {/* ADD BENEFIT */}
               <div className="grid grid-cols-3 gap-2">
                 <Input placeholder="Label" value={benefitLabel} onChange={(e) => setBenefitLabel(e.target.value)} />
                 <Input placeholder="Type" value={benefitType} onChange={(e) => setBenefitType(e.target.value)} />
