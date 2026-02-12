@@ -46,7 +46,7 @@ interface RedemptionWithReward extends RewardRedemption {
 interface Tier {
   id: string;
   name: string;
-  threshold_points: number;
+  points_threshold: number;
 }
 
 /* ---------- Component ---------- */
@@ -74,69 +74,7 @@ export default function FanProfilePage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("badges");
 
-  /* ---------- PREVIEW ---------- */
-
-  const loadPreview = () => {
-    const previewClub: Club = {
-      id: "preview",
-      admin_id: "preview",
-      name: "Preview FC",
-      logo_url: null,
-      primary_color: "#0f766e",
-      country: "",
-      city: "",
-      stadium_name: null,
-      season_start: null,
-      season_end: null,
-      status: "verified",
-      created_at: "",
-      updated_at: "",
-    };
-
-    const previewProgram: LoyaltyProgram = {
-      id: "preview",
-      club_id: "preview",
-      name: "Preview Rewards",
-      description: null,
-      points_currency_name: "Points",
-      is_active: true,
-      created_at: "",
-      updated_at: "",
-    };
-
-    setClub(previewClub);
-    setProgram(previewProgram);
-
-    setMembership({
-      id: "preview",
-      fan_id: "preview-fan",
-      club_id: "preview",
-      program_id: "preview",
-      points_balance: previewPointsBalance,
-      joined_at: new Date(Date.now() - 40 * 86400000).toISOString(),
-      updated_at: "",
-    });
-
-    setEarnedPoints(previewPointsBalance);
-
-    setTiers([
-      { id: "1", name: "Silver", threshold_points: 1000 },
-      { id: "2", name: "Gold", threshold_points: 2000 },
-    ]);
-
-    const fanBadges = computeFanBadges({
-      totalPoints: previewPointsBalance,
-      activitiesCompleted: completedPreviewActivities.length,
-      rewardsRedeemed: 0,
-      memberSinceDays: 40,
-      leaderboardRank: 5,
-    });
-
-    setBadges(fanBadges);
-    setDataLoading(false);
-  };
-
-  /* ---------- REAL DATA ---------- */
+  /* ---------- FETCH ---------- */
 
   const fetchData = async () => {
     if (!profile) return;
@@ -144,6 +82,7 @@ export default function FanProfilePage() {
     setDataLoading(true);
 
     try {
+      /** Membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -158,40 +97,46 @@ export default function FanProfilePage() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
+      /** Club */
       const { data: clubs } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
       if (clubs?.length) setClub(clubs[0] as Club);
 
+      /** Program */
       const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
       if (programs?.length) setProgram(programs[0] as LoyaltyProgram);
 
+      /** Activity completions */
       const { data: comps } = await supabase
         .from("activity_completions")
         .select(`*, activities(name, verification_method, points_awarded)`)
-        .eq("fan_id", profile.id)
-        .order("completed_at", { ascending: false });
+        .eq("fan_id", profile.id);
 
       const completionsData = (comps ?? []) as CompletionWithActivity[];
       setCompletions(completionsData);
 
-      const totalEarned = completionsData.reduce((s, c) => s + c.points_earned, 0);
+      /** Total earned points (IDENTICAL to FanHome logic) */
+      const totalEarned = completionsData.reduce((sum, c) => sum + (c.points_earned || 0), 0) ?? 0;
+
       setEarnedPoints(totalEarned);
 
+      /** Rewards */
       const { data: reds } = await supabase
         .from("reward_redemptions")
         .select(`*, rewards(name, redemption_method)`)
-        .eq("fan_id", profile.id)
-        .order("redeemed_at", { ascending: false });
+        .eq("fan_id", profile.id);
 
       setRedemptions((reds ?? []) as RedemptionWithReward[]);
 
+      /** Tiers (IDENTICAL to FanHome logic) */
       const { data: tierRows } = await supabase
         .from("tiers")
         .select("*")
         .eq("program_id", m.program_id)
-        .order("threshold_points", { ascending: true });
+        .order("points_threshold", { ascending: true });
 
       setTiers((tierRows ?? []) as Tier[]);
 
+      /** Badges */
       const daysMember = Math.floor((Date.now() - new Date(m.joined_at).getTime()) / 86400000);
 
       const fanBadges = computeFanBadges({
@@ -210,18 +155,10 @@ export default function FanProfilePage() {
   /* ---------- EFFECT ---------- */
 
   useEffect(() => {
-    if (isPreviewMode) {
-      loadPreview();
-      return;
-    }
-
-    if (!loading && !user) {
-      navigate("/auth");
-      return;
-    }
-
+    if (isPreviewMode) return;
+    if (!loading && !user) navigate("/auth");
     if (!loading && profile) fetchData();
-  }, [isPreviewMode, loading, user, profile]);
+  }, [loading, user, profile]);
 
   /* ---------- LOADING ---------- */
 
@@ -233,15 +170,15 @@ export default function FanProfilePage() {
     );
   }
 
-  const displayName = isPreviewMode ? "Preview Fan" : profile?.full_name || profile?.email?.split("@")[0] || "Fan";
+  const displayName = profile?.full_name || profile?.email?.split("@")[0] || "Fan";
 
-  /* ---------- TIER CALCULATION ---------- */
+  /* ---------- TIER CALCULATION (IDENTICAL TO FANHOME) ---------- */
 
   let currentTier: Tier | null = null;
   let nextTier: Tier | null = null;
 
   for (let i = 0; i < tiers.length; i++) {
-    if (earnedPoints >= tiers[i].threshold_points) {
+    if (earnedPoints >= tiers[i].points_threshold) {
       currentTier = tiers[i];
       nextTier = tiers[i + 1] ?? null;
     }
@@ -249,7 +186,7 @@ export default function FanProfilePage() {
 
   const progress =
     currentTier && nextTier
-      ? ((earnedPoints - currentTier.threshold_points) / (nextTier.threshold_points - currentTier.threshold_points)) *
+      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
         100
       : 100;
 
@@ -257,14 +194,12 @@ export default function FanProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isPreviewMode && <PreviewBanner role="fan" />}
-
-      {/* HEADER */}
       <header
         className="relative overflow-hidden text-white"
         style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
       >
         <div className="absolute inset-0 bg-black/25" />
+
         <div className="container py-4 flex items-center gap-4 relative z-10">
           <Button
             variant="ghost"
@@ -278,7 +213,6 @@ export default function FanProfilePage() {
           <Logo />
         </div>
 
-        {/* HERO */}
         <div className="container py-10 flex flex-col md:flex-row md:items-center gap-6 relative z-10">
           <Avatar className="h-24 w-24 border-4 border-white/30">
             <AvatarFallback className="text-3xl font-bold bg-white/20 text-white">
@@ -286,11 +220,11 @@ export default function FanProfilePage() {
             </AvatarFallback>
           </Avatar>
 
-          <div className="flex-1">
-            <h1 className="text-3xl font-display font-bold">{displayName}</h1>
+          <div>
+            <h1 className="text-3xl font-bold">{displayName}</h1>
             <p className="text-white/70">{club?.name}</p>
 
-            {/* Tier badge */}
+            {/* ===== TIER DISPLAY ===== */}
             {currentTier && (
               <div className="mt-4 bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 max-w-md">
                 <Badge className="bg-white/20 text-white border-white/30 mb-2">
@@ -302,7 +236,7 @@ export default function FanProfilePage() {
                   <>
                     <Progress value={progress} className="h-2 bg-white/20" />
                     <p className="text-xs text-white/70 mt-2">
-                      {nextTier.threshold_points - earnedPoints} pts to {nextTier.name}
+                      {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
                     </p>
                   </>
                 ) : (
@@ -314,7 +248,6 @@ export default function FanProfilePage() {
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="container py-10">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-3 max-w-md mx-auto mb-8">
@@ -328,43 +261,25 @@ export default function FanProfilePage() {
           </TabsContent>
 
           <TabsContent value="activities">
-            {completions.length === 0 ? (
-              <p className="text-muted-foreground text-center">No activities yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {completions.map((c) => (
-                  <Card key={c.id}>
-                    <CardContent className="py-4 flex justify-between">
-                      <div>
-                        <p className="font-semibold">{c.activities?.name}</p>
-                        <p className="text-sm text-muted-foreground">{new Date(c.completed_at).toLocaleDateString()}</p>
-                      </div>
-                      <Badge>+{c.points_earned}</Badge>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {completions.map((c) => (
+              <Card key={c.id} className="mb-3">
+                <CardContent className="py-4 flex justify-between">
+                  <span>{c.activities?.name}</span>
+                  <Badge>+{c.points_earned}</Badge>
+                </CardContent>
+              </Card>
+            ))}
           </TabsContent>
 
           <TabsContent value="rewards">
-            {redemptions.length === 0 ? (
-              <p className="text-muted-foreground text-center">No rewards yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {redemptions.map((r) => (
-                  <Card key={r.id}>
-                    <CardContent className="py-4 flex justify-between">
-                      <div>
-                        <p className="font-semibold">{r.rewards?.name}</p>
-                        <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
-                      </div>
-                      <Badge>-{r.points_spent}</Badge>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {redemptions.map((r) => (
+              <Card key={r.id} className="mb-3">
+                <CardContent className="py-4 flex justify-between">
+                  <span>{r.rewards?.name}</span>
+                  <Badge>-{r.points_spent}</Badge>
+                </CardContent>
+              </Card>
+            ))}
           </TabsContent>
         </Tabs>
       </main>
