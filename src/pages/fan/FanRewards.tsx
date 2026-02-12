@@ -20,6 +20,11 @@ interface RedemptionWithReward extends RewardRedemption {
   };
 }
 
+interface RewardWithDiscount extends Reward {
+  discounted_cost?: number;
+  discount_percent?: number;
+}
+
 export default function FanRewards() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,13 +35,11 @@ export default function FanRewards() {
 
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [rewards, setRewards] = useState<RewardWithDiscount[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
-  const [tierDiscount, setTierDiscount] = useState(0);
-
   const [dataLoading, setDataLoading] = useState(true);
 
-  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [selectedReward, setSelectedReward] = useState<RewardWithDiscount | null>(null);
   const [redemptionModalOpen, setRedemptionModalOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
@@ -57,7 +60,7 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
-      // membership
+      /** MEMBERSHIP */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -72,42 +75,12 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // program
+      /** PROGRAM */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
-      // rewards: fetch all rewards for this program (no is_active filter)
-      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
-
-      setRewards((rewardsData ?? []) as Reward[]);
-
-      // redemption history
-      const { data: redemptionsData } = await supabase
-        .from("reward_redemptions")
-        .select(
-          `
-          *,
-          rewards (
-            name,
-            description
-          )
-        `,
-        )
-        .eq("fan_id", profile.id)
-        .order("redeemed_at", { ascending: false });
-
-      setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
-
-      // current tier
-      const { data: tierState } = await supabase
-        .from("membership_tier_state")
-        .select("tier_id")
-        .eq("membership_id", m.id)
-        .maybeSingle();
-
-      // tier benefit: discount_percent
-      /** 🔹 Fetch tier benefits for discount */
+      /** 🔹 GET CURRENT TIER */
       let discountPercent = 0;
 
       const { data: tierState } = await supabase
@@ -126,7 +99,37 @@ export default function FanRewards() {
         discountPercent = Number(discount?.benefit_value ?? 0);
       }
 
-      setTierDiscount(discountPercent);
+      /** REWARDS */
+      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
+
+      const rewardsWithDiscount: RewardWithDiscount[] = (rewardsData ?? []).map((r) => {
+        const discountedCost = Math.round((r.points_cost * (100 - discountPercent)) / 100);
+
+        return {
+          ...r,
+          discounted_cost: discountedCost,
+          discount_percent: discountPercent,
+        };
+      });
+
+      setRewards(rewardsWithDiscount);
+
+      /** REDEMPTIONS */
+      const { data: redemptionsData } = await supabase
+        .from("reward_redemptions")
+        .select(
+          `
+          *,
+          rewards (
+            name,
+            description
+          )
+        `,
+        )
+        .eq("fan_id", profile.id)
+        .order("redeemed_at", { ascending: false });
+
+      setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
     } catch (err) {
       console.error("FanRewards fetch error:", err);
       toast({
@@ -171,7 +174,7 @@ export default function FanRewards() {
       setSelectedReward(null);
       await fetchData();
 
-      return { success: true, code: data ?? null };
+      return { success: true };
     } catch (err: any) {
       const message = err?.message || "Redemption failed. Please try again.";
 
@@ -235,12 +238,8 @@ export default function FanRewards() {
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
-                const discountedCost =
-                  tierDiscount > 0
-                    ? Math.max(Math.round(reward.points_cost - (reward.points_cost * tierDiscount) / 100), 0)
-                    : reward.points_cost;
-
-                const canAfford = balance >= discountedCost;
+                const cost = reward.discounted_cost ?? reward.points_cost;
+                const canAfford = balance >= cost;
 
                 return (
                   <Card key={reward.id}>
@@ -248,33 +247,24 @@ export default function FanRewards() {
                       <h3 className="font-semibold">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
-                      <Badge className="mt-3">
-                        {tierDiscount > 0 ? (
+                      <Badge className="mt-3 flex gap-2 items-center">
+                        {reward.discount_percent ? (
                           <>
-                            <span className="mr-2">Cost:</span>
-                            <span className="line-through mr-2">
-                              {reward.points_cost} {currency}
-                            </span>
-                            <span className="text-green-600 font-semibold">
-                              {discountedCost} {currency} ({tierDiscount}% off)
-                            </span>
+                            <span className="line-through text-muted-foreground">{reward.points_cost}</span>
+                            <span className="text-green-600 font-semibold">{cost}</span>
+                            <span>-{reward.discount_percent}%</span>
                           </>
                         ) : (
-                          <>
-                            Cost: {reward.points_cost} {currency}
-                          </>
-                        )}
+                          <>{reward.points_cost}</>
+                        )}{" "}
+                        {currency}
                       </Badge>
 
                       <Button
                         className="mt-4 w-full"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
-                          // IMPORTANT: pass discounted cost to modal display
-                          setSelectedReward({
-                            ...reward,
-                            points_cost: discountedCost,
-                          } as Reward);
+                          setSelectedReward(reward);
                           setRedemptionModalOpen(true);
                         }}
                       >
