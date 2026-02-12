@@ -107,16 +107,23 @@ export default function FanRewards() {
         .maybeSingle();
 
       // tier benefit: discount_percent
+      /** 🔹 Fetch tier benefits for discount */
       let discountPercent = 0;
-      if (tierState?.tier_id) {
+
+      const { data: tierState } = await supabase
+        .from("membership_tier_state")
+        .select("tier_id")
+        .eq("membership_id", m.id)
+        .single();
+
+      if (tierState) {
         const { data: benefits } = await supabase
           .from("tier_benefits")
-          .select("value")
-          .eq("tier_id", tierState.tier_id)
-          .eq("benefit_type", "discount_percent")
-          .limit(1);
+          .select("benefit_type, benefit_value")
+          .eq("tier_id", tierState.tier_id);
 
-        discountPercent = benefits?.[0]?.value ?? 0;
+        const discount = benefits?.find((b) => b.benefit_type === "reward_discount_percent");
+        discountPercent = Number(discount?.benefit_value ?? 0);
       }
 
       setTierDiscount(discountPercent);
