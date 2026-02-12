@@ -99,31 +99,41 @@ export default function FanRewards() {
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /* ---------- CURRENT TIER DISCOUNT ---------- */
+      /* ---------- 🔥 REAL TIER-BASED DISCOUNT ---------- */
 
-  // 1️⃣ get membership tier
-  const { data: tierState } = await supabase
-    .from("membership_tier_state")
-    .select("tier_id")
-    .eq("membership_id", m.id)
-    .single();
-  
-  let discount = 0;
-  
-  if (tierState?.tier_id) {
-    // 2️⃣ get discount for that tier
-    const { data: benefitData } = await supabase
-      .from("tier_benefits")
-      .select("benefit_value")
-      .eq("tier_id", tierState.tier_id)
-      .eq("benefit_type", "reward_discount_percent")
-      .single();
-  
-    discount = Number(benefitData?.benefit_value ?? 0);
-  }
-  
-  setDiscountPercent(discount);
+      // 1️⃣ get membership tier
+      const { data: tierState } = await supabase
+        .from("membership_tier_state")
+        .select("tier_id")
+        .eq("membership_id", m.id)
+        .single();
 
+      let discount = 0;
+
+      // 2️⃣ get discount for THAT tier only
+      if (tierState?.tier_id) {
+        const { data: benefitData } = await supabase
+          .from("tier_benefits")
+          .select("benefit_value")
+          .eq("tier_id", tierState.tier_id)
+          .eq("benefit_type", "reward_discount_percent")
+          .single();
+
+        discount = Number(benefitData?.benefit_value ?? 0);
+      }
+
+      setDiscountPercent(discount);
+    } catch (err) {
+      console.error("FanRewards fetch error:", err);
+      toast({
+        title: "Error loading rewards",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
   /* ================= REDEEM ================= */
   const handleConfirmRedeem = async (): Promise<{
@@ -215,11 +225,11 @@ export default function FanRewards() {
           </div>
         </div>
 
-        {/* DISCOUNT BADGE */}
+        {/* DISCOUNT BANNER */}
         {discountPercent > 0 && (
           <div className="mb-6 flex items-center gap-2 text-sm text-green-600 font-semibold">
             <Percent className="h-4 w-4" />
-            {discountPercent}% tier discount applied to rewards
+            {discountPercent}% tier discount applied
           </div>
         )}
 
@@ -229,7 +239,7 @@ export default function FanRewards() {
             <TabsTrigger value="history">My Redemptions</TabsTrigger>
           </TabsList>
 
-          {/* AVAILABLE REWARDS */}
+          {/* AVAILABLE */}
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
@@ -246,14 +256,14 @@ export default function FanRewards() {
                       <h3 className="font-semibold">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
-                      {/* ORIGINAL COST */}
+                      {/* original price */}
                       {discountPercent > 0 && (
                         <p className="text-xs line-through text-muted-foreground mt-2">
                           {reward.points_cost} {currency}
                         </p>
                       )}
 
-                      {/* DISCOUNTED COST */}
+                      {/* discounted price */}
                       <Badge className="mt-2">
                         Cost: {discountedCost} {currency}
                       </Badge>
