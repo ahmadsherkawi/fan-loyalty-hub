@@ -34,118 +34,10 @@ export default function ClubAnalytics() {
   const [totalIssued, setTotalIssued] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
 
-  // Optional chart placeholders (until you extend RPC to return timeseries)
   const [fansGrowth, setFansGrowth] = useState<any[]>([]);
   const [pointsFlow, setPointsFlow] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (loading) return;
-
-    if (!isPreviewMode && !user) {
-      navigate("/auth?role=club_admin");
-      return;
-    }
-
-    if (!isPreviewMode && profile?.role !== "club_admin") {
-      navigate("/fan/home");
-      return;
-    }
-
-    if (isPreviewMode) {
-      setClub({} as Club);
-
-      setTotalFans(420);
-      setTotalIssued(2300);
-      setTotalSpent(1100);
-
-      setFansGrowth([
-        { month: "Jan", fans: 100 },
-        { month: "Feb", fans: 150 },
-        { month: "Mar", fans: 220 },
-        { month: "Apr", fans: 310 },
-        { month: "May", fans: 420 },
-      ]);
-
-      setPointsFlow([
-        { month: "Jan", issued: 500, spent: 100 },
-        { month: "Feb", issued: 800, spent: 200 },
-        { month: "Mar", issued: 900, spent: 400 },
-        { month: "Apr", issued: 1200, spent: 550 },
-        { month: "May", issued: 1500, spent: 700 },
-      ]);
-
-      setDataLoading(false);
-      return;
-    }
-
-    if (profile) fetchData();
-  }, [loading, user, profile]);
-
-  const fetchData = async () => {
-    if (!profile) return;
-
-    setDataLoading(true);
-
-    try {
-      // 1) Get the club for this admin
-      const { data: clubs, error: clubsError } = await supabase
-        .from("clubs")
-        .select("*")
-        .eq("admin_id", profile.id)
-        .limit(1);
-
-      if (clubsError) {
-        console.error("Failed to fetch club:", clubsError);
-        return;
-      }
-
-      if (!clubs?.length) {
-        console.warn("No club found for admin_id:", profile.id);
-        return;
-      }
-
-      const clubData = clubs[0] as Club;
-      setClub(clubData);
-
-      // 2) Fetch analytics from RPC
-      const { data: analytics, error: analyticsError } = await supabase.rpc("get_club_analytics", {
-        p_club_id: clubData.id,
-      });
-
-      if (analyticsError) {
-        console.error("Failed to fetch analytics:", analyticsError);
-        return;
-      }
-
-      const a = analytics as AnalyticsResponse;
-
-      setTotalFans(a?.total_fans ?? 0);
-      setTotalIssued(a?.total_issued ?? 0);
-      setTotalSpent(a?.total_spent ?? 0);
-
-      // 3) Charts (until you add timeseries to the RPC)
-      setFansGrowth([{ month: "Now", fans: a?.total_fans ?? 0 }]);
-
-      setPointsFlow([
-        {
-          month: "Now",
-          issued: a?.total_issued ?? 0,
-          spent: a?.total_spent ?? 0,
-        },
-      ]);
-    } finally {
-      setDataLoading(false);
-    }
-  };
-
-  if (!isPreviewMode && (loading || dataLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
+  // ✅ ALL HOOKS MUST BE ABOVE ANY RETURN
   const engagementRate = useMemo(() => {
     if (totalIssued <= 0) return 0;
     return Math.round((totalSpent / totalIssued) * 100);
@@ -185,11 +77,77 @@ export default function ClubAnalytics() {
     [totalFans, totalIssued, totalSpent, engagementRate],
   );
 
+  useEffect(() => {
+    if (loading) return;
+
+    if (!isPreviewMode && !user) {
+      navigate("/auth?role=club_admin");
+      return;
+    }
+
+    if (!isPreviewMode && profile?.role !== "club_admin") {
+      navigate("/fan/home");
+      return;
+    }
+
+    if (isPreviewMode) {
+      setTotalFans(420);
+      setTotalIssued(2300);
+      setTotalSpent(1100);
+
+      setFansGrowth([{ month: "Now", fans: 420 }]);
+      setPointsFlow([{ month: "Now", issued: 2300, spent: 1100 }]);
+
+      setDataLoading(false);
+      return;
+    }
+
+    if (profile) fetchData();
+  }, [loading, user, profile]);
+
+  const fetchData = async () => {
+    if (!profile) return;
+
+    setDataLoading(true);
+
+    try {
+      const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
+
+      if (!clubs?.length) return;
+
+      const clubData = clubs[0] as Club;
+      setClub(clubData);
+
+      const { data } = await supabase.rpc("get_club_analytics", {
+        p_club_id: clubData.id,
+      });
+
+      const a = data as AnalyticsResponse;
+
+      setTotalFans(a?.total_fans ?? 0);
+      setTotalIssued(a?.total_issued ?? 0);
+      setTotalSpent(a?.total_spent ?? 0);
+
+      setFansGrowth([{ month: "Now", fans: a?.total_fans ?? 0 }]);
+      setPointsFlow([{ month: "Now", issued: a?.total_issued ?? 0, spent: a?.total_spent ?? 0 }]);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  // ✅ SAFE loading return AFTER hooks
+  if (!isPreviewMode && (loading || dataLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
 
-      {/* HEADER */}
       <header className="border-b border-border/40">
         <div className="container py-5 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/club/dashboard")} className="rounded-full">
@@ -217,7 +175,7 @@ export default function ClubAnalytics() {
           </p>
         </div>
 
-        {/* SUMMARY CARDS */}
+        {/* SUMMARY */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {summaryStats.map((s) => (
             <Card key={s.label} className="rounded-2xl">
@@ -242,12 +200,10 @@ export default function ClubAnalytics() {
 
         {/* CHARTS */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* FAN GROWTH */}
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Fan Growth</CardTitle>
             </CardHeader>
-
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={fansGrowth}>
@@ -261,12 +217,10 @@ export default function ClubAnalytics() {
             </CardContent>
           </Card>
 
-          {/* POINTS FLOW */}
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Points Economy</CardTitle>
             </CardHeader>
-
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={pointsFlow}>
@@ -280,17 +234,6 @@ export default function ClubAnalytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
-
-        {/* FOOTER NOTE (optional) */}
-        <div className="text-xs text-muted-foreground">
-          {club?.name ? (
-            <span>
-              Showing analytics for <span className="font-medium">{club.name}</span>.
-            </span>
-          ) : (
-            <span>Showing club analytics.</span>
-          )}
         </div>
       </main>
     </div>
