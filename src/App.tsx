@@ -23,6 +23,7 @@ import FanProfilePage from "./pages/fan/FanProfilePage";
 import JoinClub from "./pages/fan/JoinClub";
 import ClubAnalytics from "@/pages/club/ClubAnalytics";
 import ClubSeasons from "@/pages/club/ClubSeasons";
+import TierManagement from "@/pages/club/TierManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/club/claims" element={<ClaimReview />} />
               <Route path="/club/analytics" element={<ClubAnalytics />} />
               <Route path="/club/seasons" element={<ClubSeasons />} />
+              <Route path="/club/tiers" element={<TierManagement />} />
 
               {/* Fan Routes */}
               <Route path="/fan/home" element={<FanHome />} />
