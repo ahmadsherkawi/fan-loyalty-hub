@@ -51,6 +51,7 @@ const App = () => (
               <Route path="/club/claims" element={<ClaimReview />} />
               <Route path="/club/analytics" element={<ClubAnalytics />} />
               <Route path="/club/seasons" element={<ClubSeasons />} />
+              <Route path="/club/tiers" element={<TierManagement />} />
 
               {/* Fan Routes */}
               <Route path="/fan/home" element={<FanHome />} />
