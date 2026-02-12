@@ -57,7 +57,7 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
-      /** MEMBERSHIP */
+      // membership
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -72,17 +72,17 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      /** PROGRAM */
+      // program
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
-      /** REWARDS */
+      // rewards: fetch all rewards for this program (no is_active filter)
       const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
 
       setRewards((rewardsData ?? []) as Reward[]);
 
-      /** REDEMPTION HISTORY */
+      // redemption history
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
         .select(
@@ -99,16 +99,15 @@ export default function FanRewards() {
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /** CURRENT TIER */
+      // current tier
       const { data: tierState } = await supabase
         .from("membership_tier_state")
         .select("tier_id")
         .eq("membership_id", m.id)
         .maybeSingle();
 
-      /** TIER BENEFITS → DISCOUNT */
+      // tier benefit: discount_percent
       let discountPercent = 0;
-
       if (tierState?.tier_id) {
         const { data: benefits } = await supabase
           .from("tier_benefits")
@@ -165,7 +164,7 @@ export default function FanRewards() {
       setSelectedReward(null);
       await fetchData();
 
-      return { success: true };
+      return { success: true, code: data ?? null };
     } catch (err: any) {
       const message = err?.message || "Redemption failed. Please try again.";
 
@@ -226,11 +225,13 @@ export default function FanRewards() {
             <TabsTrigger value="history">My Redemptions</TabsTrigger>
           </TabsList>
 
-          {/* AVAILABLE REWARDS */}
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
-                const discountedCost = reward.points_cost - (reward.points_cost * tierDiscount) / 100;
+                const discountedCost =
+                  tierDiscount > 0
+                    ? Math.max(Math.round(reward.points_cost - (reward.points_cost * tierDiscount) / 100), 0)
+                    : reward.points_cost;
 
                 const canAfford = balance >= discountedCost;
 
@@ -243,11 +244,12 @@ export default function FanRewards() {
                       <Badge className="mt-3">
                         {tierDiscount > 0 ? (
                           <>
+                            <span className="mr-2">Cost:</span>
                             <span className="line-through mr-2">
                               {reward.points_cost} {currency}
                             </span>
                             <span className="text-green-600 font-semibold">
-                              {discountedCost} {currency}
+                              {discountedCost} {currency} ({tierDiscount}% off)
                             </span>
                           </>
                         ) : (
@@ -261,9 +263,10 @@ export default function FanRewards() {
                         className="mt-4 w-full"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
+                          // IMPORTANT: pass discounted cost to modal display
                           setSelectedReward({
                             ...reward,
-                            points_cost: discountedCost, // ensure modal uses discounted price
+                            points_cost: discountedCost,
                           } as Reward);
                           setRedemptionModalOpen(true);
                         }}
@@ -277,7 +280,6 @@ export default function FanRewards() {
             </div>
           </TabsContent>
 
-          {/* REDEMPTION HISTORY */}
           <TabsContent value="history">
             <div className="space-y-4 mt-6">
               {redemptions.map((r) => (
