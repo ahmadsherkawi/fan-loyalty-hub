@@ -13,11 +13,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
 
-import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy, Sparkles } from "lucide-react";
-
-/* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
-/* -------------------------------------------------------------------------- */
+import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy } from "lucide-react";
 
 interface Tier {
   id: string;
@@ -36,21 +32,6 @@ interface TierBenefit {
   benefit_label: string | null;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                              BENEFIT OPTIONS                               */
-/* -------------------------------------------------------------------------- */
-
-const BENEFIT_TYPES = [
-  { value: "points_multiplier", label: "Points Multiplier", needsValue: true, suffix: "× faster points" },
-  { value: "reward_discount", label: "Reward Discount", needsValue: true, suffix: "% off rewards" },
-  { value: "vip_access", label: "VIP Access", needsValue: false, suffix: "VIP rewards unlocked" },
-  { value: "exclusive_badge", label: "Exclusive Badge", needsValue: false, suffix: "Special badge" },
-];
-
-/* -------------------------------------------------------------------------- */
-/*                                COMPONENT                                   */
-/* -------------------------------------------------------------------------- */
-
 export default function TierManagement() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -67,17 +48,14 @@ export default function TierManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<Tier | null>(null);
 
-  const [benefitDialogTier, setBenefitDialogTier] = useState<Tier | null>(null);
-  const [benefitType, setBenefitType] = useState("points_multiplier");
-  const [benefitValue, setBenefitValue] = useState("");
-
   const [name, setName] = useState("");
   const [rank, setRank] = useState("1");
   const [threshold, setThreshold] = useState("0");
 
-  /* -------------------------------------------------------------------------- */
-  /*                                   AUTH                                     */
-  /* -------------------------------------------------------------------------- */
+  const [benefitLabel, setBenefitLabel] = useState("");
+  const [benefitType, setBenefitType] = useState("");
+  const [benefitValue, setBenefitValue] = useState("");
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isPreview) {
@@ -90,10 +68,6 @@ export default function TierManagement() {
     if (!loading && profile?.role !== "club_admin") navigate("/fan/home");
     if (!loading && profile) fetchData();
   }, [loading, user, profile]);
-
-  /* -------------------------------------------------------------------------- */
-  /*                                   FETCH                                    */
-  /* -------------------------------------------------------------------------- */
 
   const fetchData = async () => {
     if (!profile) return;
@@ -138,24 +112,17 @@ export default function TierManagement() {
           );
 
         const grouped: Record<string, TierBenefit[]> = {};
-
-        benefitsData?.forEach((b) => {
+        (benefitsData || []).forEach((b: any) => {
           if (!grouped[b.tier_id]) grouped[b.tier_id] = [];
-          grouped[b.tier_id].push(b as TierBenefit);
+          grouped[b.tier_id].push(b);
         });
 
         setBenefits(grouped);
-      } else {
-        setBenefits({});
       }
     } finally {
       setDataLoading(false);
     }
   };
-
-  /* -------------------------------------------------------------------------- */
-  /*                                 TIER SAVE                                  */
-  /* -------------------------------------------------------------------------- */
 
   const handleSave = async () => {
     if (!programId) return;
@@ -198,60 +165,42 @@ export default function TierManagement() {
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                              BENEFIT CREATION                              */
-  /* -------------------------------------------------------------------------- */
-
   const handleAddBenefit = async () => {
-    if (!benefitDialogTier) return;
-
-    const selected = BENEFIT_TYPES.find((b) => b.value === benefitType);
-
-    const numericValue = benefitValue ? parseFloat(benefitValue) : null;
-
-    const label = selected?.needsValue ? `${numericValue}${selected?.suffix}` : selected?.suffix;
+    if (!selectedTierId || !benefitType) return;
 
     try {
       const { error } = await supabase.from("tier_benefits").insert({
-        tier_id: benefitDialogTier.id,
+        tier_id: selectedTierId,
         benefit_type: benefitType,
-        benefit_value: numericValue,
-        benefit_label: label,
+        benefit_value: benefitValue ? Number(benefitValue) : null,
+        benefit_label: benefitLabel || null,
       });
 
       if (error) throw error;
 
-      toast({ title: "Benefit added" });
-
-      setBenefitDialogTier(null);
+      setBenefitLabel("");
+      setBenefitType("");
       setBenefitValue("");
+
       fetchData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                                DELETE TIER                                 */
-  /* -------------------------------------------------------------------------- */
-
-  const handleDelete = async (tierId: string) => {
-    if (!confirm("Delete this tier?")) return;
+  const handleDeleteBenefit = async (benefitId: string) => {
+    if (!confirm("Delete this benefit?")) return;
 
     try {
-      const { error } = await supabase.from("tiers").delete().eq("id", tierId);
+      const { error } = await supabase.from("tier_benefits").delete().eq("id", benefitId);
       if (error) throw error;
 
-      toast({ title: "Tier deleted" });
+      toast({ title: "Benefit deleted" });
       fetchData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
-
-  /* -------------------------------------------------------------------------- */
-  /*                                  FORM                                      */
-  /* -------------------------------------------------------------------------- */
 
   const resetForm = () => {
     setDialogOpen(false);
@@ -261,18 +210,6 @@ export default function TierManagement() {
     setThreshold("0");
   };
 
-  const openEdit = (tier: Tier) => {
-    setEditingTier(tier);
-    setName(tier.name);
-    setRank(String(tier.rank));
-    setThreshold(String(tier.points_threshold));
-    setDialogOpen(true);
-  };
-
-  /* -------------------------------------------------------------------------- */
-  /*                                  LOADING                                   */
-  /* -------------------------------------------------------------------------- */
-
   if (!isPreview && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -281,10 +218,6 @@ export default function TierManagement() {
     );
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                                    UI                                      */
-  /* -------------------------------------------------------------------------- */
-
   return (
     <div className="min-h-screen bg-background">
       {isPreview && <PreviewBanner role="club_admin" />}
@@ -292,145 +225,55 @@ export default function TierManagement() {
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/club/dashboard")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Logo />
         </div>
       </header>
 
       <main className="container py-8 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Trophy className="h-7 w-7 text-primary" />
-            Tier Management
-          </h1>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Trophy className="h-7 w-7 text-primary" /> Tier Management
+        </h1>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Tier
-              </Button>
-            </DialogTrigger>
+        {tiers.map((tier) => (
+          <Card key={tier.id}>
+            <CardHeader>
+              <CardTitle className="flex justify-between">
+                {tier.name} <Badge>Rank {tier.rank}</Badge>
+              </CardTitle>
+            </CardHeader>
 
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingTier ? "Edit Tier" : "Create Tier"}</DialogTitle>
-              </DialogHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">Unlock at {tier.points_threshold} pts</p>
 
-              <div className="space-y-3">
-                <div>
-                  <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+              {(benefits[tier.id] || []).map((b) => (
+                <div key={b.id} className="flex justify-between items-center border rounded-lg px-3 py-2">
+                  <span>{b.benefit_label || b.benefit_type}</span>
+                  <Button size="icon" variant="destructive" onClick={() => handleDeleteBenefit(b.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
+              ))}
 
-                <div>
-                  <Label>Rank</Label>
-                  <Input type="number" value={rank} onChange={(e) => setRank(e.target.value)} />
-                </div>
-
-                <div>
-                  <Label>Points Threshold</Label>
-                  <Input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
-                </div>
-
-                <Button className="w-full" onClick={handleSave}>
-                  Save
-                </Button>
+              <div className="grid grid-cols-3 gap-2">
+                <Input placeholder="Label" value={benefitLabel} onChange={(e) => setBenefitLabel(e.target.value)} />
+                <Input placeholder="Type" value={benefitType} onChange={(e) => setBenefitType(e.target.value)} />
+                <Input placeholder="Value" value={benefitValue} onChange={(e) => setBenefitValue(e.target.value)} />
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
 
-        {/* Tier list */}
-        {tiers.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">No tiers created yet.</CardContent>
+              <Button
+                onClick={() => {
+                  setSelectedTierId(tier.id);
+                  handleAddBenefit();
+                }}
+                className="w-full"
+              >
+                Add Benefit
+              </Button>
+            </CardContent>
           </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tiers.map((tier) => (
-              <Card key={tier.id} className="relative overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    {tier.name}
-                    <Badge>Rank {tier.rank}</Badge>
-                  </CardTitle>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">Unlock at {tier.points_threshold} pts</p>
-
-                  {/* Benefits */}
-                  <div className="space-y-1">
-                    {benefits[tier.id]?.length ? (
-                      benefits[tier.id].map((b) => (
-                        <div key={b.id} className="text-xs flex items-center gap-2 text-muted-foreground">
-                          <Sparkles className="h-3 w-3" />
-                          {b.benefit_label}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No benefits yet</p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" onClick={() => openEdit(tier)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-
-                    <Button size="sm" variant="secondary" onClick={() => setBenefitDialogTier(tier)}>
-                      Manage Benefits
-                    </Button>
-
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(tier.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Benefit Dialog */}
-        <Dialog open={!!benefitDialogTier} onOpenChange={() => setBenefitDialogTier(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Benefit</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-3">
-              <div>
-                <Label>Benefit Type</Label>
-                <select
-                  className="w-full border rounded-md p-2"
-                  value={benefitType}
-                  onChange={(e) => setBenefitType(e.target.value)}
-                >
-                  {BENEFIT_TYPES.map((b) => (
-                    <option key={b.value} value={b.value}>
-                      {b.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {BENEFIT_TYPES.find((b) => b.value === benefitType)?.needsValue && (
-                <div>
-                  <Label>Value</Label>
-                  <Input value={benefitValue} onChange={(e) => setBenefitValue(e.target.value)} />
-                </div>
-              )}
-
-              <Button className="w-full" onClick={handleAddBenefit}>
-                Save Benefit
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        ))}
       </main>
     </div>
   );
