@@ -140,6 +140,8 @@ export default function FanProfilePage() {
 
   const fetchData = async () => {
     if (!profile) return;
+    console.log("TIERS:", tierRows);
+    console.log("EARNED POINTS:", totalEarned);
 
     setDataLoading(true);
 
