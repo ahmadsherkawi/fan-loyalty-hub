@@ -1,5 +1,3 @@
-// FULL FILE — READY TO PASTE
-
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +10,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Gift, Loader2, Trophy, Star } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Trophy } from "lucide-react";
 import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
 interface RedemptionWithReward extends RewardRedemption {
@@ -20,11 +18,6 @@ interface RedemptionWithReward extends RewardRedemption {
     name: string;
     description: string | null;
   };
-}
-
-interface TierBenefit {
-  benefit_type: string;
-  benefit_value: number;
 }
 
 export default function FanRewards() {
@@ -39,9 +32,10 @@ export default function FanRewards() {
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
-  const [tierBenefits, setTierBenefits] = useState<TierBenefit[]>([]);
+  const [tierDiscount, setTierDiscount] = useState(0);
 
   const [dataLoading, setDataLoading] = useState(true);
+
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [redemptionModalOpen, setRedemptionModalOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
@@ -52,7 +46,9 @@ export default function FanRewards() {
       return;
     }
 
-    if (!loading && profile) fetchData();
+    if (!loading && profile) {
+      fetchData();
+    }
   }, [profile, loading, isPreviewMode]);
 
   const fetchData = async () => {
@@ -61,6 +57,7 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
+      /** MEMBERSHIP */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -75,44 +72,79 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
+      /** PROGRAM */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
+      /** REWARDS */
       const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
 
       setRewards((rewardsData ?? []) as Reward[]);
 
+      /** REDEMPTION HISTORY */
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
-        .select(`*, rewards(name, description)`)
+        .select(
+          `
+          *,
+          rewards (
+            name,
+            description
+          )
+        `,
+        )
         .eq("fan_id", profile.id)
         .order("redeemed_at", { ascending: false });
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /** 🔥 Fetch tier benefits */
-      const { data: benefits } = await supabase
+      /** CURRENT TIER */
+      const { data: tierState } = await supabase
         .from("membership_tier_state")
-        .select(`tier_benefits(benefit_type, benefit_value)`)
+        .select("tier_id")
         .eq("membership_id", m.id)
         .maybeSingle();
 
-      setTierBenefits((benefits?.tier_benefits ?? []) as TierBenefit[]);
+      /** TIER BENEFITS → DISCOUNT */
+      let discountPercent = 0;
+
+      if (tierState?.tier_id) {
+        const { data: benefits } = await supabase
+          .from("tier_benefits")
+          .select("value")
+          .eq("tier_id", tierState.tier_id)
+          .eq("benefit_type", "discount_percent")
+          .limit(1);
+
+        discountPercent = benefits?.[0]?.value ?? 0;
+      }
+
+      setTierDiscount(discountPercent);
     } catch (err) {
       console.error("FanRewards fetch error:", err);
-      toast({ title: "Error loading rewards", variant: "destructive" });
+      toast({
+        title: "Error loading rewards",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setDataLoading(false);
     }
   };
 
-  const discount = tierBenefits.find((b) => b.benefit_type === "discount_percent")?.benefit_value ?? 0;
+  const handleConfirmRedeem = async (): Promise<{
+    success: boolean;
+    code?: string | null;
+    error?: string;
+  }> => {
+    if (!membership || !selectedReward) {
+      return { success: false, error: "Missing required data" };
+    }
 
-  const applyDiscount = (cost: number) => Math.ceil(cost * (1 - discount / 100));
-
-  const handleConfirmRedeem = async () => {
-    if (!membership || !selectedReward) return { success: false };
+    if (isPreviewMode) {
+      return { success: true };
+    }
 
     setRedeeming(true);
 
@@ -124,7 +156,10 @@ export default function FanRewards() {
 
       if (error) throw error;
 
-      toast({ title: "Reward redeemed!", description: data ? `Code: ${data}` : undefined });
+      toast({
+        title: "Reward redeemed!",
+        description: data ? `Your code: ${data}` : "Your redemption was successful.",
+      });
 
       setRedemptionModalOpen(false);
       setSelectedReward(null);
@@ -132,12 +167,15 @@ export default function FanRewards() {
 
       return { success: true };
     } catch (err: any) {
+      const message = err?.message || "Redemption failed. Please try again.";
+
       toast({
         title: "Redemption failed",
-        description: err?.message,
+        description: message,
         variant: "destructive",
       });
-      return { success: false };
+
+      return { success: false, error: message };
     } finally {
       setRedeeming(false);
     }
@@ -161,7 +199,8 @@ export default function FanRewards() {
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/fan/home")}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
           <Logo />
         </div>
@@ -170,7 +209,8 @@ export default function FanRewards() {
       <main className="container py-8">
         <div className="flex justify-between mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Gift className="h-8 w-8 text-accent" /> Rewards
+            <Gift className="h-8 w-8 text-accent" />
+            Rewards
           </h1>
 
           <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
@@ -180,54 +220,80 @@ export default function FanRewards() {
           </div>
         </div>
 
-        {discount > 0 && (
-          <Badge className="mb-4 bg-green-100 text-green-700">
-            <Star className="h-3 w-3 mr-1" />
-            {discount}% Tier Discount Applied
-          </Badge>
-        )}
+        <Tabs defaultValue="available">
+          <TabsList className="grid grid-cols-2 max-w-md">
+            <TabsTrigger value="available">Available</TabsTrigger>
+            <TabsTrigger value="history">My Redemptions</TabsTrigger>
+          </TabsList>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {rewards.map((reward) => {
-            const finalCost = applyDiscount(reward.points_cost);
-            const canAfford = balance >= finalCost;
+          {/* AVAILABLE REWARDS */}
+          <TabsContent value="available">
+            <div className="grid md:grid-cols-3 gap-6 mt-6">
+              {rewards.map((reward) => {
+                const discountedCost = reward.points_cost - (reward.points_cost * tierDiscount) / 100;
 
-            return (
-              <Card key={reward.id}>
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold">{reward.name}</h3>
-                  <p className="text-sm text-muted-foreground">{reward.description}</p>
+                const canAfford = balance >= discountedCost;
 
-                  {discount > 0 ? (
-                    <div className="mt-3">
-                      <p className="line-through text-sm text-muted-foreground">
-                        {reward.points_cost} {currency}
-                      </p>
-                      <Badge>
-                        {finalCost} {currency}
+                return (
+                  <Card key={reward.id}>
+                    <CardContent className="pt-6">
+                      <h3 className="font-semibold">{reward.name}</h3>
+                      <p className="text-sm text-muted-foreground">{reward.description}</p>
+
+                      <Badge className="mt-3">
+                        {tierDiscount > 0 ? (
+                          <>
+                            <span className="line-through mr-2">
+                              {reward.points_cost} {currency}
+                            </span>
+                            <span className="text-green-600 font-semibold">
+                              {discountedCost} {currency}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            Cost: {reward.points_cost} {currency}
+                          </>
+                        )}
                       </Badge>
-                    </div>
-                  ) : (
-                    <Badge className="mt-3">
-                      {reward.points_cost} {currency}
-                    </Badge>
-                  )}
 
-                  <Button
-                    className="mt-4 w-full"
-                    disabled={!canAfford || redeeming}
-                    onClick={() => {
-                      setSelectedReward(reward);
-                      setRedemptionModalOpen(true);
-                    }}
-                  >
-                    Redeem
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                      <Button
+                        className="mt-4 w-full"
+                        disabled={!canAfford || redeeming}
+                        onClick={() => {
+                          setSelectedReward({
+                            ...reward,
+                            points_cost: discountedCost, // ensure modal uses discounted price
+                          } as Reward);
+                          setRedemptionModalOpen(true);
+                        }}
+                      >
+                        Redeem
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* REDEMPTION HISTORY */}
+          <TabsContent value="history">
+            <div className="space-y-4 mt-6">
+              {redemptions.map((r) => (
+                <Card key={r.id}>
+                  <CardContent className="py-4 flex justify-between">
+                    <div>
+                      <p className="font-semibold">{r.rewards?.name}</p>
+                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
+                    </div>
+                    <Badge>-{r.points_spent}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <RewardRedemptionModal
