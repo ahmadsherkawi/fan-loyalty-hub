@@ -100,24 +100,30 @@ export default function FanRewards() {
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
       /* ---------- CURRENT TIER DISCOUNT ---------- */
-      const { data: benefitData } = await supabase
-        .from("tier_benefits")
-        .select("benefit_value")
-        .eq("benefit_type", "reward_discount_percent")
-        .limit(1);
 
-      setDiscountPercent(Number(benefitData?.[0]?.benefit_value ?? 0));
-    } catch (err) {
-      console.error("FanRewards fetch error:", err);
-      toast({
-        title: "Error loading rewards",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setDataLoading(false);
-    }
-  };
+  // 1️⃣ get membership tier
+  const { data: tierState } = await supabase
+    .from("membership_tier_state")
+    .select("tier_id")
+    .eq("membership_id", m.id)
+    .single();
+  
+  let discount = 0;
+  
+  if (tierState?.tier_id) {
+    // 2️⃣ get discount for that tier
+    const { data: benefitData } = await supabase
+      .from("tier_benefits")
+      .select("benefit_value")
+      .eq("tier_id", tierState.tier_id)
+      .eq("benefit_type", "reward_discount_percent")
+      .single();
+  
+    discount = Number(benefitData?.benefit_value ?? 0);
+  }
+  
+  setDiscountPercent(discount);
+
 
   /* ================= REDEEM ================= */
   const handleConfirmRedeem = async (): Promise<{
