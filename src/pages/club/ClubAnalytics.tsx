@@ -73,7 +73,7 @@ export default function ClubAnalytics() {
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      /** 2️⃣ ACTIVE FANS (Dashboard truth) */
+      /** 2️⃣ ACTIVE FANS (Dashboard truth — KEEP THIS) */
       const { count: fans } = await supabase
         .from("fan_memberships")
         .select("*", { count: "exact", head: true })
@@ -81,47 +81,13 @@ export default function ClubAnalytics() {
 
       setActiveFans(fans ?? 0);
 
-      /** 3️⃣ FAN GROWTH (original logic) */
-      const { data: memberships } = await supabase
-        .from("fan_memberships")
-        .select("created_at")
-        .eq("club_id", clubData.id);
+      /** 3️⃣ NEW: SQL TIME-SERIES ANALYTICS (replaces JS aggregation) */
+      const { data: tsData, error } = await supabase.rpc("get_club_analytics_timeseries", { p_club_id: clubData.id });
 
-      const growthMap: Record<string, number> = {};
-
-      memberships?.forEach((m: any) => {
-        const month = new Date(m.created_at).toLocaleString("default", {
-          month: "short",
-        });
-        growthMap[month] = (growthMap[month] || 0) + 1;
-      });
-
-      setFansGrowth(Object.entries(growthMap).map(([month, fans]) => ({ month, fans })));
-
-      /** 4️⃣ POINTS FLOW (original working ledger logic) */
-      const { data: ledger } = await supabase.from("points_ledger").select("delta_points, created_at");
-
-      const issuedMap: Record<string, number> = {};
-      const spentMap: Record<string, number> = {};
-
-      ledger?.forEach((l: any) => {
-        const month = new Date(l.created_at).toLocaleString("default", {
-          month: "short",
-        });
-
-        if (l.delta_points > 0) issuedMap[month] = (issuedMap[month] || 0) + l.delta_points;
-        else spentMap[month] = (spentMap[month] || 0) + Math.abs(l.delta_points);
-      });
-
-      const months = Array.from(new Set([...Object.keys(issuedMap), ...Object.keys(spentMap)]));
-
-      setPointsFlow(
-        months.map((m) => ({
-          month: m,
-          issued: issuedMap[m] || 0,
-          spent: spentMap[m] || 0,
-        })),
-      );
+      if (!error && tsData) {
+        setFansGrowth(tsData.fan_growth ?? []);
+        setPointsFlow(tsData.points_flow ?? []);
+      }
     } finally {
       setDataLoading(false);
     }
