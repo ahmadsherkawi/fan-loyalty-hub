@@ -50,8 +50,8 @@ const App = () => (
               <Route path="/club/rewards" element={<RewardsBuilder />} />
               <Route path="/club/claims" element={<ClaimReview />} />
               <Route path="/club/analytics" element={<ClubAnalytics />} />
-              <Route path="/club/seasons" element={<ClubSeasons />} />
               <Route path="/club/tiers" element={<TierManagement />} />
+              <Route path="/club/seasons" element={<ClubSeasons />} />
 
               {/* Fan Routes */}
               <Route path="/fan/home" element={<FanHome />} />
