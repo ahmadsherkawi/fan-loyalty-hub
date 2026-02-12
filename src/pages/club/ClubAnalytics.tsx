@@ -87,6 +87,12 @@ export default function ClubAnalytics() {
       if (!error && tsData) {
         setFansGrowth(tsData.fan_growth ?? []);
         setPointsFlow(tsData.points_flow ?? []);
+        const s = tsData.summary ?? {};
+        setActiveFans(s.current_fans ?? 0);
+        setTotalIssued(s.current_issued ?? 0);
+        setTotalSpent(s.current_spent ?? 0);
+        setFanGrowthPercent(s.fan_growth_percent ?? 0);
+        setEngagementGrowthPercent(s.engagement_growth_percent ?? 0);
       }
     } finally {
       setDataLoading(false);
