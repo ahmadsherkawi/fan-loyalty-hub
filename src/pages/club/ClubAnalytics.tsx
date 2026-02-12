@@ -23,6 +23,8 @@ export default function ClubAnalytics() {
 
   const [club, setClub] = useState<Club | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+
+  const [totalFans, setTotalFans] = useState(0);
   const [fansGrowth, setFansGrowth] = useState<any[]>([]);
   const [pointsFlow, setPointsFlow] = useState<any[]>([]);
 
@@ -33,6 +35,8 @@ export default function ClubAnalytics() {
     if (!isPreviewMode && profile?.role !== "club_admin") navigate("/fan/home");
 
     if (isPreviewMode) {
+      setTotalFans(420);
+
       setFansGrowth([
         { month: "Jan", fans: 100 },
         { month: "Feb", fans: 150 },
@@ -62,6 +66,7 @@ export default function ClubAnalytics() {
     setDataLoading(true);
 
     try {
+      // Get club
       const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
 
       if (!clubs?.length) return;
@@ -69,10 +74,20 @@ export default function ClubAnalytics() {
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
+      // ===== TOTAL FANS (direct count — production correct) =====
+      const { count: fanCount } = await supabase
+        .from("fan_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("club_id", clubData.id);
+
+      setTotalFans(fanCount ?? 0);
+
+      // ===== FAN GROWTH (monthly) =====
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("created_at")
-        .eq("club_id", clubData.id);
+        .eq("club_id", clubData.id)
+        .not("created_at", "is", null);
 
       const growthMap: Record<string, number> = {};
 
@@ -85,7 +100,11 @@ export default function ClubAnalytics() {
 
       setFansGrowth(Object.entries(growthMap).map(([month, fans]) => ({ month, fans })));
 
-      const { data: ledger } = await supabase.from("points_ledger").select("delta_points, created_at");
+      // ===== POINTS FLOW =====
+      const { data: ledger } = await supabase
+        .from("points_ledger")
+        .select("delta_points, created_at")
+        .eq("club_id", clubData.id);
 
       const issuedMap: Record<string, number> = {};
       const spentMap: Record<string, number> = {};
@@ -121,8 +140,6 @@ export default function ClubAnalytics() {
     );
   }
 
-  const latestFans = fansGrowth.length > 0 ? fansGrowth[fansGrowth.length - 1].fans : 0;
-
   const totalIssued = pointsFlow.reduce((s, p) => s + p.issued, 0);
   const totalSpent = pointsFlow.reduce((s, p) => s + p.spent, 0);
 
@@ -131,7 +148,7 @@ export default function ClubAnalytics() {
   const summaryStats = [
     {
       label: "Active Fans",
-      value: latestFans,
+      value: totalFans,
       icon: <Users className="h-4 w-4" />,
       change: "+18%",
       color: "text-primary",
@@ -163,8 +180,9 @@ export default function ClubAnalytics() {
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
 
-      <header className="relative border-b border-border/40 overflow-hidden">
-        <div className="relative container py-5 flex items-center gap-4">
+      {/* HEADER */}
+      <header className="border-b border-border/40">
+        <div className="container py-5 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/club/dashboard")} className="rounded-full">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
@@ -176,21 +194,35 @@ export default function ClubAnalytics() {
       </header>
 
       <main className="container py-10 max-w-6xl space-y-10">
-        {/* SUMMARY */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* TITLE */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-accent text-xs font-semibold uppercase tracking-wider">
+            <BarChart3 className="h-4 w-4" />
+            Insights
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Club Analytics</h1>
+          <p className="text-muted-foreground max-w-md">
+            Track fan growth, engagement trends, and loyalty point activity in real time.
+          </p>
+        </div>
+
+        {/* SUMMARY CARDS */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {summaryStats.map((s) => (
-            <Card key={s.label} className="rounded-2xl border-border/40">
+            <Card key={s.label} className="rounded-2xl">
               <CardContent className="pt-5 pb-4 px-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${s.color}`}>{s.icon}</div>
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center bg-muted ${s.color}`}>
+                    {s.icon}
+                  </div>
 
-                  <div className="flex items-center gap-1 text-primary text-xs font-semibold">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-primary">
                     <ArrowUpRight className="h-3 w-3" />
                     {s.change}
                   </div>
                 </div>
 
-                <p className="text-2xl font-bold">{s.value}</p>
+                <p className="text-2xl font-bold tracking-tight">{s.value}</p>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
               </CardContent>
             </Card>
@@ -199,8 +231,8 @@ export default function ClubAnalytics() {
 
         {/* CHARTS */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Fans */}
-          <Card className="rounded-2xl border-border/40">
+          {/* FAN GROWTH */}
+          <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Fan Growth</CardTitle>
             </CardHeader>
@@ -218,8 +250,8 @@ export default function ClubAnalytics() {
             </CardContent>
           </Card>
 
-          {/* Points */}
-          <Card className="rounded-2xl border-border/40">
+          {/* POINTS FLOW */}
+          <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Points Economy</CardTitle>
             </CardHeader>
@@ -231,8 +263,8 @@ export default function ClubAnalytics() {
                   <XAxis dataKey="month" />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
-                  <Bar dataKey="issued" />
-                  <Bar dataKey="spent" />
+                  <Bar dataKey="issued" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="spent" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
