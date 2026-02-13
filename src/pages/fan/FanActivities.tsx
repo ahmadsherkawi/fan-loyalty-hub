@@ -1,4 +1,4 @@
-// (FULL FILE — PRODUCTION SAFE)
+// (FULL FILE — NO TRUNCATION)
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -49,27 +49,36 @@ export default function FanActivities() {
 
   const [dataLoading, setDataLoading] = useState(true);
 
-  // ===== MODAL STATE =====
+  // Modal state
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
   const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [submittingProof, setSubmittingProof] = useState(false);
+
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [processingQR, setProcessingQR] = useState(false);
+
   const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [processingLocation, setProcessingLocation] = useState(false);
+
   const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
 
-  // ================= FETCH =================
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      const { data: memberships } = await supabase
+      // Membership
+      const { data: memberships, error: mErr } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
+
+      if (mErr) throw mErr;
 
       if (!memberships?.length) {
         navigate("/fan/join");
@@ -79,38 +88,52 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // multiplier
-      const { data: multData } = await supabase.rpc("get_membership_multiplier", {
+      // Multiplier (same method as before)
+      const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
         p_membership_id: m.id,
       });
+      if (multErr) throw multErr;
 
       const multValue = Number(multData ?? 1);
       setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
 
-      // program
-      const { data: prog } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
+      // Program
+      const { data: prog, error: pErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .limit(1);
+
+      if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // activities
-      const { data: acts } = await supabase
+      // Activities
+      const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
         .eq("program_id", m.program_id)
         .eq("is_active", true);
 
-      setActivities((acts || []) as Activity[]);
+      if (aErr) throw aErr;
+      setActivities((acts || []) as unknown as Activity[]);
 
-      // completions
-      const { data: comps } = await supabase.from("activity_completions").select("*").eq("fan_id", profile.id);
+      // Completions
+      const { data: comps, error: cErr } = await supabase
+        .from("activity_completions")
+        .select("*")
+        .eq("fan_id", profile.id);
+
+      if (cErr) throw cErr;
       setCompletions((comps || []) as ActivityCompletion[]);
 
-      // pending proof
-      const { data: claims } = await supabase
+      // Pending manual claims
+      const { data: claims, error: clErr } = await supabase
         .from("manual_claims")
         .select("activity_id")
         .eq("fan_id", profile.id)
         .eq("status", "pending");
 
+      if (clErr) throw clErr;
       setPendingClaims((claims || []).map((c: any) => c.activity_id));
     } catch (err: any) {
       toast({
@@ -134,25 +157,30 @@ export default function FanActivities() {
       return;
     }
 
-    if (!loading && profile) fetchData();
+    if (!loading && profile) {
+      fetchData();
+    }
   }, [isPreviewMode, loading, profile, navigate, fetchData]);
 
-  // ================= HELPERS =================
-  const isCompleted = (id: string) =>
-    isPreviewMode ? completedPreviewActivities.includes(id) : completions.some((c) => c.activity_id === id);
+  const isCompleted = (activityId: string) => {
+    if (isPreviewMode) return completedPreviewActivities.includes(activityId);
+    return completions.some((c) => c.activity_id === activityId);
+  };
 
-  const hasPendingClaim = (id: string) => pendingClaims.includes(id);
+  const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
-  // ================= COMPLETE =================
+  // Single source of truth completion (same behavior you had before)
   const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      const final = Math.round(activity.points_awarded);
-      addPreviewPoints(final);
+      const previewMultiplier = 1;
+      const previewFinal = Math.round((activity.points_awarded || 0) * previewMultiplier);
+
+      addPreviewPoints(previewFinal);
       markActivityCompleted(activity.id);
 
       toast({
         title: "Activity Completed!",
-        description: `You earned ${final} ${program?.points_currency_name || "Points"}.`,
+        description: `You earned ${previewFinal} ${program?.points_currency_name || "Points"} (×${previewMultiplier}).`,
       });
       return;
     }
@@ -163,42 +191,223 @@ export default function FanActivities() {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
     });
-
     if (error) throw error;
 
-    const earned = Math.round((activity.points_awarded || 0) * multiplier);
+    const earned = Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
+    const mult = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
 
     toast({
       title: "Activity Completed!",
-      description: `You earned ${earned} ${program?.points_currency_name || "Points"} (×${multiplier}).`,
+      description: `You earned ${earned} ${program?.points_currency_name || "Points"} (×${mult}).`,
     });
 
     await fetchData();
   };
 
-  // ================= START CLICK =================
+  // Decide what happens when user clicks an activity
   const handleStart = (activity: Activity) => {
+    // already done
     if (isCompleted(activity.id)) {
-      toast({ title: "Already completed" });
+      toast({ title: "Already completed", description: "You have already completed this activity." });
       return;
     }
 
+    // manual proof already pending
     if (activity.verification_method === "manual_proof" && hasPendingClaim(activity.id)) {
-      toast({ title: "Pending review" });
+      toast({
+        title: "Pending review",
+        description: "You already submitted proof. Wait for the club to review it.",
+      });
       return;
     }
 
     setSelectedActivity(activity);
 
-    if (activity.verification_method === "manual_proof") return setProofModalOpen(true);
-    if (activity.verification_method === "qr_scan") return setQrScannerOpen(true);
-    if (activity.verification_method === "location_checkin") return setLocationModalOpen(true);
-    if (activity.verification_method === "in_app_completion") return setPollQuizModalOpen(true);
+    if (activity.verification_method === "manual_proof") {
+      setProofModalOpen(true);
+      return;
+    }
 
-    completeViaRpc(activity);
+    if (activity.verification_method === "qr_scan") {
+      setQrScannerOpen(true);
+      return;
+    }
+
+    if (activity.verification_method === "location_checkin") {
+      setLocationModalOpen(true);
+      return;
+    }
+
+    if (activity.verification_method === "in_app_completion" && activity.in_app_config) {
+      setPollQuizModalOpen(true);
+      return;
+    }
+
+    // fallback
+    completeViaRpc(activity).catch((err: any) => {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to complete activity.",
+        variant: "destructive",
+      });
+    });
   };
 
-  // ================= LOADING =================
+  // Manual proof submit: create manual_claims (do NOT award immediately)
+  const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
+    if (!selectedActivity) return;
+
+    if (!proofDescription?.trim()) {
+      toast({
+        title: "Add a short description",
+        description: "Please describe your proof briefly so the club can review it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasPendingClaim(selectedActivity.id)) {
+      toast({ title: "Pending review", description: "You already submitted proof for this activity." });
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+
+    if (isCompleted(selectedActivity.id)) {
+      toast({ title: "Already completed", description: "This activity is already completed." });
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+
+    if (isPreviewMode) {
+      toast({
+        title: "Proof Submitted!",
+        description: "Preview mode: proof would be sent to the club admin for review.",
+      });
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+
+    if (!membership || !profile) return;
+
+    setSubmittingProof(true);
+    try {
+      const { error } = await supabase.from("manual_claims").insert({
+        activity_id: selectedActivity.id,
+        fan_id: profile.id,
+        membership_id: membership.id,
+        proof_description: proofDescription.trim(),
+        proof_url: proofUrl,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      setPendingClaims((prev) => (prev.includes(selectedActivity.id) ? prev : [...prev, selectedActivity.id]));
+
+      toast({
+        title: "Proof Submitted!",
+        description: "The club admin will review it. You earn points once approved.",
+      });
+
+      setProofModalOpen(false);
+      setSelectedActivity(null);
+
+      await fetchData();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to submit proof.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingProof(false);
+    }
+  };
+
+  // QR success
+  const handleQRSuccess = async () => {
+    if (!selectedActivity) return;
+
+    setProcessingQR(true);
+    try {
+      await completeViaRpc(selectedActivity);
+      setQrScannerOpen(false);
+      setSelectedActivity(null);
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to complete QR activity.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingQR(false);
+    }
+  };
+
+  // Location success
+  const handleLocationSuccess = async () => {
+    if (!selectedActivity) return;
+
+    setProcessingLocation(true);
+    try {
+      await completeViaRpc(selectedActivity);
+      setLocationModalOpen(false);
+      setSelectedActivity(null);
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to complete check-in.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingLocation(false);
+    }
+  };
+
+  // Poll/Quiz submit: IMPORTANT correctness logic
+  const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
+    if (!selectedActivity) return;
+
+    // Don’t allow re-submit if completed
+    if (isCompleted(selectedActivity.id)) {
+      toast({ title: "Already completed", description: "You have already completed this activity." });
+      setPollQuizModalOpen(false);
+      setSelectedActivity(null);
+      return;
+    }
+
+    const cfg = selectedActivity.in_app_config as any;
+    const isPoll = cfg?.type === "poll";
+
+    // Quiz: only award if correct
+    if (!isPoll && !isCorrect) {
+      toast({ title: "Incorrect", description: "Try again." });
+      return;
+    }
+
+    try {
+      await completeViaRpc(selectedActivity);
+      setPollQuizModalOpen(false);
+      setSelectedActivity(null);
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to record response.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
+    qr_scan: QrCode,
+    location_checkin: MapPin,
+    in_app_completion: Smartphone,
+    manual_proof: FileCheck,
+  };
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -207,22 +416,13 @@ export default function FanActivities() {
     );
   }
 
-  // ================= UI =================
-  const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
-    qr_scan: QrCode,
-    location_checkin: MapPin,
-    in_app_completion: Smartphone,
-    manual_proof: FileCheck,
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate("/fan/home")}>
+          <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -230,7 +430,6 @@ export default function FanActivities() {
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="container py-8">
         <div className="flex justify-between mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -243,83 +442,117 @@ export default function FanActivities() {
           </Badge>
         </div>
 
-        <div className="space-y-4">
-          {activities.map((activity) => {
-            const Icon = icons[activity.verification_method];
-            const completed = isCompleted(activity.id);
+        {activities.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center">
+              <p className="text-muted-foreground">No activities available yet.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {activities.map((activity) => {
+              const Icon = icons[activity.verification_method];
+              const completed = isCompleted(activity.id);
+              const pending = hasPendingClaim(activity.id);
 
-            return (
-              <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
-                <CardContent className="py-4 flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <Icon className="h-5 w-5 text-primary" />
+              return (
+                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
+                  <CardContent className="py-4 flex justify-between items-center gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Icon className="h-5 w-5 text-primary" />
+                      </div>
 
-                    <div>
-                      <p className="font-semibold">{activity.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        +{Math.round((activity.points_awarded || 0) * multiplier)}{" "}
-                        {program?.points_currency_name || "Points"}
-                        {multiplier > 1 && <span className="ml-2 text-green-600">×{multiplier}</span>}
-                      </p>
+                      <div>
+                        <p className="font-semibold">{activity.name}</p>
+
+                        <p className="text-sm text-muted-foreground">
+                          +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
+                          {program?.points_currency_name || "Points"}
+                          {multiplier > 1 && (
+                            <span className="ml-2 text-xs text-green-600 font-semibold">×{multiplier}</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  {completed ? (
-                    <Badge className="bg-success text-success-foreground">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Done
-                    </Badge>
-                  ) : (
-                    <Button onClick={() => handleStart(activity)}>Start</Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    {completed ? (
+                      <Badge className="bg-success text-success-foreground">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Done
+                      </Badge>
+                    ) : pending ? (
+                      <Badge variant="outline">Pending</Badge>
+                    ) : (
+                      <Button onClick={() => handleStart(activity)}>Start</Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </main>
 
-      {/* ===== MODALS WITH WORKING SUCCESS ===== */}
-
+      {/* Manual Proof */}
       <ManualProofModal
         open={proofModalOpen}
-        onOpenChange={setProofModalOpen}
-        onSuccess={async () => {
-          if (!selectedActivity) return;
-          await completeViaRpc(selectedActivity);
-          setProofModalOpen(false);
+        onOpenChange={(open) => {
+          setProofModalOpen(open);
+          if (!open) setSelectedActivity(null);
         }}
+        activityName={selectedActivity?.name || ""}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
+        pointsCurrencyName={program?.points_currency_name || "Points"}
+        onSubmit={handleSubmitProof}
+        isLoading={submittingProof}
       />
 
+      {/* QR Scanner */}
       <QRScannerModal
         open={qrScannerOpen}
-        onOpenChange={setQrScannerOpen}
-        onSuccess={async () => {
-          if (!selectedActivity) return;
-          await completeViaRpc(selectedActivity);
-          setQrScannerOpen(false);
+        onOpenChange={(open) => {
+          setQrScannerOpen(open);
+          if (!open) setSelectedActivity(null);
         }}
+        activityName={selectedActivity?.name || ""}
+        expectedQRData={(selectedActivity as any)?.qr_code_data || null}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
+        pointsCurrencyName={program?.points_currency_name || "Points"}
+        onSuccess={handleQRSuccess}
+        isLoading={processingQR}
       />
 
+      {/* Location Check-in */}
       <LocationCheckinModal
         open={locationModalOpen}
-        onOpenChange={setLocationModalOpen}
-        onSuccess={async () => {
-          if (!selectedActivity) return;
-          await completeViaRpc(selectedActivity);
-          setLocationModalOpen(false);
+        onOpenChange={(open) => {
+          setLocationModalOpen(open);
+          if (!open) setSelectedActivity(null);
         }}
+        activityName={selectedActivity?.name || ""}
+        targetLat={(selectedActivity as any)?.location_lat ?? null}
+        targetLng={(selectedActivity as any)?.location_lng ?? null}
+        radiusMeters={(selectedActivity as any)?.location_radius_meters || 500}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
+        pointsCurrencyName={program?.points_currency_name || "Points"}
+        onSuccess={handleLocationSuccess}
+        isLoading={processingLocation}
       />
 
+      {/* Poll/Quiz */}
       {selectedActivity?.in_app_config && (
         <PollQuizParticipation
           isOpen={pollQuizModalOpen}
-          onClose={() => setPollQuizModalOpen(false)}
+          onClose={() => {
+            setPollQuizModalOpen(false);
+            setSelectedActivity(null);
+          }}
           activityName={selectedActivity.name}
           config={selectedActivity.in_app_config as unknown as InAppConfig}
-          pointsAwarded={Math.round((selectedActivity.points_awarded || 0) * multiplier)}
+          pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
           pointsCurrency={program?.points_currency_name || "Points"}
-          onSubmit={() => completeViaRpc(selectedActivity)}
+          onSubmit={handlePollQuizSubmit}
           isPreview={isPreviewMode}
         />
       )}
