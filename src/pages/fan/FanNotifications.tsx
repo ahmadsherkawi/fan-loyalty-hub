@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, BellOff, CheckCircle2, Gift, Trophy, Zap, Check } from "lucide-react";
+import { ArrowLeft, Loader2, BellOff, CheckCircle2, Gift, Trophy, Zap } from "lucide-react";
+
 import type { Club, FanMembership } from "@/types/database";
 
 interface NotificationRow {
@@ -34,6 +35,9 @@ export default function FanNotifications() {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
+  /** ✅ NEW: unread counter */
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
   /* ================= INIT ================= */
   useEffect(() => {
     if (loading) return;
@@ -57,16 +61,16 @@ export default function FanNotifications() {
 
       setNotifications([
         {
-          id: "1",
-          user_id: "preview",
+          id: "sample-1",
+          user_id: "preview-fan",
           type: "points_earned",
-          data: { points: 120, activityName: "Attend Match" },
+          data: { points: 100, activityName: "Attend Match" },
           is_read: false,
           created_at: new Date().toISOString(),
         },
         {
-          id: "2",
-          user_id: "preview",
+          id: "sample-2",
+          user_id: "preview-fan",
           type: "reward_redeemed",
           data: { rewardName: "Club Scarf", points: 500 },
           is_read: false,
@@ -89,28 +93,39 @@ export default function FanNotifications() {
     }
   }, [loading, user, profile, isPreviewMode]);
 
-  /* ================= FETCH ================= */
+  /* ================= FETCH CLUB ================= */
   const fetchClub = async () => {
     if (!profile) return;
 
-    const { data: memberships } = await supabase.from("fan_memberships").select("*").eq("fan_id", profile.id).limit(1);
+    try {
+      const { data: memberships } = await supabase
+        .from("fan_memberships")
+        .select("*")
+        .eq("fan_id", profile.id)
+        .limit(1);
 
-    if (memberships?.length) {
-      const m = memberships[0] as FanMembership;
+      if (memberships?.length) {
+        const m = memberships[0] as FanMembership;
 
-      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
+        const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
 
-      if (clubData?.length) setClub(clubData[0] as Club);
+        if (clubData?.length) {
+          setClub(clubData[0] as Club);
+        }
+      }
+    } catch {
+      /* ignore */
     }
   };
 
+  /* ================= FETCH NOTIFICATIONS ================= */
   const fetchNotifications = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", profile.id)
@@ -118,7 +133,7 @@ export default function FanNotifications() {
 
       if (error) throw error;
 
-      setNotifications((data ?? []) as NotificationRow[]);
+      setNotifications((rows ?? []) as NotificationRow[]);
     } catch {
       toast({
         title: "Error",
@@ -130,172 +145,134 @@ export default function FanNotifications() {
     }
   };
 
-  /* ================= ACTIONS ================= */
+  /* ================= MARK SINGLE AS READ ================= */
+  const markAsRead = async (notification: NotificationRow) => {
+    if (notification.is_read) return;
 
-  const markAsRead = async (notif: NotificationRow) => {
-    if (notif.is_read) return;
+    /** optimistic UI */
+    setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)));
 
-    setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)));
-
-    await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+    try {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", notification.id);
+    } catch {
+      /* ignore failure */
+    }
   };
 
+  /* ================= NEW: MARK ALL AS READ ================= */
   const markAllAsRead = async () => {
-    if (!profile) return;
+    if (unreadCount === 0) return;
 
+    /** optimistic UI */
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
 
-    await supabase.from("notifications").update({ is_read: true }).eq("user_id", profile.id).eq("is_read", false);
-  };
-
-  /* ================= NAVIGATION ================= */
-
-  const openNotification = async (n: NotificationRow) => {
-    await markAsRead(n);
-
-    switch (n.type) {
-      case "points_earned":
-      case "new_activity":
-        navigate("/fan/activities");
-        break;
-
-      case "reward_redeemed":
-        navigate("/fan/rewards");
-        break;
-
-      case "tier_upgraded":
-        navigate("/fan/home");
-        break;
-
-      default:
-        break;
+    try {
+      await supabase.from("notifications").update({ is_read: true }).eq("user_id", profile?.id).eq("is_read", false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to mark notifications as read.",
+        variant: "destructive",
+      });
     }
   };
 
-  /* ================= HELPERS ================= */
-
-  const getMessage = (n: NotificationRow) => {
-    switch (n.type) {
+  /* ================= MESSAGE BUILDER ================= */
+  const getMessage = (notif: NotificationRow) => {
+    switch (notif.type) {
       case "points_earned":
-        return `You earned ${n.data?.points ?? 0} pts for ${n.data?.activityName ?? "an activity"}`;
+        return `You earned ${notif.data?.points ?? 0} points for ${notif.data?.activityName ?? "an activity"}`;
       case "reward_redeemed":
-        return `You redeemed ${n.data?.rewardName ?? "a reward"}`;
+        return `You redeemed ${notif.data?.rewardName ?? "a reward"} for ${notif.data?.points ?? 0} points`;
       case "tier_upgraded":
-        return `You reached ${n.data?.newTier ?? "a new tier"} 🎉`;
+        return `Congratulations! You were upgraded to ${notif.data?.newTier ?? "a new"} tier`;
       case "new_activity":
-        return `New activity: ${n.data?.activityName ?? "Check it out!"}`;
+        return `New activity available: ${notif.data?.activityName ?? "an activity"}`;
       default:
-        return n.data?.message ?? "New notification";
+        return notif.data?.message ?? "You have a new notification";
     }
   };
-
-  const today = new Date().toDateString();
-
-  const todayNotifs = notifications.filter((n) => new Date(n.created_at).toDateString() === today);
-
-  const earlierNotifs = notifications.filter((n) => new Date(n.created_at).toDateString() !== today);
 
   /* ================= LOADING ================= */
-
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   /* ================= UI ================= */
-
-  const renderList = (list: NotificationRow[]) => (
-    <div className="space-y-3">
-      {list.map((n) => (
-        <Card
-          key={n.id}
-          onClick={() => openNotification(n)}
-          className={`cursor-pointer border-border/50 hover:border-primary/20 transition ${
-            n.is_read ? "opacity-60" : ""
-          }`}
-        >
-          <CardContent className="py-4 flex justify-between items-start gap-3">
-            <div className="flex items-start gap-3">
-              {n.type === "points_earned" && <Trophy className="h-5 w-5 text-accent" />}
-              {n.type === "reward_redeemed" && <Gift className="h-5 w-5 text-accent" />}
-              {n.type === "tier_upgraded" && <CheckCircle2 className="h-5 w-5 text-accent" />}
-              {n.type === "new_activity" && <Zap className="h-5 w-5 text-accent" />}
-
-              <div>
-                <p className="font-medium">{getMessage(n)}</p>
-                <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
-              </div>
-            </div>
-
-            {!n.is_read && (
-              <Badge variant="destructive" className="mt-1">
-                New
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
       <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
-        <div className="container py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
-            className="text-primary-foreground hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-
-          <Logo />
-
-          <div className="ml-auto">
-            <Button size="sm" variant="secondary" onClick={markAllAsRead} className="flex items-center gap-1">
-              <Check className="h-4 w-4" />
-              Mark all read
+        <div className="container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
+              className="text-primary-foreground hover:bg-white/10"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
             </Button>
+
+            <Logo />
           </div>
+
+          {/* ✅ NEW unread badge */}
+          {unreadCount > 0 && <Badge variant="destructive">{unreadCount} new</Badge>}
         </div>
 
-        <div className="container pb-6">
+        <div className="container pb-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-primary-foreground">Notifications</h1>
+
+          {/* ✅ NEW mark all read button */}
+          {unreadCount > 0 && (
+            <Button size="sm" variant="secondary" onClick={markAllAsRead}>
+              Mark all as read
+            </Button>
+          )}
         </div>
       </header>
 
-      {/* CONTENT */}
-      <main className="container py-8 max-w-2xl mx-auto space-y-8">
+      {/* MAIN */}
+      <main className="container py-8 max-w-2xl mx-auto">
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center py-20 gap-4">
+          <div className="flex flex-col items-center py-20 text-center gap-4">
             <BellOff className="h-10 w-10 text-muted-foreground" />
-            <p className="text-muted-foreground">You’re all caught up.</p>
+            <h2 className="text-lg font-semibold">No Notifications</h2>
+            <p className="text-sm text-muted-foreground">You’re all caught up for now.</p>
           </div>
         ) : (
-          <>
-            {todayNotifs.length > 0 && (
-              <section>
-                <h2 className="text-sm font-semibold text-muted-foreground mb-3">Today</h2>
-                {renderList(todayNotifs)}
-              </section>
-            )}
+          <div className="space-y-3">
+            {notifications.map((n) => (
+              <Card
+                key={n.id}
+                className={`border-border/50 ${n.is_read ? "opacity-70" : ""} hover:border-primary/20 transition-colors`}
+                onClick={() => markAsRead(n)}
+              >
+                <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="font-medium mb-1 flex items-center gap-2">
+                      {n.type === "points_earned" && <Trophy className="h-4 w-4 text-accent" />}
+                      {n.type === "reward_redeemed" && <Gift className="h-4 w-4 text-accent" />}
+                      {n.type === "tier_upgraded" && <CheckCircle2 className="h-4 w-4 text-accent" />}
+                      {n.type === "new_activity" && <Zap className="h-4 w-4 text-accent" />}
+                      {getMessage(n)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
+                  </div>
 
-            {earlierNotifs.length > 0 && (
-              <section>
-                <h2 className="text-sm font-semibold text-muted-foreground mb-3">Earlier</h2>
-                {renderList(earlierNotifs)}
-              </section>
-            )}
-          </>
+                  {!n.is_read && <Badge variant="destructive">New</Badge>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </main>
     </div>
