@@ -1,76 +1,89 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { ManualProofModal } from "@/components/ui/ManualProofModal";
-import { QRScannerModal } from "@/components/ui/QRScannerModal";
-import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
-import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle } from "lucide-react";
-import type { Database } from "@/integrations/supabase/types";
 
-type Activity = Database["public"]["Tables"]["activities"]["Row"];
-type FanMembership = Database["public"]["Tables"]["fan_memberships"]["Row"];
-type LoyaltyProgram = Database["public"]["Tables"]["loyalty_programs"]["Row"];
-type ActivityCompletion = Database["public"]["Tables"]["activity_completions"]["Row"];
-type VerificationMethod = Database["public"]["Enums"]["verification_method"];
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles } from "lucide-react";
 
-export default function FanActivities() {
+import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
+
+interface Tier {
+  id: string;
+  name: string;
+  rank: number;
+  points_threshold: number;
+}
+
+export default function FanHome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, loading } = useAuth();
-  const { toast } = useToast();
-
-  const { previewPointsBalance, addPreviewPoints, completedPreviewActivities, markActivityCompleted } =
-    usePreviewMode();
+  const { user, profile, signOut, loading } = useAuth();
+  const { previewPointsBalance } = usePreviewMode();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
 
   const [membership, setMembership] = useState<FanMembership | null>(null);
+  const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [completions, setCompletions] = useState<ActivityCompletion[]>([]);
-  const [pendingClaims, setPendingClaims] = useState<string[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [tiers, setTiers] = useState<Tier[]>([]);
 
-  // Modal state
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [currentTier, setCurrentTier] = useState<Tier | null>(null);
+  const [nextTier, setNextTier] = useState<Tier | null>(null);
 
-  const [proofModalOpen, setProofModalOpen] = useState(false);
-  const [submittingProof, setSubmittingProof] = useState(false);
+  const [tierBenefits, setTierBenefits] = useState<any[]>([]);
 
-  const [qrScannerOpen, setQrScannerOpen] = useState(false);
-  const [processingQR, setProcessingQR] = useState(false);
-
-  const [locationModalOpen, setLocationModalOpen] = useState(false);
-  const [processingLocation, setProcessingLocation] = useState(false);
-
-  const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
+  /** REAL backend values */
   const [multiplier, setMultiplier] = useState<number>(1);
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
 
-  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
+  const [dataLoading, setDataLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const fetchData = useCallback(async () => {
+  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
+
+  // ---------- AUTH ----------
+  useEffect(() => {
+    if (loading) return;
+
+    if (!isPreviewMode && !user) {
+      navigate("/auth", { replace: true });
+      return;
+    }
+
+    if (!isPreviewMode && profile?.role === "club_admin") {
+      navigate("/club/dashboard", { replace: true });
+      return;
+    }
+
+    if (!isPreviewMode && profile?.role === "fan") {
+      fetchData();
+    }
+  }, [loading, user, profile, isPreviewMode]);
+
+  // ---------- FETCH ----------
+  const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      // Membership
-      const { data: memberships, error: mErr } = await supabase
+      /** Membership */
+      const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
-
-      if (mErr) throw mErr;
 
       if (!memberships?.length) {
         navigate("/fan/join");
@@ -80,484 +93,267 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // ✅ FIX: fetch multiplier after we have membership id
-      const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
+      /** REAL multiplier from backend */
+      const { data: multData } = await supabase.rpc("get_membership_multiplier", {
         p_membership_id: m.id,
       });
 
-      if (multErr) throw multErr;
+      const mult = Number(multData ?? 1);
+      setMultiplier(Number.isFinite(mult) && mult > 0 ? mult : 1);
 
-      const multValue = Number(multData ?? 1);
-      setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
+      /** REAL discount from backend */
+      const { data: discData } = await supabase.rpc("get_membership_discount", {
+        p_membership_id: m.id,
+      });
 
-      // Program
-      const { data: prog, error: pErr } = await supabase
-        .from("loyalty_programs")
-        .select("*")
-        .eq("id", m.program_id)
-        .limit(1);
+      const disc = Number(discData ?? 0);
+      setDiscountPercent(Number.isFinite(disc) && disc > 0 ? disc : 0);
 
-      if (pErr) throw pErr;
-      if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
+      /** Club */
+      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      setClub(clubData as Club);
 
-      // Activities
-      const { data: acts, error: aErr } = await (supabase as any)
-        .from("activities")
+      /** Program */
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      setProgram(programData as LoyaltyProgram);
+
+      /** Activities */
+      const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
+      setActivities((acts ?? []) as Activity[]);
+
+      /** Rewards */
+      const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
+      setRewards((rews ?? []) as Reward[]);
+
+      /** Tiers */
+      const { data: tiersData } = await supabase
+        .from("tiers")
         .select("*")
         .eq("program_id", m.program_id)
-        .eq("is_active", true);
+        .order("rank", { ascending: true });
 
-      if (aErr) throw aErr;
-      setActivities((acts || []) as unknown as Activity[]);
+      const tierList = (tiersData ?? []) as Tier[];
+      setTiers(tierList);
 
-      // Completions
-      const { data: comps, error: cErr } = await supabase
+      /** Earned points */
+      const { data: completions } = await supabase
         .from("activity_completions")
-        .select("*")
+        .select("points_earned")
         .eq("fan_id", profile.id);
 
-      if (cErr) throw cErr;
-      setCompletions((comps || []) as ActivityCompletion[]);
+      const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+      setEarnedPoints(totalEarned);
 
-      // Pending manual claims
-      const { data: claims, error: clErr } = await supabase
-        .from("manual_claims")
-        .select("activity_id")
-        .eq("fan_id", profile.id)
-        .eq("status", "pending");
+      let current: Tier | null = null;
+      let next: Tier | null = null;
 
-      if (clErr) throw clErr;
-      setPendingClaims((claims || []).map((c: any) => c.activity_id));
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to load activities.",
-        variant: "destructive",
-      });
+      for (let i = 0; i < tierList.length; i++) {
+        if (totalEarned >= tierList[i].points_threshold) {
+          current = tierList[i];
+          next = tierList[i + 1] ?? null;
+        }
+      }
+
+      setCurrentTier(current);
+      setNextTier(next);
+
+      /** Tier benefits (for tooltip text only) */
+      if (current?.id) {
+        const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
+        setTierBenefits(benefits ?? []);
+      }
+
+      /** Notifications */
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_read", false);
+
+      setUnreadCount(count ?? 0);
     } finally {
       setDataLoading(false);
     }
-  }, [profile, navigate, toast]);
-
-  useEffect(() => {
-    if (isPreviewMode) {
-      setDataLoading(false);
-      return;
-    }
-
-    if (!loading && !profile) {
-      navigate("/auth");
-      return;
-    }
-
-    if (!loading && profile) {
-      fetchData();
-    }
-  }, [isPreviewMode, loading, profile, navigate, fetchData]);
-
-  const isCompleted = (activityId: string) => {
-    if (isPreviewMode) return completedPreviewActivities.includes(activityId);
-    return completions.some((c) => c.activity_id === activityId);
   };
 
-  const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
-
-  // Single source of truth completion
-  const completeViaRpc = async (activity: Activity) => {
-    if (isPreviewMode) {
-      const previewMultiplier = 1; // preview simplicity
-      const previewFinal = Math.round(activity.points_awarded * previewMultiplier);
-
-      addPreviewPoints(previewFinal);
-      markActivityCompleted(activity.id);
-
-      toast({
-        title: "Activity Completed!",
-        description: `You earned ${previewFinal} ${program?.points_currency_name || "Points"} (×${previewMultiplier}).`,
-      });
-      return;
-    }
-
-    if (!membership) return;
-
-    // ✅ FIX: capture RPC response data
-    const { data, error } = await supabase.rpc("complete_activity", {
-      p_membership_id: membership.id,
-      p_activity_id: activity.id,
-    });
-    if (error) throw error;
-
-    // Fallback if RPC returns nothing
-    const earned =
-      data?.final_points != null
-        ? Number(data.final_points)
-        : Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
-    const mult =
-      data?.multiplier != null
-        ? Number(data.multiplier)
-        : Number.isFinite(multiplier) && multiplier > 0
-          ? multiplier
-          : 1;
-
-    toast({
-      title: "Activity Completed!",
-      description: `You earned ${earned} ${program?.points_currency_name || "Points"} (×${mult}).`,
-    });
-
-    await fetchData();
-  };
-
-  // Decide what happens when user clicks an activity
-  const handleStart = (activity: Activity) => {
-    // Guard: already done
-    if (isCompleted(activity.id)) {
-      toast({ title: "Already completed", description: "You have already completed this activity." });
-      return;
-    }
-
-    // Guard: manual proof already pending
-    if (activity.verification_method === "manual_proof" && hasPendingClaim(activity.id)) {
-      toast({
-        title: "Pending review",
-        description: "You already submitted proof. Wait for the club to review it.",
-      });
-      return;
-    }
-
-    setSelectedActivity(activity);
-
-    if (activity.verification_method === "manual_proof") {
-      setProofModalOpen(true);
-      return;
-    }
-
-    if (activity.verification_method === "qr_scan") {
-      setQrScannerOpen(true);
-      return;
-    }
-
-    if (activity.verification_method === "location_checkin") {
-      setLocationModalOpen(true);
-      return;
-    }
-
-    if (activity.verification_method === "in_app_completion" && activity.in_app_config) {
-      setPollQuizModalOpen(true);
-      return;
-    }
-
-    // Fallback
-    completeViaRpc(activity).catch((err: any) => {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to complete activity.",
-        variant: "destructive",
-      });
-    });
-  };
-
-  // Manual proof submit
-  const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
-    if (!selectedActivity) return;
-
-    // Validate basic input
-    if (!proofDescription?.trim()) {
-      toast({
-        title: "Add a short description",
-        description: "Please describe your proof briefly so the club can review it.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Double guard: pending or completed
-    if (hasPendingClaim(selectedActivity.id)) {
-      toast({
-        title: "Pending review",
-        description: "You already submitted proof for this activity.",
-      });
-      setProofModalOpen(false);
-      setSelectedActivity(null);
-      return;
-    }
-    if (isCompleted(selectedActivity.id)) {
-      toast({
-        title: "Already completed",
-        description: "This activity is already completed.",
-      });
-      setProofModalOpen(false);
-      setSelectedActivity(null);
-      return;
-    }
-
-    if (isPreviewMode) {
-      toast({
-        title: "Proof Submitted!",
-        description: "Preview mode: proof would be sent to the club admin for review.",
-      });
-      setProofModalOpen(false);
-      setSelectedActivity(null);
-      return;
-    }
-
-    if (!membership || !profile) return;
-
-    setSubmittingProof(true);
-    try {
-      const { error } = await supabase.from("manual_claims").insert({
-        activity_id: selectedActivity.id,
-        fan_id: profile.id,
-        membership_id: membership.id,
-        proof_description: proofDescription.trim(),
-        proof_url: proofUrl,
-        status: "pending",
-      });
-
-      if (error) throw error;
-
-      setPendingClaims((prev) => (prev.includes(selectedActivity.id) ? prev : [...prev, selectedActivity.id]));
-
-      toast({
-        title: "Proof Submitted!",
-        description: "The club admin will review it. You earn points once approved.",
-      });
-
-      setProofModalOpen(false);
-      setSelectedActivity(null);
-
-      await fetchData();
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to submit proof.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmittingProof(false);
-    }
-  };
-
-  // QR success
-  const handleQRSuccess = async () => {
-    if (!selectedActivity) return;
-
-    setProcessingQR(true);
-    try {
-      await completeViaRpc(selectedActivity);
-      setQrScannerOpen(false);
-      setSelectedActivity(null);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to complete QR activity.",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingQR(false);
-    }
-  };
-
-  // Location success
-  const handleLocationSuccess = async () => {
-    if (!selectedActivity) return;
-
-    setProcessingLocation(true);
-    try {
-      await completeViaRpc(selectedActivity);
-      setLocationModalOpen(false);
-      setSelectedActivity(null);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to complete check-in.",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingLocation(false);
-    }
-  };
-
-  // Poll/Quiz submit
-  const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
-    if (!selectedActivity) return;
-
-    const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
-
-    if (!isPoll && !isCorrect) {
-      toast({ title: "Incorrect", description: "Better luck next time!" });
-      return;
-    }
-
-    try {
-      await completeViaRpc(selectedActivity);
-
-      setPollQuizModalOpen(false);
-      setSelectedActivity(null);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to record response.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
-    qr_scan: QrCode,
-    location_checkin: MapPin,
-    in_app_completion: Smartphone,
-    manual_proof: FileCheck,
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
   };
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  const progress =
+    currentTier && nextTier
+      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
+        100
+      : 100;
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+      {/* ================= HERO ================= */}
+      <header className="relative text-white" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
+        <div className="absolute inset-0 bg-black/25" />
+
+        {/* TOP BAR */}
+        <div className="container relative z-10 py-4 flex justify-between items-center">
           <Logo />
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="text-white">
+              <Bell className="h-5 w-5" />
+            </Button>
+
+            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")} className="text-white">
+              <User className="h-5 w-5" />
+            </Button>
+
+            <Button variant="ghost" onClick={handleSignOut} className="text-white">
+              <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            </Button>
+          </div>
+        </div>
+
+        {/* HERO CONTENT */}
+        <div className="container relative z-10 py-12 text-center">
+          <h1 className="text-3xl font-bold">{club?.name}</h1>
+          <p className="text-white/60 mt-1">{program?.name}</p>
+
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <div className="bg-white/10 backdrop-blur-xl rounded-3xl px-10 py-6 space-y-4">
+              <div className="flex items-center justify-center gap-3">
+                <Trophy className="h-7 w-7 text-accent" />
+                <span className="text-5xl font-bold">{effectivePointsBalance}</span>
+                <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
+              </div>
+
+              {/* CURRENT TIER + TOOLTIP */}
+              {currentTier && (
+                <div className="relative group inline-block">
+                  <Badge className="bg-white/20 text-white border-white/30 cursor-default">
+                    <Star className="h-3 w-3 mr-1" />
+                    {currentTier.name}
+                  </Badge>
+
+                  {/* TOOLTIP */}
+                  {(multiplier > 1 || discountPercent > 0) && (
+                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 rounded-xl bg-black text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50">
+                      {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
+                      {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {nextTier && (
+                <>
+                  <Progress value={progress} className="h-2 bg-white/20" />
+                  <p className="text-xs text-white/70">
+                    {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="container py-8">
-        <div className="flex justify-between mb-6">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary" />
-            Activities
-          </h1>
+      {/* ================= CONTENT ================= */}
+      <main className="container py-10 space-y-12">
+        {/* ACTIVITIES */}
+        <section>
+          <SectionHeader
+            title="Activities"
+            icon={<Zap className="h-4 w-4" />}
+            onClick={() => navigate("/fan/activities")}
+          />
 
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            {effectivePointsBalance} {program?.points_currency_name || "Points"}
-          </Badge>
-        </div>
+          <div className="space-y-3">
+            {activities.map((a) => (
+              <InfoCard
+                key={a.id}
+                title={a.name}
+                badge={`+${Math.round(a.points_awarded * multiplier)} pts${multiplier > 1 ? ` (×${multiplier})` : ""}`}
+                onClick={() => navigate("/fan/activities")}
+              />
+            ))}
+          </div>
+        </section>
 
-        {activities.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground">No activities available yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {activities.map((activity) => {
-              const Icon = icons[activity.verification_method];
-              const completed = isCompleted(activity.id);
-              const pending = hasPendingClaim(activity.id);
+        {/* REWARDS */}
+        <section>
+          <SectionHeader title="Rewards" icon={<Gift className="h-4 w-4" />} onClick={() => navigate("/fan/rewards")} />
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {rewards.map((r) => {
+              const discountedCost = Math.round(r.points_cost * (1 - discountPercent / 100));
+              const canAfford = effectivePointsBalance >= discountedCost;
 
               return (
-                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
-                  <CardContent className="py-4 flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
+                <Card key={r.id}>
+                  <CardContent className="pt-6">
+                    <h3 className="font-bold">{r.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
 
-                      <div>
-                        <p className="font-semibold">{activity.name}</p>
+                    <Badge className="mt-3">
+                      {discountedCost} pts
+                      {discountPercent > 0 && <span className="ml-2 text-green-600">-{discountPercent}%</span>}
+                    </Badge>
 
-                        {/* ✅ show multiplied points + multiplier badge */}
-                        <p className="text-sm text-muted-foreground">
-                          +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
-                          {program?.points_currency_name || "Points"}
-                          {multiplier > 1 && (
-                            <span className="ml-2 text-xs text-green-600 font-semibold">×{multiplier}</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    {completed ? (
-                      <Badge className="bg-success text-success-foreground">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Done
-                      </Badge>
-                    ) : pending ? (
-                      <Badge variant="outline">Pending</Badge>
-                    ) : (
-                      <Button onClick={() => handleStart(activity)}>Start</Button>
-                    )}
+                    <Button disabled={!canAfford} className="mt-4 w-full" onClick={() => navigate("/fan/rewards")}>
+                      Redeem
+                    </Button>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
-        )}
+        </section>
       </main>
-
-      {/* Manual Proof */}
-      <ManualProofModal
-        open={proofModalOpen}
-        onOpenChange={(open) => {
-          setProofModalOpen(open);
-          if (!open) setSelectedActivity(null);
-        }}
-        activityName={selectedActivity?.name || ""}
-        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
-        pointsCurrencyName={program?.points_currency_name || "Points"}
-        onSubmit={handleSubmitProof}
-        isLoading={submittingProof}
-      />
-
-      {/* QR Scanner */}
-      <QRScannerModal
-        open={qrScannerOpen}
-        onOpenChange={(open) => {
-          setQrScannerOpen(open);
-          if (!open) setSelectedActivity(null);
-        }}
-        activityName={selectedActivity?.name || ""}
-        expectedQRData={selectedActivity?.qr_code_data || null}
-        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
-        pointsCurrencyName={program?.points_currency_name || "Points"}
-        onSuccess={handleQRSuccess}
-        isLoading={processingQR}
-      />
-
-      {/* Location Check-in */}
-      <LocationCheckinModal
-        open={locationModalOpen}
-        onOpenChange={(open) => {
-          setLocationModalOpen(open);
-          if (!open) setSelectedActivity(null);
-        }}
-        activityName={selectedActivity?.name || ""}
-        targetLat={selectedActivity?.location_lat ?? null}
-        targetLng={selectedActivity?.location_lng ?? null}
-        radiusMeters={selectedActivity?.location_radius_meters || 500}
-        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
-        pointsCurrencyName={program?.points_currency_name || "Points"}
-        onSuccess={handleLocationSuccess}
-        isLoading={processingLocation}
-      />
-
-      {/* Poll/Quiz */}
-      {selectedActivity?.in_app_config && (
-        <PollQuizParticipation
-          isOpen={pollQuizModalOpen}
-          onClose={() => {
-            setPollQuizModalOpen(false);
-            setSelectedActivity(null);
-          }}
-          activityName={selectedActivity.name}
-          config={selectedActivity.in_app_config as unknown as InAppConfig}
-          pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
-          pointsCurrency={program?.points_currency_name || "Points"}
-          onSubmit={handlePollQuizSubmit}
-          isPreview={isPreviewMode}
-        />
-      )}
     </div>
+  );
+}
+
+/* ---------- Reusable components ---------- */
+
+function SectionHeader({ title, icon, onClick }: any) {
+  return (
+    <div className="flex justify-between items-center mb-5">
+      <h2 className="text-xl font-bold flex items-center gap-2">
+        <div className="h-8 w-8 flex items-center justify-center">{icon}</div>
+        {title}
+      </h2>
+
+      <Button variant="ghost" size="sm" onClick={onClick}>
+        View all <ChevronRight className="h-4 w-4 ml-1" />
+      </Button>
+    </div>
+  );
+}
+
+function InfoCard({ title, badge, onClick }: any) {
+  return (
+    <Card className="hover:border-primary transition-colors">
+      <CardContent className="py-4 flex justify-between items-center">
+        <div>
+          <p className="font-semibold">{title}</p>
+          <Badge variant="secondary" className="mt-1">
+            {badge}
+          </Badge>
+        </div>
+
+        <Button size="sm" onClick={onClick}>
+          Participate
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
