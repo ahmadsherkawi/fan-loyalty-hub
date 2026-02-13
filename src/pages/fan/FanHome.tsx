@@ -11,6 +11,9 @@ import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
+// ✅ FIX: use shadcn tooltip (portal, not clipped by overflow-hidden)
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -40,6 +43,7 @@ export default function FanHome() {
   const [earnedPoints, setEarnedPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
+
   const [tierBenefits, setTierBenefits] = useState<any[]>([]);
 
   const [dataLoading, setDataLoading] = useState(true);
@@ -47,7 +51,6 @@ export default function FanHome() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
-  /* ================= AUTH ================= */
   useEffect(() => {
     if (loading) return;
 
@@ -66,9 +69,9 @@ export default function FanHome() {
     }
   }, [loading, user, profile, isPreviewMode]);
 
-  /* ================= FETCH ================= */
   const fetchData = async () => {
     if (!profile) return;
+
     setDataLoading(true);
 
     try {
@@ -128,9 +131,12 @@ export default function FanHome() {
       setCurrentTier(current);
       setNextTier(next);
 
+      // ✅ FIX: ensure tier benefits always refresh when current tier exists
       if (current?.id) {
         const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
         setTierBenefits(benefits ?? []);
+      } else {
+        setTierBenefits([]);
       }
 
       const { count } = await supabase
@@ -158,7 +164,7 @@ export default function FanHome() {
     );
   }
 
-  /* ================= TIER EFFECTS ================= */
+  /** Tier Effects */
   const tierEffects = {
     multiplier: 1,
     discountPercent: 0,
@@ -189,169 +195,235 @@ export default function FanHome() {
         100
       : 100;
 
+  // Tooltip content (stable string list)
+  const tierTooltipLines: string[] = [];
+  if (tierEffects.multiplier > 1) tierTooltipLines.push(`✨ ${tierEffects.multiplier}× activity points`);
+  if (tierEffects.discountPercent > 0) tierTooltipLines.push(`🎁 ${tierEffects.discountPercent}% reward discount`);
+  if (tierEffects.vipAccess) tierTooltipLines.push(`🏟 VIP access`);
+  if (tierEffects.monthlyBonus > 0) tierTooltipLines.push(`📅 +${tierEffects.monthlyBonus} monthly points`);
+
   return (
-    <div className="min-h-screen bg-background">
-      {isPreviewMode && <PreviewBanner role="fan" />}
+    <TooltipProvider>
+      <div className="min-h-screen bg-background">
+        {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* ================= TOP BAR ================= */}
-      <header className="border-b bg-card">
-        <div className="container py-4 flex justify-between items-center">
-          <Logo />
+        {/* HERO */}
+        <header
+          className="relative overflow-hidden text-white"
+          style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
+        >
+          {/* ✅ FIX: overlays must not block hover/click */}
+          <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+          <div className="absolute inset-0 gradient-mesh opacity-40 pointer-events-none" />
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="relative">
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[9px] flex items-center justify-center text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </Button>
+          {/* TOP BAR */}
+          <div className="container relative z-10 py-4 flex justify-between items-center">
+            <Logo />
 
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")}>
-              <User className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/fan/notifications")}
+                className="text-white hover:bg-white/10 rounded-full relative"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 text-[8px] items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Button>
 
-            <Button variant="ghost" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/fan/profile")}
+                className="text-white hover:bg-white/10 rounded-full"
+              >
+                <User className="h-5 w-5" />
+              </Button>
 
-      {/* ================= HERO ================= */}
-      <section
-        className="text-white text-center py-12"
-        style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
-      >
-        <h1 className="text-3xl font-bold">{club?.name}</h1>
-        <p className="text-white/70">{program?.name}</p>
-
-        <div className="mt-6 inline-block bg-white/10 backdrop-blur-xl px-10 py-6 rounded-3xl relative">
-          <div className="flex items-center justify-center gap-3">
-            <Trophy className="h-7 w-7 text-accent" />
-            <span className="text-5xl font-bold">{effectivePointsBalance}</span>
-            <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
-          </div>
-
-          {/* ===== CURRENT TIER WITH REAL HOVER ===== */}
-          {currentTier && (
-            <div className="relative inline-block group mt-3">
-              <Badge className="bg-white/20 text-white border-white/30 rounded-full">
-                <Star className="h-3 w-3 mr-1" />
-                {currentTier.name}
-              </Badge>
-
-              {/* REAL WORKING TOOLTIP */}
-              {tierBenefits.length > 0 && (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60
-                                rounded-xl bg-black text-white text-xs p-3
-                                opacity-0 group-hover:opacity-100 transition z-50 shadow-lg"
-                >
-                  {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× activity points</p>}
-                  {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
-                  {tierEffects.vipAccess && <p>🏟 VIP access</p>}
-                  {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly points</p>}
-                </div>
-              )}
-
-              {nextTier && (
-                <>
-                  <Progress value={progress} className="h-2 bg-white/20 mt-3" />
-                  <p className="text-xs text-white/70 mt-1">
-                    {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
-                  </p>
-                </>
-              )}
+              <Button variant="ghost" onClick={handleSignOut} className="text-white hover:bg-white/10 rounded-full">
+                <LogOut className="h-4 w-4 mr-2" /> Sign Out
+              </Button>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* ================= CONTENT ================= */}
-      <main className="container py-10 space-y-12">
-        {/* ACTIVITIES */}
-        <section>
-          <SectionHeader
-            title="Activities"
-            icon={<Zap className="h-4 w-4 text-primary" />}
-            onClick={() => navigate("/fan/activities")}
-          />
-
-          <div className="space-y-3">
-            {activities.map((a) => {
-              const multiplied = Math.round(a.points_awarded * tierEffects.multiplier);
-
-              return (
-                <InfoCard
-                  key={a.id}
-                  title={a.name}
-                  badge={
-                    tierEffects.multiplier > 1
-                      ? `+${multiplied} pts (×${tierEffects.multiplier})`
-                      : `+${a.points_awarded} pts`
-                  }
-                  onClick={() => navigate("/fan/activities")}
-                />
-              );
-            })}
           </div>
-        </section>
 
-        {/* REWARDS */}
-        <section>
-          <SectionHeader
-            title="Rewards"
-            icon={<Gift className="h-4 w-4 text-accent" />}
-            onClick={() => navigate("/fan/rewards")}
-          />
+          {/* HERO CONTENT */}
+          <div className="container relative z-10 py-12 text-center">
+            <h1 className="text-3xl font-display font-bold">{club?.name}</h1>
+            <p className="text-white/60 mt-1">{program?.name}</p>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            {rewards.map((r) => {
-              const discounted = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
-              const canAfford = effectivePointsBalance >= discounted;
+            {/* POINTS + TIER CARD */}
+            <div className="mt-10 flex flex-col items-center gap-4">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl px-10 py-6 space-y-4">
+                <div className="flex items-center justify-center gap-3">
+                  <Trophy className="h-7 w-7 text-accent" />
+                  <span className="text-5xl font-bold">{effectivePointsBalance}</span>
+                  <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
+                </div>
 
-              return (
-                <Card key={r.id} className="rounded-2xl border-border/50">
-                  <CardContent className="pt-6">
-                    <h3 className="font-bold">{r.name}</h3>
+                {/* CURRENT TIER (ported tooltip, not clipped) */}
+                {currentTier && (
+                  <div className="space-y-3">
+                    <div className="flex justify-center">
+                      {tierTooltipLines.length > 0 ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="bg-white/20 text-white border-white/30 rounded-full cursor-help">
+                              <Star className="h-3 w-3 mr-1" />
+                              {currentTier.name}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="space-y-1 text-xs">
+                              {tierTooltipLines.map((line, idx) => (
+                                <p key={idx}>{line}</p>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Badge className="bg-white/20 text-white border-white/30 rounded-full">
+                          <Star className="h-3 w-3 mr-1" />
+                          {currentTier.name}
+                        </Badge>
+                      )}
+                    </div>
 
-                    {tierEffects.discountPercent > 0 && (
-                      <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
+                    {nextTier && (
+                      <>
+                        <Progress value={progress} className="h-2 bg-white/20" />
+                        <p className="text-xs text-white/70">
+                          {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
+                        </p>
+                      </>
                     )}
+                  </div>
+                )}
+              </div>
 
-                    <Badge className="mt-2 rounded-full">{discounted} pts</Badge>
+              {/* BENEFITS CARD */}
+              {currentTier && tierBenefits.length > 0 && (
+                <Card className="w-full max-w-md rounded-2xl border-border/40 bg-gradient-to-br from-primary/5 to-accent/5">
+                  <CardContent className="py-5 space-y-2 text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm font-semibold text-primary">
+                      <Sparkles className="h-4 w-4" />
+                      Your Tier Benefits
+                    </div>
 
-                    {tierEffects.discountPercent > 0 && (
-                      <p className="text-xs text-green-600 mt-1">−{tierEffects.discountPercent}% discount</p>
-                    )}
-
-                    <Button
-                      disabled={!canAfford}
-                      className="mt-4 w-full rounded-xl gradient-golden"
-                      onClick={() => navigate("/fan/rewards")}
-                    >
-                      Redeem
-                    </Button>
+                    {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× points on activities</p>}
+                    {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
+                    {tierEffects.vipAccess && <p>🏟 VIP access unlocked</p>}
+                    {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly bonus points</p>}
                   </CardContent>
                 </Card>
-              );
-            })}
+              )}
+            </div>
+
+            {/* LEADERBOARD */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/fan/leaderboard")}
+              className="mt-6 text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              View Leaderboard
+            </Button>
           </div>
-        </section>
-      </main>
-    </div>
+        </header>
+
+        {/* CONTENT */}
+        <main className="container py-10 space-y-12">
+          {/* ACTIVITIES */}
+          <section>
+            <SectionHeader
+              title="Activities"
+              icon={<Zap className="h-4 w-4 text-primary" />}
+              onClick={() => navigate("/fan/activities")}
+            />
+
+            <div className="space-y-3">
+              {activities.map((a) => {
+                const finalPts = Math.round(a.points_awarded * tierEffects.multiplier);
+
+                return (
+                  <InfoCard
+                    key={a.id}
+                    title={a.name}
+                    badge={tierEffects.multiplier > 1 ? `+${finalPts} pts` : `+${a.points_awarded} pts`}
+                    // ✅ show multiplier label on the card itself
+                    multiplier={tierEffects.multiplier}
+                    onClick={() => navigate("/fan/activities")}
+                  />
+                );
+              })}
+            </div>
+          </section>
+
+          {/* REWARDS */}
+          <section>
+            <SectionHeader
+              title="Rewards"
+              icon={<Gift className="h-4 w-4 text-accent" />}
+              onClick={() => navigate("/fan/rewards")}
+            />
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {rewards.map((r) => {
+                const discountedCost = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
+                const canAfford = effectivePointsBalance >= discountedCost;
+
+                return (
+                  <Card key={r.id} className="rounded-2xl border-border/50">
+                    <CardContent className="pt-6">
+                      <h3 className="font-bold">{r.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
+
+                      {/* ✅ show both original and discounted */}
+                      <div className="mt-3 space-y-1">
+                        {tierEffects.discountPercent > 0 && (
+                          <p className="text-xs text-muted-foreground line-through">{r.points_cost} pts</p>
+                        )}
+
+                        <div className="flex items-center gap-2 justify-center">
+                          <Badge className="rounded-full">{discountedCost} pts</Badge>
+
+                          {tierEffects.discountPercent > 0 && (
+                            <span className="text-xs text-green-600 font-semibold">
+                              -{tierEffects.discountPercent}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button
+                        disabled={!canAfford}
+                        className="mt-4 w-full rounded-xl gradient-golden"
+                        onClick={() => navigate("/fan/rewards")}
+                      >
+                        Redeem
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }
 
-/* ---------- reusable ---------- */
+/* ---------- Small reusable components ---------- */
 
 function SectionHeader({ title, icon, onClick }: any) {
   return (
     <div className="flex justify-between items-center mb-5">
-      <h2 className="text-xl font-bold flex items-center gap-2.5">
+      <h2 className="text-xl font-display font-bold flex items-center gap-2.5">
         <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">{icon}</div>
         {title}
       </h2>
@@ -363,15 +435,21 @@ function SectionHeader({ title, icon, onClick }: any) {
   );
 }
 
-function InfoCard({ title, badge, onClick }: any) {
+// ✅ FIX: allow showing multiplier label next to badge
+function InfoCard({ title, badge, multiplier, onClick }: any) {
   return (
     <Card className="rounded-2xl border-border/50 hover:border-primary/20 transition-colors">
       <CardContent className="py-4 flex justify-between items-center">
         <div>
           <p className="font-semibold">{title}</p>
-          <Badge variant="secondary" className="mt-1 rounded-full">
-            {badge}
-          </Badge>
+
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="secondary" className="rounded-full">
+              {badge}
+            </Badge>
+
+            {Number(multiplier) > 1 && <span className="text-xs text-green-600 font-semibold">×{multiplier}</span>}
+          </div>
         </div>
 
         <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium">
