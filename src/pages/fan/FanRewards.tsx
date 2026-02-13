@@ -99,27 +99,14 @@ export default function FanRewards() {
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /* ---------- Tier Discount ---------- */
-      const { data: tierState } = await supabase
-        .from("membership_tier_state")
-        .select("tier_id")
-        .eq("membership_id", m.id)
-        .single();
+      /* ---------- REAL backend discount ---------- */
+      const { data: discountData, error: discountError } = await supabase.rpc("get_membership_discount", {
+        p_membership_id: m.id,
+      });
 
-      let discount = 0;
+      if (discountError) throw discountError;
 
-      if (tierState?.tier_id) {
-        const { data: benefitData } = await supabase
-          .from("tier_benefits")
-          .select("benefit_value")
-          .eq("tier_id", tierState.tier_id)
-          .eq("benefit_type", "reward_discount_percent")
-          .single();
-
-        discount = Number(benefitData?.benefit_value ?? 0);
-      }
-
-      setDiscountPercent(discount);
+      setDiscountPercent(Number(discountData ?? 0));
     } catch (err) {
       console.error("FanRewards fetch error:", err);
       toast({
@@ -143,7 +130,7 @@ export default function FanRewards() {
     setRedeeming(true);
 
     try {
-      const { data, error } = await (supabase.rpc as any)("redeem_reward", {
+      const { data, error } = await supabase.rpc("redeem_reward", {
         p_membership_id: membership.id,
         p_reward_id: selectedReward.id,
       });
@@ -152,7 +139,7 @@ export default function FanRewards() {
 
       toast({
         title: "Reward redeemed!",
-        description: data ? `Your code: ${data}` : "Your redemption was successful.",
+        description: `Spent ${data.final_cost} ${currency}. New balance: ${data.balance_after}.`,
       });
 
       setRedemptionModalOpen(false);
@@ -192,6 +179,7 @@ export default function FanRewards() {
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
+      {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/fan/home")}>
@@ -265,7 +253,7 @@ export default function FanRewards() {
                         className="mt-4 w-full"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
-                          setSelectedReward(reward); // KEEP ORIGINAL
+                          setSelectedReward(reward);
                           setRedemptionModalOpen(true);
                         }}
                       >
