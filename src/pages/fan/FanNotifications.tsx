@@ -119,30 +119,37 @@ export default function FanNotifications() {
 
   /* ================= FETCH NOTIFICATIONS ================= */
   const fetchNotifications = async () => {
-    if (!profile) return;
+    if (!user) return;
 
     setDataLoading(true);
 
     try {
-      console.log("AUTH USER ID:", user?.id);
+      console.log("AUTH USER ID:", user.id);
       console.log("PROFILE ID:", profile?.id);
+
+      // 🔥 fetch ALL rows first (no filter)
+      const { data: allRows, error: allError } = await supabase.from("notifications").select("*");
+
+      console.log("ALL NOTIFICATIONS FROM FRONTEND:", allRows);
+
+      if (allError) throw allError;
+
+      // 🔥 now fetch only this user's rows (correct filter)
       const { data: rows, error } = await supabase
         .from("notifications")
         .select("*")
-      console.log("ALL NOTIFICATIONS FROM FRONTEND:", rows);
-        .eq("user_id", profile.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      /** 🔥 normalize boolean */
       const normalized = (rows ?? []).map((n: any) => ({
         ...n,
         is_read: n.is_read === true,
       }));
 
-      setNotifications(normalized as NotificationRow[]);
-    } catch {
+      setNotifications(normalized);
+    } catch (err) {
       toast({
         title: "Error",
         description: "Failed to load notifications.",
