@@ -1,4 +1,4 @@
-// (FULL FILE — NO TRUNCATION)
+// (FULL FILE — PRODUCTION SAFE)
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -89,7 +89,6 @@ export default function FanActivities() {
 
       // program
       const { data: prog } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
-
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
       // activities
@@ -103,7 +102,6 @@ export default function FanActivities() {
 
       // completions
       const { data: comps } = await supabase.from("activity_completions").select("*").eq("fan_id", profile.id);
-
       setCompletions((comps || []) as ActivityCompletion[]);
 
       // pending proof
@@ -148,7 +146,7 @@ export default function FanActivities() {
   // ================= COMPLETE =================
   const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      const final = Math.round(activity.points_awarded * 1);
+      const final = Math.round(activity.points_awarded);
       addPreviewPoints(final);
       markActivityCompleted(activity.id);
 
@@ -281,10 +279,37 @@ export default function FanActivities() {
         </div>
       </main>
 
-      {/* ===== MODALS RESTORED ===== */}
-      <ManualProofModal open={proofModalOpen} onOpenChange={setProofModalOpen} />
-      <QRScannerModal open={qrScannerOpen} onOpenChange={setQrScannerOpen} />
-      <LocationCheckinModal open={locationModalOpen} onOpenChange={setLocationModalOpen} />
+      {/* ===== MODALS WITH WORKING SUCCESS ===== */}
+
+      <ManualProofModal
+        open={proofModalOpen}
+        onOpenChange={setProofModalOpen}
+        onSuccess={async () => {
+          if (!selectedActivity) return;
+          await completeViaRpc(selectedActivity);
+          setProofModalOpen(false);
+        }}
+      />
+
+      <QRScannerModal
+        open={qrScannerOpen}
+        onOpenChange={setQrScannerOpen}
+        onSuccess={async () => {
+          if (!selectedActivity) return;
+          await completeViaRpc(selectedActivity);
+          setQrScannerOpen(false);
+        }}
+      />
+
+      <LocationCheckinModal
+        open={locationModalOpen}
+        onOpenChange={setLocationModalOpen}
+        onSuccess={async () => {
+          if (!selectedActivity) return;
+          await completeViaRpc(selectedActivity);
+          setLocationModalOpen(false);
+        }}
+      />
 
       {selectedActivity?.in_app_config && (
         <PollQuizParticipation
