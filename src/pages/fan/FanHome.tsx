@@ -1,3 +1,4 @@
+// (imports unchanged)
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,7 +43,6 @@ export default function FanHome() {
   const [nextTier, setNextTier] = useState<Tier | null>(null);
 
   const [tierBenefits, setTierBenefits] = useState<any[]>([]);
-
   const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -68,7 +68,6 @@ export default function FanHome() {
 
   const fetchData = async () => {
     if (!profile) return;
-
     setDataLoading(true);
 
     try {
@@ -113,6 +112,7 @@ export default function FanHome() {
         .eq("fan_id", profile.id);
 
       const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+
       setEarnedPoints(totalEarned);
 
       let current: Tier | null = null;
@@ -201,46 +201,12 @@ export default function FanHome() {
         <div className="absolute inset-0 bg-black/25" />
         <div className="absolute inset-0 gradient-mesh opacity-40" />
 
-        {/* TOP BAR */}
-        <div className="container relative z-10 py-4 flex justify-between items-center">
-          <Logo />
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/fan/notifications")}
-              className="text-white hover:bg-white/10 rounded-full relative"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 text-[8px] items-center justify-center">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/fan/profile")}
-              className="text-white hover:bg-white/10 rounded-full"
-            >
-              <User className="h-5 w-5" />
-            </Button>
-
-            <Button variant="ghost" onClick={handleSignOut} className="text-white hover:bg-white/10 rounded-full">
-              <LogOut className="h-4 w-4 mr-2" /> Sign Out
-            </Button>
-          </div>
-        </div>
-
         {/* HERO CONTENT */}
         <div className="container relative z-10 py-12 text-center">
           <h1 className="text-3xl font-display font-bold">{club?.name}</h1>
           <p className="text-white/60 mt-1">{program?.name}</p>
 
-          {/* POINTS CARD */}
+          {/* POINTS */}
           <div className="mt-10 flex flex-col items-center gap-4">
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl px-10 py-6 space-y-4">
               <div className="flex items-center justify-center gap-3">
@@ -249,17 +215,20 @@ export default function FanHome() {
                 <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
               </div>
 
-              {/* CURRENT TIER WITH HOVER TOOLTIP */}
+              {/* TIER + REAL HOVER */}
               {currentTier && (
-                <div className="space-y-3 relative inline-block group">
-                  <Badge className="bg-white/20 text-white border-white/30 rounded-full cursor-default">
+                <div className="relative group inline-block">
+                  <Badge className="bg-white/20 text-white border-white/30 rounded-full">
                     <Star className="h-3 w-3 mr-1" />
                     {currentTier.name}
                   </Badge>
 
-                  {/* HOVER TOOLTIP */}
                   {tierBenefits.length > 0 && (
-                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 rounded-xl bg-black/90 text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20">
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60
+                                    rounded-xl bg-black text-white text-xs p-3
+                                    opacity-0 group-hover:opacity-100 transition z-50 shadow-lg"
+                    >
                       {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× activity points</p>}
                       {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
                       {tierEffects.vipAccess && <p>🏟 VIP access</p>}
@@ -269,8 +238,8 @@ export default function FanHome() {
 
                   {nextTier && (
                     <>
-                      <Progress value={progress} className="h-2 bg-white/20" />
-                      <p className="text-xs text-white/70">
+                      <Progress value={progress} className="h-2 bg-white/20 mt-3" />
+                      <p className="text-xs text-white/70 mt-1">
                         {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
                       </p>
                     </>
@@ -278,35 +247,7 @@ export default function FanHome() {
                 </div>
               )}
             </div>
-
-            {/* BENEFITS CARD */}
-            {currentTier && tierBenefits.length > 0 && (
-              <Card className="w-full max-w-md rounded-2xl border-border/40 bg-gradient-to-br from-primary/5 to-accent/5">
-                <CardContent className="py-5 space-y-2 text-center">
-                  <div className="flex items-center justify-center gap-2 text-sm font-semibold text-primary">
-                    <Sparkles className="h-4 w-4" />
-                    Your Tier Benefits
-                  </div>
-
-                  {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× points on activities</p>}
-                  {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
-                  {tierEffects.vipAccess && <p>🏟 VIP access unlocked</p>}
-                  {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly bonus points</p>}
-                </CardContent>
-              </Card>
-            )}
           </div>
-
-          {/* LEADERBOARD */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/fan/leaderboard")}
-            className="mt-6 text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            View Leaderboard
-          </Button>
         </div>
       </header>
 
@@ -321,14 +262,22 @@ export default function FanHome() {
           />
 
           <div className="space-y-3">
-            {activities.map((a) => (
-              <InfoCard
-                key={a.id}
-                title={a.name}
-                badge={`+${Math.round(a.points_awarded * tierEffects.multiplier)} pts`}
-                onClick={() => navigate("/fan/activities")}
-              />
-            ))}
+            {activities.map((a) => {
+              const multiplied = Math.round(a.points_awarded * tierEffects.multiplier);
+
+              return (
+                <InfoCard
+                  key={a.id}
+                  title={a.name}
+                  badge={
+                    tierEffects.multiplier > 1
+                      ? `+${multiplied} pts (×${tierEffects.multiplier})`
+                      : `+${a.points_awarded} pts`
+                  }
+                  onClick={() => navigate("/fan/activities")}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -342,16 +291,25 @@ export default function FanHome() {
 
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
-              const discountedCost = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
-              const canAfford = effectivePointsBalance >= discountedCost;
+              const discounted = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
+              const canAfford = effectivePointsBalance >= discounted;
 
               return (
                 <Card key={r.id} className="rounded-2xl border-border/50">
                   <CardContent className="pt-6">
                     <h3 className="font-bold">{r.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
 
-                    <Badge className="mt-3 rounded-full">{discountedCost} pts</Badge>
+                    {/* ORIGINAL PRICE */}
+                    {tierEffects.discountPercent > 0 && (
+                      <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
+                    )}
+
+                    {/* DISCOUNTED PRICE */}
+                    <Badge className="mt-2 rounded-full">{discounted} pts</Badge>
+
+                    {tierEffects.discountPercent > 0 && (
+                      <p className="text-xs text-green-600 mt-1">−{tierEffects.discountPercent}% discount</p>
+                    )}
 
                     <Button
                       disabled={!canAfford}
@@ -371,7 +329,7 @@ export default function FanHome() {
   );
 }
 
-/* ---------- Small reusable components ---------- */
+/* ---------- reusable ---------- */
 
 function SectionHeader({ title, icon, onClick }: any) {
   return (
