@@ -53,6 +53,7 @@ export default function FanActivities() {
   const [processingLocation, setProcessingLocation] = useState(false);
 
   const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
+  const [multiplier, setMultiplier] = useState<number>(1);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
 
@@ -79,6 +80,16 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
+      // ✅ FIX: fetch multiplier after we have membership id
+      const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
+        p_membership_id: m.id,
+      });
+
+      if (multErr) throw multErr;
+
+      const multValue = Number(multData ?? 1);
+      setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
+
       // Program
       const { data: prog, error: pErr } = await supabase
         .from("loyalty_programs")
@@ -89,8 +100,7 @@ export default function FanActivities() {
       if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // Activities: fetch all activities for the program. Some databases may not have an
-      // is_active column. Frontend will handle active/inactive display if present.
+      // Activities
       const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
@@ -153,30 +163,47 @@ export default function FanActivities() {
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
   // Single source of truth completion
-  const completeViaRpc = async (activity: Activity, metadata: Record<string, unknown>) => {
+  const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      addPreviewPoints(activity.points_awarded);
+      const previewMultiplier = 1; // preview simplicity
+      const previewFinal = Math.round(activity.points_awarded * previewMultiplier);
+
+      addPreviewPoints(previewFinal);
       markActivityCompleted(activity.id);
+
       toast({
         title: "Activity Completed!",
-        description: `You earned ${activity.points_awarded} ${program?.points_currency_name || "Points"}!`,
+        description: `You earned ${previewFinal} ${program?.points_currency_name || "Points"} (×${previewMultiplier}).`,
       });
       return;
     }
 
     if (!membership) return;
 
-    // Call secure RPC without metadata. Points earned are known from the activity object.
-    const { error } = await supabase.rpc("complete_activity", {
+    // ✅ FIX: capture RPC response data
+    const { data, error } = await supabase.rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
     });
     if (error) throw error;
 
+    // Fallback if RPC returns nothing
+    const earned =
+      data?.final_points != null
+        ? Number(data.final_points)
+        : Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
+    const mult =
+      data?.multiplier != null
+        ? Number(data.multiplier)
+        : Number.isFinite(multiplier) && multiplier > 0
+          ? multiplier
+          : 1;
+
     toast({
       title: "Activity Completed!",
-      description: `You earned ${data.final_points} ${program?.points_currency_name || "Points"} (×${data.multiplier}).`,
+      description: `You earned ${earned} ${program?.points_currency_name || "Points"} (×${mult}).`,
     });
+
     await fetchData();
   };
 
@@ -220,7 +247,7 @@ export default function FanActivities() {
     }
 
     // Fallback
-    completeViaRpc(activity, { verification: activity.verification_method }).catch((err: any) => {
+    completeViaRpc(activity).catch((err: any) => {
       toast({
         title: "Error",
         description: err?.message || "Failed to complete activity.",
@@ -288,7 +315,6 @@ export default function FanActivities() {
 
       if (error) throw error;
 
-      // Optimistic UI: mark as pending immediately
       setPendingClaims((prev) => (prev.includes(selectedActivity.id) ? prev : [...prev, selectedActivity.id]));
 
       toast({
@@ -299,7 +325,6 @@ export default function FanActivities() {
       setProofModalOpen(false);
       setSelectedActivity(null);
 
-      // Sync from DB
       await fetchData();
     } catch (err: any) {
       toast({
@@ -318,7 +343,7 @@ export default function FanActivities() {
 
     setProcessingQR(true);
     try {
-      await completeViaRpc(selectedActivity, { verification: "qr_scan" });
+      await completeViaRpc(selectedActivity);
       setQrScannerOpen(false);
       setSelectedActivity(null);
     } catch (err: any) {
@@ -338,7 +363,7 @@ export default function FanActivities() {
 
     setProcessingLocation(true);
     try {
-      await completeViaRpc(selectedActivity, { verification: "location_checkin" });
+      await completeViaRpc(selectedActivity);
       setLocationModalOpen(false);
       setSelectedActivity(null);
     } catch (err: any) {
@@ -364,12 +389,7 @@ export default function FanActivities() {
     }
 
     try {
-      await completeViaRpc(selectedActivity, {
-        verification: "in_app_completion",
-        type: (selectedActivity.in_app_config as any)?.type,
-        selected_option: selectedOptionId,
-        is_correct: isCorrect,
-      });
+      await completeViaRpc(selectedActivity);
 
       setPollQuizModalOpen(false);
       setSelectedActivity(null);
@@ -446,8 +466,14 @@ export default function FanActivities() {
 
                       <div>
                         <p className="font-semibold">{activity.name}</p>
+
+                        {/* ✅ show multiplied points + multiplier badge */}
                         <p className="text-sm text-muted-foreground">
-                          +{activity.points_awarded} {program?.points_currency_name || "Points"}
+                          +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
+                          {program?.points_currency_name || "Points"}
+                          {multiplier > 1 && (
+                            <span className="ml-2 text-xs text-green-600 font-semibold">×{multiplier}</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -478,7 +504,7 @@ export default function FanActivities() {
           if (!open) setSelectedActivity(null);
         }}
         activityName={selectedActivity?.name || ""}
-        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSubmit={handleSubmitProof}
         isLoading={submittingProof}
@@ -493,7 +519,7 @@ export default function FanActivities() {
         }}
         activityName={selectedActivity?.name || ""}
         expectedQRData={selectedActivity?.qr_code_data || null}
-        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleQRSuccess}
         isLoading={processingQR}
@@ -510,7 +536,7 @@ export default function FanActivities() {
         targetLat={selectedActivity?.location_lat ?? null}
         targetLng={selectedActivity?.location_lng ?? null}
         radiusMeters={selectedActivity?.location_radius_meters || 500}
-        pointsAwarded={selectedActivity?.points_awarded || 0}
+        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleLocationSuccess}
         isLoading={processingLocation}
@@ -526,7 +552,7 @@ export default function FanActivities() {
           }}
           activityName={selectedActivity.name}
           config={selectedActivity.in_app_config as unknown as InAppConfig}
-          pointsAwarded={selectedActivity.points_awarded}
+          pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
           pointsCurrency={program?.points_currency_name || "Points"}
           onSubmit={handlePollQuizSubmit}
           isPreview={isPreviewMode}
