@@ -24,7 +24,6 @@ import ClaimReview from "./pages/club/ClaimReview";
 import ClubAnalytics from "./pages/club/ClubAnalytics";
 import ClubSeasons from "./pages/club/ClubSeasons";
 import TierManagement from "./pages/club/TierManagement";
-import FanNotifications from "./pages/fan/FanNotifications";
 
 // Fan pages
 import FanHome from "./pages/fan/FanHome";
@@ -33,6 +32,7 @@ import FanRewards from "./pages/fan/FanRewards";
 import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import FanProfilePage from "./pages/fan/FanProfilePage";
 import JoinClub from "./pages/fan/JoinClub";
+import FanNotifications from "./pages/fan/FanNotifications"; // ✅ FIXED IMPORT
 
 const queryClient = new QueryClient();
 
@@ -52,7 +52,6 @@ const App = () => {
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/preview" element={<PreviewHub />} />
-
                 {/* ================= CLUB ADMIN ================= */}
                 <Route path="/club/onboarding" element={<ClubOnboarding />} />
                 <Route path="/club/dashboard" element={<ClubDashboard />} />
@@ -62,11 +61,8 @@ const App = () => {
                 <Route path="/club/claims" element={<ClaimReview />} />
                 <Route path="/club/analytics" element={<ClubAnalytics />} />
                 <Route path="/club/seasons" element={<ClubSeasons />} />
-                <Route path="/fan/notification" element={<FanNotifications />} />
-
-                {/* ✅ TIER MANAGEMENT — KEEP THIS EXACT PATH */}
+                {/* ✅ Tier management */}
                 <Route path="/club/tiers" element={<TierManagement />} />
-
                 {/* ================= FAN ================= */}
                 <Route path="/fan/home" element={<FanHome />} />
                 <Route path="/fan/activities" element={<FanActivities />} />
@@ -74,7 +70,7 @@ const App = () => {
                 <Route path="/fan/leaderboard" element={<FanLeaderboardPage />} />
                 <Route path="/fan/profile" element={<FanProfilePage />} />
                 <Route path="/fan/join" element={<JoinClub />} />
-
+                <Route path="/fan/notifications" element={<FanNotifications />} /> {/* ✅ CORRECT ROUTE */}
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
