@@ -1,3 +1,5 @@
+// (FULL FILE — NO TRUNCATION)
+
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,7 +49,7 @@ export default function FanActivities() {
 
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Modal state
+  // ===== MODAL STATE =====
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
@@ -56,14 +58,13 @@ export default function FanActivities() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
 
-  /* ================= FETCH ================= */
+  // ================= FETCH =================
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      // Membership
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -78,7 +79,7 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // 🔥 multiplier from backend
+      // multiplier
       const { data: multData } = await supabase.rpc("get_membership_multiplier", {
         p_membership_id: m.id,
       });
@@ -86,12 +87,12 @@ export default function FanActivities() {
       const multValue = Number(multData ?? 1);
       setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
 
-      // Program
+      // program
       const { data: prog } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).limit(1);
 
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // Activities
+      // activities
       const { data: acts } = await supabase
         .from("activities")
         .select("*")
@@ -100,12 +101,12 @@ export default function FanActivities() {
 
       setActivities((acts || []) as Activity[]);
 
-      // Completions
+      // completions
       const { data: comps } = await supabase.from("activity_completions").select("*").eq("fan_id", profile.id);
 
       setCompletions((comps || []) as ActivityCompletion[]);
 
-      // Pending manual claims
+      // pending proof
       const { data: claims } = await supabase
         .from("manual_claims")
         .select("activity_id")
@@ -135,45 +136,39 @@ export default function FanActivities() {
       return;
     }
 
-    if (!loading && profile) {
-      fetchData();
-    }
+    if (!loading && profile) fetchData();
   }, [isPreviewMode, loading, profile, navigate, fetchData]);
 
-  /* ================= HELPERS ================= */
+  // ================= HELPERS =================
+  const isCompleted = (id: string) =>
+    isPreviewMode ? completedPreviewActivities.includes(id) : completions.some((c) => c.activity_id === id);
 
-  const isCompleted = (activityId: string) => {
-    if (isPreviewMode) return completedPreviewActivities.includes(activityId);
-    return completions.some((c) => c.activity_id === activityId);
-  };
+  const hasPendingClaim = (id: string) => pendingClaims.includes(id);
 
-  const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
-
-  /* ================= COMPLETE ================= */
-
+  // ================= COMPLETE =================
   const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      const previewFinal = Math.round(activity.points_awarded * 1);
-      addPreviewPoints(previewFinal);
+      const final = Math.round(activity.points_awarded * 1);
+      addPreviewPoints(final);
       markActivityCompleted(activity.id);
 
       toast({
         title: "Activity Completed!",
-        description: `You earned ${previewFinal} ${program?.points_currency_name || "Points"}.`,
+        description: `You earned ${final} ${program?.points_currency_name || "Points"}.`,
       });
       return;
     }
 
     if (!membership) return;
 
-    const { data, error } = await supabase.rpc("complete_activity", {
+    const { error } = await supabase.rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
     });
 
     if (error) throw error;
 
-    const earned = data?.final_points ?? Math.round((activity.points_awarded || 0) * (multiplier || 1));
+    const earned = Math.round((activity.points_awarded || 0) * multiplier);
 
     toast({
       title: "Activity Completed!",
@@ -183,8 +178,7 @@ export default function FanActivities() {
     await fetchData();
   };
 
-  /* ================= CLICK HANDLER ================= */
-
+  // ================= START CLICK =================
   const handleStart = (activity: Activity) => {
     if (isCompleted(activity.id)) {
       toast({ title: "Already completed" });
@@ -201,16 +195,12 @@ export default function FanActivities() {
     if (activity.verification_method === "manual_proof") return setProofModalOpen(true);
     if (activity.verification_method === "qr_scan") return setQrScannerOpen(true);
     if (activity.verification_method === "location_checkin") return setLocationModalOpen(true);
-    if (activity.verification_method === "in_app_completion" && activity.in_app_config)
-      return setPollQuizModalOpen(true);
+    if (activity.verification_method === "in_app_completion") return setPollQuizModalOpen(true);
 
-    completeViaRpc(activity).catch(() =>
-      toast({ title: "Error", description: "Failed to complete activity.", variant: "destructive" }),
-    );
+    completeViaRpc(activity);
   };
 
-  /* ================= LOADING ================= */
-
+  // ================= LOADING =================
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -219,8 +209,7 @@ export default function FanActivities() {
     );
   }
 
-  /* ================= UI ================= */
-
+  // ================= UI =================
   const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
     qr_scan: QrCode,
     location_checkin: MapPin,
@@ -256,53 +245,59 @@ export default function FanActivities() {
           </Badge>
         </div>
 
-        {activities.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground">No activities available yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {activities.map((activity) => {
-              const Icon = icons[activity.verification_method];
-              const completed = isCompleted(activity.id);
+        <div className="space-y-4">
+          {activities.map((activity) => {
+            const Icon = icons[activity.verification_method];
+            const completed = isCompleted(activity.id);
 
-              return (
-                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
-                  <CardContent className="py-4 flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
+            return (
+              <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
+                <CardContent className="py-4 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <Icon className="h-5 w-5 text-primary" />
 
-                      <div>
-                        <p className="font-semibold">{activity.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
-                          {program?.points_currency_name || "Points"}
-                          {multiplier > 1 && (
-                            <span className="ml-2 text-xs text-green-600 font-semibold">×{multiplier}</span>
-                          )}
-                        </p>
-                      </div>
+                    <div>
+                      <p className="font-semibold">{activity.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        +{Math.round((activity.points_awarded || 0) * multiplier)}{" "}
+                        {program?.points_currency_name || "Points"}
+                        {multiplier > 1 && <span className="ml-2 text-green-600">×{multiplier}</span>}
+                      </p>
                     </div>
+                  </div>
 
-                    {completed ? (
-                      <Badge className="bg-success text-success-foreground">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Done
-                      </Badge>
-                    ) : (
-                      <Button onClick={() => handleStart(activity)}>Start</Button>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                  {completed ? (
+                    <Badge className="bg-success text-success-foreground">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Done
+                    </Badge>
+                  ) : (
+                    <Button onClick={() => handleStart(activity)}>Start</Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </main>
+
+      {/* ===== MODALS RESTORED ===== */}
+      <ManualProofModal open={proofModalOpen} onOpenChange={setProofModalOpen} />
+      <QRScannerModal open={qrScannerOpen} onOpenChange={setQrScannerOpen} />
+      <LocationCheckinModal open={locationModalOpen} onOpenChange={setLocationModalOpen} />
+
+      {selectedActivity?.in_app_config && (
+        <PollQuizParticipation
+          isOpen={pollQuizModalOpen}
+          onClose={() => setPollQuizModalOpen(false)}
+          activityName={selectedActivity.name}
+          config={selectedActivity.in_app_config as unknown as InAppConfig}
+          pointsAwarded={Math.round((selectedActivity.points_awarded || 0) * multiplier)}
+          pointsCurrency={program?.points_currency_name || "Points"}
+          onSubmit={() => completeViaRpc(selectedActivity)}
+          isPreview={isPreviewMode}
+        />
+      )}
     </div>
   );
 }
