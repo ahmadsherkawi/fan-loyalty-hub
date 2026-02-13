@@ -41,7 +41,6 @@ export default function FanHome() {
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
 
-  /** NEW: Tier benefits */
   const [tierBenefits, setTierBenefits] = useState<any[]>([]);
 
   const [dataLoading, setDataLoading] = useState(true);
@@ -49,7 +48,6 @@ export default function FanHome() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
-  // ---------- AUTH ----------
   useEffect(() => {
     if (loading) return;
 
@@ -68,14 +66,12 @@ export default function FanHome() {
     }
   }, [loading, user, profile, isPreviewMode]);
 
-  // ---------- FETCH ----------
   const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
-      /** Membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -90,27 +86,18 @@ export default function FanHome() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      /** Club */
       const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-
       setClub(clubData as Club);
 
-      /** Program */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-
       setProgram(programData as LoyaltyProgram);
 
-      /** Activities */
       const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
-
       setActivities((acts ?? []) as Activity[]);
 
-      /** Rewards */
       const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
-
       setRewards((rews ?? []) as Reward[]);
 
-      /** 🔹 TIERS */
       const { data: tiersData } = await supabase
         .from("tiers")
         .select("*")
@@ -120,17 +107,14 @@ export default function FanHome() {
       const tierList = (tiersData ?? []) as Tier[];
       setTiers(tierList);
 
-      /** 🔹 EARNED POINTS (ignore spent) */
       const { data: completions } = await supabase
         .from("activity_completions")
         .select("points_earned")
         .eq("fan_id", profile.id);
 
       const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
-
       setEarnedPoints(totalEarned);
 
-      /** 🔹 CURRENT + NEXT TIER */
       let current: Tier | null = null;
       let next: Tier | null = null;
 
@@ -144,14 +128,11 @@ export default function FanHome() {
       setCurrentTier(current);
       setNextTier(next);
 
-      /** 🔹 LOAD TIER BENEFITS */
       if (current?.id) {
         const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
-
         setTierBenefits(benefits ?? []);
       }
 
-      /** Notifications */
       const { count } = await supabase
         .from("notifications")
         .select("*", { count: "exact", head: true })
@@ -177,7 +158,7 @@ export default function FanHome() {
     );
   }
 
-  /** ---------- Tier Effects Engine ---------- */
+  /** Tier Effects */
   const tierEffects = {
     multiplier: 1,
     discountPercent: 0,
@@ -202,7 +183,6 @@ export default function FanHome() {
     }
   });
 
-  /** Progress to next tier */
   const progress =
     currentTier && nextTier
       ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
@@ -213,7 +193,7 @@ export default function FanHome() {
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* ================= HERO ================= */}
+      {/* HERO */}
       <header
         className="relative overflow-hidden text-white"
         style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
@@ -260,7 +240,7 @@ export default function FanHome() {
           <h1 className="text-3xl font-display font-bold">{club?.name}</h1>
           <p className="text-white/60 mt-1">{program?.name}</p>
 
-          {/* POINTS + TIER CARD */}
+          {/* POINTS CARD */}
           <div className="mt-10 flex flex-col items-center gap-4">
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl px-10 py-6 space-y-4">
               <div className="flex items-center justify-center gap-3">
@@ -269,13 +249,23 @@ export default function FanHome() {
                 <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
               </div>
 
-              {/* CURRENT TIER */}
+              {/* CURRENT TIER WITH HOVER TOOLTIP */}
               {currentTier && (
-                <div className="space-y-3">
-                  <Badge className="bg-white/20 text-white border-white/30 rounded-full">
+                <div className="space-y-3 relative inline-block group">
+                  <Badge className="bg-white/20 text-white border-white/30 rounded-full cursor-default">
                     <Star className="h-3 w-3 mr-1" />
                     {currentTier.name}
                   </Badge>
+
+                  {/* HOVER TOOLTIP */}
+                  {tierBenefits.length > 0 && (
+                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 rounded-xl bg-black/90 text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20">
+                      {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× activity points</p>}
+                      {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
+                      {tierEffects.vipAccess && <p>🏟 VIP access</p>}
+                      {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly points</p>}
+                    </div>
+                  )}
 
                   {nextTier && (
                     <>
@@ -289,7 +279,7 @@ export default function FanHome() {
               )}
             </div>
 
-            {/* 🔹 BENEFITS CARD */}
+            {/* BENEFITS CARD */}
             {currentTier && tierBenefits.length > 0 && (
               <Card className="w-full max-w-md rounded-2xl border-border/40 bg-gradient-to-br from-primary/5 to-accent/5">
                 <CardContent className="py-5 space-y-2 text-center">
@@ -320,7 +310,7 @@ export default function FanHome() {
         </div>
       </header>
 
-      {/* ================= CONTENT ================= */}
+      {/* CONTENT */}
       <main className="container py-10 space-y-12">
         {/* ACTIVITIES */}
         <section>
@@ -353,7 +343,6 @@ export default function FanHome() {
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
               const discountedCost = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
-
               const canAfford = effectivePointsBalance >= discountedCost;
 
               return (
