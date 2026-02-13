@@ -12,10 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy, LogOut, Sparkles } from "lucide-react";
 
 interface Tier {
   id: string;
@@ -55,7 +53,7 @@ const BENEFIT_DEFS: Record<
     valuePlaceholder: "e.g. 1.25",
     min: 1,
     max: 10,
-    helper: "Multiply points earned from activities (spending does not reduce tier).",
+    helper: "Multiply points earned from activities.",
   },
   reward_discount_percent: {
     label: "Reward Discount",
@@ -78,7 +76,7 @@ const BENEFIT_DEFS: Record<
     valuePlaceholder: "e.g. 200",
     min: 0,
     max: 1000000,
-    helper: "Add a monthly points grant (needs backend scheduler later).",
+    helper: "Add a monthly points grant.",
   },
 };
 
@@ -96,7 +94,7 @@ function formatBenefit(b: TierBenefit): string {
 export default function TierManagement() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const isPreview = searchParams.get("preview") === "club_admin";
@@ -129,7 +127,6 @@ export default function TierManagement() {
     if (!loading && !user) navigate("/auth?role=club_admin");
     if (!loading && profile?.role !== "club_admin") navigate("/fan/home");
     if (!loading && profile) fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, profile]);
 
   const fetchData = async () => {
@@ -359,10 +356,15 @@ export default function TierManagement() {
     }
   };
 
+  const handleSignOut = async () => {
+    if (isPreview) navigate("/preview");
+    else { await signOut(); navigate("/"); }
+  };
+
   if (!isPreview && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin h-8 w-8" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin h-8 w-8 text-primary" />
       </div>
     );
   }
@@ -371,63 +373,81 @@ export default function TierManagement() {
     <div className="min-h-screen bg-background">
       {isPreview && <PreviewBanner role="club_admin" />}
 
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate("/club/dashboard")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate("/club/dashboard")} className="rounded-full hover:bg-card/60">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div className="h-5 w-px bg-border/40" />
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign out
           </Button>
-          <Logo />
         </div>
       </header>
 
-      <main className="container py-8 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Trophy className="h-7 w-7 text-primary" />
-            Tier Management
-          </h1>
-
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Tier
-              </Button>
-            </DialogTrigger>
-
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingTier ? "Edit Tier" : "Create Tier"}</DialogTitle>
-              </DialogHeader>
-
-              <div className="space-y-3">
-                <div>
-                  <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-
-                <div>
-                  <Label>Rank</Label>
-                  <Input type="number" value={rank} onChange={(e) => setRank(e.target.value)} />
-                </div>
-
-                <div>
-                  <Label>Points Threshold</Label>
-                  <Input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
-                </div>
-
-                <Button className="w-full" onClick={handleSaveTier}>
-                  Save Tier
-                </Button>
+      <main className="container py-10 max-w-5xl space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 p-8 md:p-10">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Loyalty Ladder</span>
               </div>
-            </DialogContent>
-          </Dialog>
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Tier Management</h1>
+              <p className="text-white/50 mt-2 max-w-md">Define loyalty tiers and their benefits to reward your most engaged fans.</p>
+            </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-full gap-2 shadow-stadium self-start md:self-auto">
+                  <Plus className="h-4 w-4" />
+                  Add Tier
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl border-border/40">
+                <DialogHeader>
+                  <DialogTitle className="font-display">{editingTier ? "Edit Tier" : "Create Tier"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Name</Label>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border-border/40" />
+                  </div>
+                  <div>
+                    <Label>Rank</Label>
+                    <Input type="number" value={rank} onChange={(e) => setRank(e.target.value)} className="rounded-xl border-border/40" />
+                  </div>
+                  <div>
+                    <Label>Points Threshold</Label>
+                    <Input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="rounded-xl border-border/40" />
+                  </div>
+                  <Button className="w-full rounded-xl" onClick={handleSaveTier}>
+                    Save Tier
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {orderedTiers.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">No tiers created yet.</CardContent>
+          <Card className="rounded-2xl border-border/40 overflow-hidden">
+            <CardContent className="py-16 text-center">
+              <div className="mx-auto h-14 w-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                <Trophy className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="font-display font-bold text-lg">No Tiers Yet</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">Create tiers to structure your loyalty program with escalating rewards.</p>
+            </CardContent>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -437,18 +457,19 @@ export default function TierManagement() {
               const def = draft.type ? BENEFIT_DEFS[draft.type] : null;
 
               return (
-                <Card key={tier.id} className="rounded-2xl border-border/40">
+                <Card key={tier.id} className="rounded-2xl border-border/40 group hover:border-primary/20 transition-all duration-300">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="font-display">{tier.name}</span>
-                      <Badge className="rounded-full">Rank {tier.rank}</Badge>
+                    <CardTitle className="flex items-center justify-between font-display">
+                      <span>{tier.name}</span>
+                      <Badge className="rounded-full bg-primary/10 text-primary border-primary/20 text-[10px]">
+                        Rank {tier.rank}
+                      </Badge>
                     </CardTitle>
                   </CardHeader>
-
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Unlock at</span>
-                      <span className="font-semibold">{tier.points_threshold} pts</span>
+                      <span className="font-display font-semibold">{tier.points_threshold} pts</span>
                     </div>
 
                     {/* BENEFITS LIST */}
@@ -484,7 +505,7 @@ export default function TierManagement() {
                           value={draft.type}
                           onValueChange={(v) => updateDraft(tier.id, { type: v as BenefitType, value: "" })}
                         >
-                          <SelectTrigger className="rounded-xl">
+                          <SelectTrigger className="rounded-xl border-border/40">
                             <SelectValue placeholder="Select benefit type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -500,7 +521,7 @@ export default function TierManagement() {
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">{def.valueLabel}</Label>
                             <Input
-                              className="rounded-xl"
+                              className="rounded-xl border-border/40"
                               placeholder={def.valuePlaceholder}
                               value={draft.value}
                               onChange={(e) => updateDraft(tier.id, { value: e.target.value })}
@@ -519,7 +540,7 @@ export default function TierManagement() {
 
                         <Button
                           variant="outline"
-                          className="rounded-xl"
+                          className="rounded-xl border-border/40"
                           onClick={() => updateDraft(tier.id, { type: "", value: "" })}
                         >
                           Clear
@@ -529,14 +550,14 @@ export default function TierManagement() {
 
                     {/* TIER ACTIONS */}
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openEditTier(tier)}>
+                      <Button size="sm" variant="outline" className="rounded-full border-border/40" onClick={() => openEditTier(tier)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="rounded-xl"
+                        className="rounded-full"
                         onClick={() => handleDeleteTier(tier.id)}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />

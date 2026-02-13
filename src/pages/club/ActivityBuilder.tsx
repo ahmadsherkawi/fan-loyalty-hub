@@ -38,10 +38,11 @@ import {
   Edit,
   HelpCircle,
   Calendar,
+  LogOut,
+  Sparkles,
 } from "lucide-react";
 import type { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from "@/types/database";
 
-// Labels and descriptions for frequency settings
 const frequencyLabels: Record<ActivityFrequency, string> = {
   once_ever: "Once Ever",
   once_per_match: "Once Per Match",
@@ -56,7 +57,6 @@ const frequencyDescriptions: Record<ActivityFrequency, string> = {
   unlimited: "No limit on how often fans can complete this",
 };
 
-// Labels and descriptions for verification methods
 const verificationLabels: Record<VerificationMethod, string> = {
   qr_scan: "QR Code Scan",
   location_checkin: "Location Check-in",
@@ -78,21 +78,14 @@ const verificationIcons: Record<VerificationMethod, React.ReactNode> = {
   manual_proof: <FileCheck className="h-4 w-4" />,
 };
 
-/**
- * ActivityBuilder allows club administrators to create and edit fan activities.
- * It handles different verification methods (QR scan, location, in-app, manual) and
- * validates input before saving to Supabase. When using QR codes, it ensures that
- * existing codes are preserved on edit instead of regenerating a new UUID each time.
- */
 export default function ActivityBuilder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "club_admin";
 
-  // Current program and list of activities
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -101,7 +94,6 @@ export default function ActivityBuilder() {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [qrActivity, setQrActivity] = useState<Activity | null>(null);
 
-  // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [pointsAwarded, setPointsAwarded] = useState("100");
@@ -109,24 +101,19 @@ export default function ActivityBuilder() {
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("qr_scan");
   const [isActive, setIsActive] = useState(true);
 
-  // Location check-in configuration
   const [locationLat, setLocationLat] = useState("");
   const [locationLng, setLocationLng] = useState("");
   const [locationRadius, setLocationRadius] = useState("500");
   const [isLocating, setIsLocating] = useState(false);
 
-  // In-app activity configuration (poll/quiz)
   const [inAppConfig, setInAppConfig] = useState<InAppConfig | null>(null);
 
-  // Time window configuration
   const [hasTimeWindow, setHasTimeWindow] = useState(false);
   const [timeWindowStart, setTimeWindowStart] = useState("");
   const [timeWindowEnd, setTimeWindowEnd] = useState("");
 
-  // Fetch program and activities on mount
   useEffect(() => {
     if (isPreviewMode) {
-      // In preview mode, use dummy data and skip network requests
       setProgram({
         id: "preview-program",
         club_id: "preview-club",
@@ -150,22 +137,17 @@ export default function ActivityBuilder() {
     }
   }, [user, profile, loading, navigate, isPreviewMode]);
 
-  /**
-   * Loads the current club’s program and existing activities. Redirects if no program exists.
-   */
   const fetchData = async () => {
     if (!profile) return;
     setDataLoading(true);
 
     try {
-      // Get the club owned by this admin
       const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
       if (!clubs || clubs.length === 0) {
         navigate("/club/onboarding");
         return;
       }
 
-      // Get the loyalty program associated with this club
       const { data: programs } = await supabase
         .from("loyalty_programs")
         .select("*")
@@ -177,7 +159,6 @@ export default function ActivityBuilder() {
       }
       setProgram(programs[0] as LoyaltyProgram);
 
-      // Fetch activities for this program
       const activitiesTable = supabase.from("activities") as any;
       const { data: activitiesData } = await activitiesTable
         .select("*")
@@ -191,9 +172,6 @@ export default function ActivityBuilder() {
     }
   };
 
-  /**
-   * Resets form state to defaults when closing the dialog or after saving.
-   */
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -211,9 +189,6 @@ export default function ActivityBuilder() {
     setTimeWindowEnd("");
   };
 
-  /**
-   * Populates the form with existing data when editing an activity and opens the modal.
-   */
   const openEditDialog = (activity: Activity) => {
     setEditingActivity(activity);
     setTitle(activity.name);
@@ -227,7 +202,6 @@ export default function ActivityBuilder() {
     setLocationRadius(activity.location_radius_meters?.toString() || "500");
     setInAppConfig(activity.in_app_config || null);
 
-    // Determine if the activity has a time window and set form values
     const hasWindow = !!(activity.time_window_start || activity.time_window_end);
     setHasTimeWindow(hasWindow);
     setTimeWindowStart(
@@ -238,9 +212,6 @@ export default function ActivityBuilder() {
     setIsDialogOpen(true);
   };
 
-  /**
-   * Use browser geolocation to set the latitude and longitude for a location check-in.
-   */
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast({
@@ -271,10 +242,6 @@ export default function ActivityBuilder() {
     );
   };
 
-  /**
-   * Handles form submission for creating or updating an activity. Performs validation and persists
-   * data via Supabase RPC. When editing a QR-verified activity, it preserves the existing QR code.
-   */
   const handleSubmit = async () => {
     if (!program) return;
 
@@ -284,105 +251,63 @@ export default function ActivityBuilder() {
       return;
     }
 
-    // Validate location for location_checkin activities
     if (verificationMethod === "location_checkin") {
       const lat = parseFloat(locationLat);
       const lng = parseFloat(locationLng);
       const radius = parseInt(locationRadius);
       if (isNaN(lat) || lat < -90 || lat > 90) {
-        toast({
-          title: "Invalid Latitude",
-          description: "Latitude must be between -90 and 90.",
-          variant: "destructive",
-        });
+        toast({ title: "Invalid Latitude", description: "Latitude must be between -90 and 90.", variant: "destructive" });
         return;
       }
       if (isNaN(lng) || lng < -180 || lng > 180) {
-        toast({
-          title: "Invalid Longitude",
-          description: "Longitude must be between -180 and 180.",
-          variant: "destructive",
-        });
+        toast({ title: "Invalid Longitude", description: "Longitude must be between -180 and 180.", variant: "destructive" });
         return;
       }
       if (isNaN(radius) || radius < 50 || radius > 5000) {
-        toast({
-          title: "Invalid Radius",
-          description: "Radius must be between 50 and 5000 meters.",
-          variant: "destructive",
-        });
+        toast({ title: "Invalid Radius", description: "Radius must be between 50 and 5000 meters.", variant: "destructive" });
         return;
       }
     }
 
-    // Validate in_app_completion activities
     if (verificationMethod === "in_app_completion") {
       if (!inAppConfig || !inAppConfig.question.trim()) {
-        toast({
-          title: "Question Required",
-          description: "Please enter a question for the poll or quiz.",
-          variant: "destructive",
-        });
+        toast({ title: "Question Required", description: "Please enter a question for the poll or quiz.", variant: "destructive" });
         return;
       }
       const filledOptions = inAppConfig.options.filter((o) => o.text.trim());
       if (filledOptions.length < 2) {
-        toast({
-          title: "Options Required",
-          description: "Please provide at least 2 answer options.",
-          variant: "destructive",
-        });
+        toast({ title: "Options Required", description: "Please provide at least 2 answer options.", variant: "destructive" });
         return;
       }
       if (inAppConfig.type === "quiz" && !inAppConfig.options.some((o) => o.isCorrect)) {
-        toast({
-          title: "Correct Answer Required",
-          description: "Please select the correct answer for the quiz.",
-          variant: "destructive",
-        });
+        toast({ title: "Correct Answer Required", description: "Please select the correct answer for the quiz.", variant: "destructive" });
         return;
       }
     }
 
-    // Validate time window
     if (hasTimeWindow) {
       if (!timeWindowStart || !timeWindowEnd) {
-        toast({
-          title: "Time Window Required",
-          description: "Please set both start and end times for the time window.",
-          variant: "destructive",
-        });
+        toast({ title: "Time Window Required", description: "Please set both start and end times for the time window.", variant: "destructive" });
         return;
       }
       if (new Date(timeWindowStart) >= new Date(timeWindowEnd)) {
-        toast({
-          title: "Invalid Time Window",
-          description: "End time must be after start time.",
-          variant: "destructive",
-        });
+        toast({ title: "Invalid Time Window", description: "End time must be after start time.", variant: "destructive" });
         return;
       }
     }
 
-    // Parse location values
     const parsedLat = verificationMethod === "location_checkin" ? parseFloat(locationLat) : null;
     const parsedLng = verificationMethod === "location_checkin" ? parseFloat(locationLng) : null;
     const parsedRadius = verificationMethod === "location_checkin" ? parseInt(locationRadius) : 100;
 
-    // Parse in_app_config - only include for in_app_completion, filter empty options
     const parsedInAppConfig =
       verificationMethod === "in_app_completion" && inAppConfig
-        ? {
-            ...inAppConfig,
-            options: inAppConfig.options.filter((o) => o.text.trim()),
-          }
+        ? { ...inAppConfig, options: inAppConfig.options.filter((o) => o.text.trim()) }
         : null;
 
-    // Parse time window
     const parsedTimeWindowStart = hasTimeWindow && timeWindowStart ? new Date(timeWindowStart).toISOString() : null;
     const parsedTimeWindowEnd = hasTimeWindow && timeWindowEnd ? new Date(timeWindowEnd).toISOString() : null;
 
-    // If in preview mode, just simulate the creation/edit and avoid DB writes
     if (isPreviewMode) {
       const newActivity: Activity = {
         id: `preview-${Date.now()}`,
@@ -418,15 +343,11 @@ export default function ActivityBuilder() {
     setIsSubmitting(true);
 
     try {
-      // Determine QR code data: preserve existing code if editing and verification hasn't changed.
       let qrCodeData: string | null = null;
       if (verificationMethod === "qr_scan") {
         if (editingActivity && editingActivity.verification_method === "qr_scan" && editingActivity.qr_code_data) {
-          // Keep existing QR code when editing an existing QR activity
           qrCodeData = editingActivity.qr_code_data;
         } else {
-          // Generate a new UUID for new QR activities or when switching to QR
-          // Use crypto.randomUUID if available; fall back to a simple generator
           const generator =
             typeof crypto !== "undefined" && crypto.randomUUID
               ? crypto.randomUUID.bind(crypto)
@@ -434,7 +355,6 @@ export default function ActivityBuilder() {
           qrCodeData = generator();
         }
       } else {
-        // Not a QR activity; remove qr_code_data
         qrCodeData = null;
       }
 
@@ -475,9 +395,6 @@ export default function ActivityBuilder() {
     }
   };
 
-  /**
-   * Deletes an activity after confirmation.
-   */
   const handleDelete = async (activityId: string) => {
     if (!confirm("Are you sure you want to delete this activity?")) return;
     if (isPreviewMode) {
@@ -496,6 +413,14 @@ export default function ActivityBuilder() {
     }
   };
 
+  const handleSignOut = async () => {
+    if (isPreviewMode) navigate("/preview");
+    else {
+      await signOut();
+      navigate("/");
+    }
+  };
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -507,347 +432,179 @@ export default function ActivityBuilder() {
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center justify-between">
+
+      {/* HEADER */}
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+            <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")} className="rounded-full hover:bg-card/60">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
-            <Logo />
+            <div className="h-5 w-px bg-border/40" />
+            <Logo size="sm" />
           </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          </Button>
         </div>
       </header>
-      <main className="container py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-8 w-8 text-primary" />
-              Activities Manager
-            </h1>
-            <p className="text-muted-foreground">
-              Create activities for fans to earn {program?.points_currency_name || "points"}
-            </p>
-          </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="gradient-stadium">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Activity
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingActivity ? "Edit Activity" : "Create New Activity"}</DialogTitle>
-                <DialogDescription>
-                  Define how fans earn {program?.points_currency_name || "points"} for this activity
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Activity Name *</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., Attend Home Match"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what fans need to do..."
-                    rows={2}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+
+      <main className="container py-10 max-w-5xl space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 p-8 md:p-10">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Activity Hub</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Activities Manager</h1>
+              <p className="text-white/50 mt-2 max-w-md">Create activities for fans to earn {program?.points_currency_name || "points"}</p>
+            </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button className="rounded-full gap-2 shadow-stadium self-start md:self-auto">
+                  <Plus className="h-4 w-4" /> Add Activity
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border-border/40">
+                <DialogHeader>
+                  <DialogTitle className="font-display">{editingActivity ? "Edit Activity" : "Create New Activity"}</DialogTitle>
+                  <DialogDescription>Define how fans earn {program?.points_currency_name || "points"} for this activity</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="points">Points Awarded *</Label>
-                    <Input
-                      id="points"
-                      type="number"
-                      min="1"
-                      value={pointsAwarded}
-                      onChange={(e) => setPointsAwarded(e.target.value)}
-                    />
+                    <Label htmlFor="name">Activity Name *</Label>
+                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Attend Home Match" className="rounded-xl border-border/40" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1">
-                      Frequency
-                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <Select value={frequency} onValueChange={(v) => setFrequency(v as ActivityFrequency)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe what fans need to do..." rows={2} className="rounded-xl border-border/40" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="points">Points Awarded *</Label>
+                      <Input id="points" type="number" min="1" value={pointsAwarded} onChange={(e) => setPointsAwarded(e.target.value)} className="rounded-xl border-border/40" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">Frequency <HelpCircle className="h-3 w-3 text-muted-foreground" /></Label>
+                      <Select value={frequency} onValueChange={(v) => setFrequency(v as ActivityFrequency)}>
+                        <SelectTrigger className="rounded-xl border-border/40"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(frequencyLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">{frequencyDescriptions[frequency]}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1">Verification Method * <HelpCircle className="h-3 w-3 text-muted-foreground" /></Label>
+                    <Select value={verificationMethod} onValueChange={(v) => setVerificationMethod(v as VerificationMethod)}>
+                      <SelectTrigger className="rounded-xl border-border/40"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(frequencyLabels).map(([value, label]) => (
+                        {Object.entries(verificationLabels).map(([value, label]) => (
                           <SelectItem key={value} value={value}>
-                            {label}
+                            <div className="flex items-center gap-2">{verificationIcons[value as VerificationMethod]}{label}</div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">{frequencyDescriptions[frequency]}</p>
+                    <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-xl">{verificationDescriptions[verificationMethod]}</p>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    Verification Method *
-                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                  </Label>
-                  <Select
-                    value={verificationMethod}
-                    onValueChange={(v) => setVerificationMethod(v as VerificationMethod)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(verificationLabels).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          <div className="flex items-center gap-2">
-                            {verificationIcons[value as VerificationMethod]}
-                            {label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                    {verificationDescriptions[verificationMethod]}
-                  </p>
-                </div>
-                {/* Location Configuration for Location Check-in */}
-                {verificationMethod === "location_checkin" && (
-                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2 text-primary">
-                        <MapPin className="h-4 w-4" />
-                        Venue Location
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleGetCurrentLocation}
-                        disabled={isLocating}
-                      >
-                        {isLocating ? (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        ) : (
-                          <MapPin className="h-3 w-3 mr-1" />
-                        )}
-                        Use My Location
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="locationLat" className="text-xs">
-                          Latitude *
-                        </Label>
-                        <Input
-                          id="locationLat"
-                          type="number"
-                          step="any"
-                          value={locationLat}
-                          onChange={(e) => setLocationLat(e.target.value)}
-                          placeholder="e.g., 53.4631"
-                        />
+                  {verificationMethod === "location_checkin" && (
+                    <div className="space-y-3 p-4 border border-primary/20 rounded-2xl bg-primary/5">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2 text-primary"><MapPin className="h-4 w-4" />Venue Location</Label>
+                        <Button type="button" variant="outline" size="sm" onClick={handleGetCurrentLocation} disabled={isLocating} className="rounded-full">
+                          {isLocating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MapPin className="h-3 w-3 mr-1" />}Use My Location
+                        </Button>
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="locationLng" className="text-xs">
-                          Longitude *
-                        </Label>
-                        <Input
-                          id="locationLng"
-                          type="number"
-                          step="any"
-                          value={locationLng}
-                          onChange={(e) => setLocationLng(e.target.value)}
-                          placeholder="e.g., -2.2913"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="locationRadius" className="text-xs">
-                        Check-in Radius (meters) *
-                      </Label>
-                      <Input
-                        id="locationRadius"
-                        type="number"
-                        min="50"
-                        max="5000"
-                        value={locationRadius}
-                        onChange={(e) => setLocationRadius(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Fans must be within this distance to check in (50-5000m)
-                      </p>
-                    </div>
-                    {/* Map Preview */}
-                    {locationLat &&
-                      locationLng &&
-                      !isNaN(parseFloat(locationLat)) &&
-                      !isNaN(parseFloat(locationLng)) && (
-                        <div className="space-y-2">
-                          <Label className="text-xs">Map Preview</Label>
-                          <VenueMapPreview
-                            lat={parseFloat(locationLat)}
-                            lng={parseFloat(locationLng)}
-                            radiusMeters={parseInt(locationRadius) || 500}
-                          />
-                          <p className="text-xs text-muted-foreground text-center">
-                            The green circle shows the check-in area
-                          </p>
-                        </div>
-                      )}
-                  </div>
-                )}
-                {/* In-App Activity Configuration (Poll/Quiz) */}
-                {verificationMethod === "in_app_completion" && (
-                  <PollQuizBuilder value={inAppConfig} onChange={setInAppConfig} />
-                )}
-                {/* Time Window Configuration */}
-                <div className="space-y-3 p-4 border border-muted rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="hasTimeWindow" className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      Time-Based Availability
-                    </Label>
-                    <Switch id="hasTimeWindow" checked={hasTimeWindow} onCheckedChange={setHasTimeWindow} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Restrict this activity to specific dates and times (e.g., match days only)
-                  </p>
-                  {hasTimeWindow && (
-                    <div className="space-y-3 pt-2">
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="timeWindowStart" className="text-xs">
-                            Available From *
-                          </Label>
-                          <Input
-                            id="timeWindowStart"
-                            type="datetime-local"
-                            value={timeWindowStart}
-                            onChange={(e) => setTimeWindowStart(e.target.value)}
-                            className="text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="timeWindowEnd" className="text-xs">
-                            Available Until *
-                          </Label>
-                          <Input
-                            id="timeWindowEnd"
-                            type="datetime-local"
-                            value={timeWindowEnd}
-                            onChange={(e) => setTimeWindowEnd(e.target.value)}
-                            className="text-sm"
-                          />
-                        </div>
+                        <div className="space-y-1"><Label htmlFor="locationLat" className="text-xs">Latitude *</Label><Input id="locationLat" type="number" step="any" value={locationLat} onChange={(e) => setLocationLat(e.target.value)} placeholder="e.g., 53.4631" className="rounded-xl border-border/40" /></div>
+                        <div className="space-y-1"><Label htmlFor="locationLng" className="text-xs">Longitude *</Label><Input id="locationLng" type="number" step="any" value={locationLng} onChange={(e) => setLocationLng(e.target.value)} placeholder="e.g., -2.2913" className="rounded-xl border-border/40" /></div>
                       </div>
-                      {timeWindowStart && timeWindowEnd && new Date(timeWindowStart) < new Date(timeWindowEnd) && (
-                        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                          ⏰ Activity will be available from{" "}
-                          <span className="font-medium">{new Date(timeWindowStart).toLocaleString()}</span> to{" "}
-                          <span className="font-medium">{new Date(timeWindowEnd).toLocaleString()}</span>
-                        </p>
+                      <div className="space-y-1">
+                        <Label htmlFor="locationRadius" className="text-xs">Check-in Radius (meters) *</Label>
+                        <Input id="locationRadius" type="number" min="50" max="5000" value={locationRadius} onChange={(e) => setLocationRadius(e.target.value)} className="rounded-xl border-border/40" />
+                        <p className="text-xs text-muted-foreground">Fans must be within this distance to check in (50-5000m)</p>
+                      </div>
+                      {locationLat && locationLng && !isNaN(parseFloat(locationLat)) && !isNaN(parseFloat(locationLng)) && (
+                        <div className="space-y-2"><Label className="text-xs">Map Preview</Label><VenueMapPreview lat={parseFloat(locationLat)} lng={parseFloat(locationLng)} radiusMeters={parseInt(locationRadius) || 500} /><p className="text-xs text-muted-foreground text-center">The green circle shows the check-in area</p></div>
                       )}
                     </div>
                   )}
+                  {verificationMethod === "in_app_completion" && <PollQuizBuilder value={inAppConfig} onChange={setInAppConfig} />}
+                  <div className="space-y-3 p-4 border border-border/40 rounded-2xl">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="hasTimeWindow" className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />Time-Based Availability</Label>
+                      <Switch id="hasTimeWindow" checked={hasTimeWindow} onCheckedChange={setHasTimeWindow} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Restrict this activity to specific dates and times (e.g., match days only)</p>
+                    {hasTimeWindow && (
+                      <div className="space-y-3 pt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1"><Label htmlFor="timeWindowStart" className="text-xs">Available From *</Label><Input id="timeWindowStart" type="datetime-local" value={timeWindowStart} onChange={(e) => setTimeWindowStart(e.target.value)} className="text-sm rounded-xl border-border/40" /></div>
+                          <div className="space-y-1"><Label htmlFor="timeWindowEnd" className="text-xs">Available Until *</Label><Input id="timeWindowEnd" type="datetime-local" value={timeWindowEnd} onChange={(e) => setTimeWindowEnd(e.target.value)} className="text-sm rounded-xl border-border/40" /></div>
+                        </div>
+                        {timeWindowStart && timeWindowEnd && new Date(timeWindowStart) < new Date(timeWindowEnd) && (
+                          <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-xl">⏰ Activity will be available from <span className="font-medium">{new Date(timeWindowStart).toLocaleString()}</span> to <span className="font-medium">{new Date(timeWindowEnd).toLocaleString()}</span></p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between"><Label htmlFor="isActive">Active</Label><Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} /></div>
+                  <Button onClick={handleSubmit} disabled={!title || isSubmitting} className="w-full rounded-xl">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}{editingActivity ? "Update Activity" : "Create Activity"}</Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="isActive">Active</Label>
-                  <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
-                </div>
-                <Button onClick={handleSubmit} disabled={!title || isSubmitting} className="w-full gradient-stadium">
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  {editingActivity ? "Update Activity" : "Create Activity"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
-        {/* Activities List */}
+
+        {/* ACTIVITIES LIST */}
         {activities.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">You Haven't Created Any Activities Yet</h3>
-              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                Activities are how fans earn {program?.points_currency_name || "points"}. Create your first activity to
-                start engaging fans.
-              </p>
-              <Button onClick={() => setIsDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Activity
-              </Button>
+          <Card className="rounded-2xl border-border/40 overflow-hidden">
+            <CardContent className="py-16 text-center">
+              <div className="mx-auto h-14 w-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4"><Zap className="h-6 w-6 text-muted-foreground" /></div>
+              <h3 className="font-display font-bold text-lg">No Activities Yet</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">Activities are how fans earn {program?.points_currency_name || "points"}. Create your first activity to start engaging fans.</p>
+              <Button onClick={() => setIsDialogOpen(true)} className="mt-4 rounded-full"><Plus className="h-4 w-4 mr-2" />Create Activity</Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
+          <div className="space-y-3">
             {activities.map((activity) => (
-              <Card key={activity.id} className={`${activity.is_active ? "" : "opacity-60"}`}>
-                <CardContent className="py-4">
+              <Card key={activity.id} className={`rounded-2xl border-border/40 group hover:border-primary/20 transition-all duration-300 ${activity.is_active ? "" : "opacity-60"}`}>
+                <CardContent className="py-5 px-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                        {verificationIcons[activity.verification_method]}
-                      </div>
+                      <div className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">{verificationIcons[activity.verification_method]}</div>
                       <div>
-                        <h3 className="font-semibold text-foreground">{activity.name}</h3>
-                        {activity.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">{activity.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary">
-                            +{activity.points_awarded} {program?.points_currency_name}
-                          </Badge>
-                          <Badge variant="outline">{frequencyLabels[activity.frequency]}</Badge>
-                          <Badge variant="outline">{verificationLabels[activity.verification_method]}</Badge>
-                          {!activity.is_active && <Badge variant="secondary">Inactive</Badge>}
+                        <h3 className="font-display font-semibold tracking-tight">{activity.name}</h3>
+                        {activity.description && <p className="text-sm text-muted-foreground line-clamp-1">{activity.description}</p>}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <Badge className="rounded-full bg-primary/10 text-primary border-primary/20 text-[10px]">+{activity.points_awarded} {program?.points_currency_name}</Badge>
+                          <Badge variant="outline" className="rounded-full text-[10px]">{frequencyLabels[activity.frequency]}</Badge>
+                          <Badge variant="outline" className="rounded-full text-[10px]">{verificationLabels[activity.verification_method]}</Badge>
+                          {!activity.is_active && <Badge variant="secondary" className="rounded-full text-[10px]">Inactive</Badge>}
                           {(activity.time_window_start || activity.time_window_end) && (
-                            <Badge variant="outline" className="gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Timed
-                            </Badge>
+                            <Badge variant="outline" className="gap-1 rounded-full text-[10px]"><Calendar className="h-3 w-3" />Timed</Badge>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {activity.verification_method === "qr_scan" && activity.qr_code_data && (
-                        <Button variant="outline" size="sm" onClick={() => setQrActivity(activity)} className="gap-1">
-                          <QrCode className="h-4 w-4" />
-                          View QR
-                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setQrActivity(activity)} className="gap-1 rounded-full border-border/40"><QrCode className="h-4 w-4" />View QR</Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(activity)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(activity.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(activity)} className="rounded-full"><Edit className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive rounded-full" onClick={() => handleDelete(activity.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 </CardContent>
@@ -855,16 +612,15 @@ export default function ActivityBuilder() {
             ))}
           </div>
         )}
+
         {/* QR Code Display Modal */}
-        {qrActivity && qrActivity.qr_code_data && (
-          <QRCodeDisplay
-            isOpen={!!qrActivity}
-            onClose={() => setQrActivity(null)}
-            activityName={qrActivity.name}
-            qrCodeData={qrActivity.qr_code_data}
-            pointsAwarded={qrActivity.points_awarded}
-            pointsCurrency={program?.points_currency_name || "Points"}
-          />
+        {qrActivity && (
+          <Dialog open={!!qrActivity} onOpenChange={() => setQrActivity(null)}>
+            <DialogContent className="rounded-2xl border-border/40">
+              <DialogHeader><DialogTitle className="font-display">QR Code: {qrActivity.name}</DialogTitle></DialogHeader>
+              <QRCodeDisplay data={qrActivity.qr_code_data || ""} activityName={qrActivity.name} />
+            </DialogContent>
+          </Dialog>
         )}
       </main>
     </div>
