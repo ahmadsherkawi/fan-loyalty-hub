@@ -1,26 +1,19 @@
-// (FULL FILE — NO TRUNCATION)
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-
 import { ManualProofModal } from "@/components/ui/ManualProofModal";
 import { QRScannerModal } from "@/components/ui/QRScannerModal";
 import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
-
 import { useToast } from "@/hooks/use-toast";
-
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle } from "lucide-react";
-
 import type { Database } from "@/integrations/supabase/types";
 
 type Activity = Database["public"]["Tables"]["activities"]["Row"];
@@ -45,8 +38,6 @@ export default function FanActivities() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [completions, setCompletions] = useState<ActivityCompletion[]>([]);
   const [pendingClaims, setPendingClaims] = useState<string[]>([]);
-  const [multiplier, setMultiplier] = useState<number>(1);
-
   const [dataLoading, setDataLoading] = useState(true);
 
   // Modal state
@@ -62,6 +53,7 @@ export default function FanActivities() {
   const [processingLocation, setProcessingLocation] = useState(false);
 
   const [pollQuizModalOpen, setPollQuizModalOpen] = useState(false);
+  const [multiplier, setMultiplier] = useState<number>(1);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance || 0;
 
@@ -88,10 +80,11 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // Multiplier (same method as before)
+      // ✅ FIX: fetch multiplier after we have membership id
       const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
         p_membership_id: m.id,
       });
+
       if (multErr) throw multErr;
 
       const multValue = Number(multData ?? 1);
@@ -169,11 +162,11 @@ export default function FanActivities() {
 
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
-  // Single source of truth completion (same behavior you had before)
+  // Single source of truth completion
   const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      const previewMultiplier = 1;
-      const previewFinal = Math.round((activity.points_awarded || 0) * previewMultiplier);
+      const previewMultiplier = 1; // preview simplicity
+      const previewFinal = Math.round(activity.points_awarded * previewMultiplier);
 
       addPreviewPoints(previewFinal);
       markActivityCompleted(activity.id);
@@ -187,14 +180,24 @@ export default function FanActivities() {
 
     if (!membership) return;
 
-    const { error } = await supabase.rpc("complete_activity", {
+    // ✅ FIX: capture RPC response data
+    const { data, error } = await supabase.rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
     });
     if (error) throw error;
 
-    const earned = Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
-    const mult = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+    // Fallback if RPC returns nothing
+    const earned =
+      data?.final_points != null
+        ? Number(data.final_points)
+        : Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
+    const mult =
+      data?.multiplier != null
+        ? Number(data.multiplier)
+        : Number.isFinite(multiplier) && multiplier > 0
+          ? multiplier
+          : 1;
 
     toast({
       title: "Activity Completed!",
@@ -206,13 +209,13 @@ export default function FanActivities() {
 
   // Decide what happens when user clicks an activity
   const handleStart = (activity: Activity) => {
-    // already done
+    // Guard: already done
     if (isCompleted(activity.id)) {
       toast({ title: "Already completed", description: "You have already completed this activity." });
       return;
     }
 
-    // manual proof already pending
+    // Guard: manual proof already pending
     if (activity.verification_method === "manual_proof" && hasPendingClaim(activity.id)) {
       toast({
         title: "Pending review",
@@ -243,7 +246,7 @@ export default function FanActivities() {
       return;
     }
 
-    // fallback
+    // Fallback
     completeViaRpc(activity).catch((err: any) => {
       toast({
         title: "Error",
@@ -253,10 +256,11 @@ export default function FanActivities() {
     });
   };
 
-  // Manual proof submit: create manual_claims (do NOT award immediately)
+  // Manual proof submit
   const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
     if (!selectedActivity) return;
 
+    // Validate basic input
     if (!proofDescription?.trim()) {
       toast({
         title: "Add a short description",
@@ -266,15 +270,21 @@ export default function FanActivities() {
       return;
     }
 
+    // Double guard: pending or completed
     if (hasPendingClaim(selectedActivity.id)) {
-      toast({ title: "Pending review", description: "You already submitted proof for this activity." });
+      toast({
+        title: "Pending review",
+        description: "You already submitted proof for this activity.",
+      });
       setProofModalOpen(false);
       setSelectedActivity(null);
       return;
     }
-
     if (isCompleted(selectedActivity.id)) {
-      toast({ title: "Already completed", description: "This activity is already completed." });
+      toast({
+        title: "Already completed",
+        description: "This activity is already completed.",
+      });
       setProofModalOpen(false);
       setSelectedActivity(null);
       return;
@@ -367,29 +377,20 @@ export default function FanActivities() {
     }
   };
 
-  // Poll/Quiz submit: IMPORTANT correctness logic
+  // Poll/Quiz submit
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
     if (!selectedActivity) return;
 
-    // Don’t allow re-submit if completed
-    if (isCompleted(selectedActivity.id)) {
-      toast({ title: "Already completed", description: "You have already completed this activity." });
-      setPollQuizModalOpen(false);
-      setSelectedActivity(null);
-      return;
-    }
+    const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
 
-    const cfg = selectedActivity.in_app_config as any;
-    const isPoll = cfg?.type === "poll";
-
-    // Quiz: only award if correct
     if (!isPoll && !isCorrect) {
-      toast({ title: "Incorrect", description: "Try again." });
+      toast({ title: "Incorrect", description: "Better luck next time!" });
       return;
     }
 
     try {
       await completeViaRpc(selectedActivity);
+
       setPollQuizModalOpen(false);
       setSelectedActivity(null);
     } catch (err: any) {
@@ -466,6 +467,7 @@ export default function FanActivities() {
                       <div>
                         <p className="font-semibold">{activity.name}</p>
 
+                        {/* ✅ show multiplied points + multiplier badge */}
                         <p className="text-sm text-muted-foreground">
                           +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
                           {program?.points_currency_name || "Points"}
@@ -516,7 +518,7 @@ export default function FanActivities() {
           if (!open) setSelectedActivity(null);
         }}
         activityName={selectedActivity?.name || ""}
-        expectedQRData={(selectedActivity as any)?.qr_code_data || null}
+        expectedQRData={selectedActivity?.qr_code_data || null}
         pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleQRSuccess}
@@ -531,9 +533,9 @@ export default function FanActivities() {
           if (!open) setSelectedActivity(null);
         }}
         activityName={selectedActivity?.name || ""}
-        targetLat={(selectedActivity as any)?.location_lat ?? null}
-        targetLng={(selectedActivity as any)?.location_lng ?? null}
-        radiusMeters={(selectedActivity as any)?.location_radius_meters || 500}
+        targetLat={selectedActivity?.location_lat ?? null}
+        targetLng={selectedActivity?.location_lng ?? null}
+        radiusMeters={selectedActivity?.location_radius_meters || 500}
         pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleLocationSuccess}
