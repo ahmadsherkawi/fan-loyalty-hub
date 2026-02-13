@@ -24,7 +24,7 @@ import ClaimReview from "./pages/club/ClaimReview";
 import ClubAnalytics from "./pages/club/ClubAnalytics";
 import ClubSeasons from "./pages/club/ClubSeasons";
 import TierManagement from "./pages/club/TierManagement";
-import FanNotifications from "./pages/club/FanNotifications";
+import FanNotifications from "./pages/fan/FanNotifications";
 
 // Fan pages
 import FanHome from "./pages/fan/FanHome";
@@ -62,7 +62,7 @@ const App = () => {
                 <Route path="/club/claims" element={<ClaimReview />} />
                 <Route path="/club/analytics" element={<ClubAnalytics />} />
                 <Route path="/club/seasons" element={<ClubSeasons />} />
-                <Route path="/club/notification" element={<FanNotifications />} />
+                <Route path="/fan/notification" element={<FanNotifications />} />
 
                 {/* ✅ TIER MANAGEMENT — KEEP THIS EXACT PATH */}
                 <Route path="/club/tiers" element={<TierManagement />} />
