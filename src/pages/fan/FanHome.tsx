@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
-// ✅ FIX: use shadcn tooltip (portal, not clipped by overflow-hidden)
+// ✅ shadcn tooltip (fixes “hover not working” by avoiding clipping)
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles } from "lucide-react";
@@ -46,11 +46,15 @@ export default function FanHome() {
 
   const [tierBenefits, setTierBenefits] = useState<any[]>([]);
 
+  // ✅ same as FanActivities
+  const [multiplier, setMultiplier] = useState<number>(1);
+
   const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
+  // ---------- AUTH ----------
   useEffect(() => {
     if (loading) return;
 
@@ -67,14 +71,17 @@ export default function FanHome() {
     if (!isPreviewMode && profile?.role === "fan") {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, profile, isPreviewMode]);
 
+  // ---------- FETCH ----------
   const fetchData = async () => {
     if (!profile) return;
 
     setDataLoading(true);
 
     try {
+      /** Membership */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -89,18 +96,36 @@ export default function FanHome() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
+      /** ✅ MULTIPLIER (same method as FanActivities) */
+      const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
+        p_membership_id: m.id,
+      });
+
+      if (multErr) {
+        // if RPC fails, fallback to 1 but do not crash FanHome
+        setMultiplier(1);
+      } else {
+        const multValue = Number(multData ?? 1);
+        setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
+      }
+
+      /** Club */
       const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
       setClub(clubData as Club);
 
+      /** Program */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
       setProgram(programData as LoyaltyProgram);
 
+      /** Activities */
       const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
       setActivities((acts ?? []) as Activity[]);
 
+      /** Rewards */
       const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
       setRewards((rews ?? []) as Reward[]);
 
+      /** TIERS */
       const { data: tiersData } = await supabase
         .from("tiers")
         .select("*")
@@ -110,6 +135,7 @@ export default function FanHome() {
       const tierList = (tiersData ?? []) as Tier[];
       setTiers(tierList);
 
+      /** Earned points */
       const { data: completions } = await supabase
         .from("activity_completions")
         .select("points_earned")
@@ -118,6 +144,7 @@ export default function FanHome() {
       const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
       setEarnedPoints(totalEarned);
 
+      /** CURRENT + NEXT TIER */
       let current: Tier | null = null;
       let next: Tier | null = null;
 
@@ -131,7 +158,7 @@ export default function FanHome() {
       setCurrentTier(current);
       setNextTier(next);
 
-      // ✅ FIX: ensure tier benefits always refresh when current tier exists
+      /** ✅ Tier benefits (same source for discount as FanRewards) */
       if (current?.id) {
         const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
         setTierBenefits(benefits ?? []);
@@ -139,6 +166,7 @@ export default function FanHome() {
         setTierBenefits([]);
       }
 
+      /** Notifications */
       const { count } = await supabase
         .from("notifications")
         .select("*", { count: "exact", head: true })
@@ -164,7 +192,7 @@ export default function FanHome() {
     );
   }
 
-  /** Tier Effects */
+  /** ---------- Tier Effects Engine ---------- */
   const tierEffects = {
     multiplier: 1,
     discountPercent: 0,
@@ -172,9 +200,11 @@ export default function FanHome() {
     monthlyBonus: 0,
   };
 
+  // ✅ use discount logic from tier_benefits
   tierBenefits.forEach((b) => {
     switch (b.benefit_type) {
       case "points_multiplier":
+        // keep it, but we will still prefer membership multiplier from RPC for consistency
         tierEffects.multiplier = Number(b.benefit_value || 1);
         break;
       case "reward_discount_percent":
@@ -189,32 +219,28 @@ export default function FanHome() {
     }
   });
 
+  // ✅ final multiplier used in UI = membership multiplier RPC (same as FanActivities)
+  const effectiveMultiplier = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+
+  /** Progress to next tier */
   const progress =
     currentTier && nextTier
       ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
         100
       : 100;
 
-  // Tooltip content (stable string list)
-  const tierTooltipLines: string[] = [];
-  if (tierEffects.multiplier > 1) tierTooltipLines.push(`✨ ${tierEffects.multiplier}× activity points`);
-  if (tierEffects.discountPercent > 0) tierTooltipLines.push(`🎁 ${tierEffects.discountPercent}% reward discount`);
-  if (tierEffects.vipAccess) tierTooltipLines.push(`🏟 VIP access`);
-  if (tierEffects.monthlyBonus > 0) tierTooltipLines.push(`📅 +${tierEffects.monthlyBonus} monthly points`);
-
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background">
         {isPreviewMode && <PreviewBanner role="fan" />}
 
-        {/* HERO */}
+        {/* ================= HERO ================= */}
         <header
           className="relative overflow-hidden text-white"
           style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
         >
-          {/* ✅ FIX: overlays must not block hover/click */}
-          <div className="absolute inset-0 bg-black/25 pointer-events-none" />
-          <div className="absolute inset-0 gradient-mesh opacity-40 pointer-events-none" />
+          <div className="absolute inset-0 bg-black/25" />
+          <div className="absolute inset-0 gradient-mesh opacity-40" />
 
           {/* TOP BAR */}
           <div className="container relative z-10 py-4 flex justify-between items-center">
@@ -264,33 +290,30 @@ export default function FanHome() {
                   <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
                 </div>
 
-                {/* CURRENT TIER (ported tooltip, not clipped) */}
+                {/* CURRENT TIER WITH REAL TOOLTIP */}
                 {currentTier && (
                   <div className="space-y-3">
-                    <div className="flex justify-center">
-                      {tierTooltipLines.length > 0 ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge className="bg-white/20 text-white border-white/30 rounded-full cursor-help">
-                              <Star className="h-3 w-3 mr-1" />
-                              {currentTier.name}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                              {tierTooltipLines.map((line, idx) => (
-                                <p key={idx}>{line}</p>
-                              ))}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Badge className="bg-white/20 text-white border-white/30 rounded-full">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className="bg-white/20 text-white border-white/30 rounded-full cursor-default">
                           <Star className="h-3 w-3 mr-1" />
                           {currentTier.name}
                         </Badge>
-                      )}
-                    </div>
+                      </TooltipTrigger>
+
+                      <TooltipContent className="max-w-[260px]">
+                        <div className="space-y-1 text-xs">
+                          {effectiveMultiplier > 1 && <p>✨ {effectiveMultiplier}× points on activities</p>}
+                          {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
+                          {tierEffects.vipAccess && <p>🏟 VIP access unlocked</p>}
+                          {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly bonus points</p>}
+                          {effectiveMultiplier <= 1 &&
+                            tierEffects.discountPercent <= 0 &&
+                            !tierEffects.vipAccess &&
+                            tierEffects.monthlyBonus <= 0 && <p>No benefits configured for this tier yet.</p>}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
 
                     {nextTier && (
                       <>
@@ -313,7 +336,7 @@ export default function FanHome() {
                       Your Tier Benefits
                     </div>
 
-                    {tierEffects.multiplier > 1 && <p>✨ {tierEffects.multiplier}× points on activities</p>}
+                    {effectiveMultiplier > 1 && <p>✨ {effectiveMultiplier}× points on activities</p>}
                     {tierEffects.discountPercent > 0 && <p>🎁 {tierEffects.discountPercent}% reward discount</p>}
                     {tierEffects.vipAccess && <p>🏟 VIP access unlocked</p>}
                     {tierEffects.monthlyBonus > 0 && <p>📅 +{tierEffects.monthlyBonus} monthly bonus points</p>}
@@ -335,7 +358,7 @@ export default function FanHome() {
           </div>
         </header>
 
-        {/* CONTENT */}
+        {/* ================= CONTENT ================= */}
         <main className="container py-10 space-y-12">
           {/* ACTIVITIES */}
           <section>
@@ -346,20 +369,21 @@ export default function FanHome() {
             />
 
             <div className="space-y-3">
-              {activities.map((a) => {
-                const finalPts = Math.round(a.points_awarded * tierEffects.multiplier);
-
-                return (
-                  <InfoCard
-                    key={a.id}
-                    title={a.name}
-                    badge={tierEffects.multiplier > 1 ? `+${finalPts} pts` : `+${a.points_awarded} pts`}
-                    // ✅ show multiplier label on the card itself
-                    multiplier={tierEffects.multiplier}
-                    onClick={() => navigate("/fan/activities")}
-                  />
-                );
-              })}
+              {activities.map((a) => (
+                <InfoCard
+                  key={a.id}
+                  title={a.name}
+                  badge={
+                    <>
+                      +{Math.round((a.points_awarded || 0) * effectiveMultiplier)} pts
+                      {effectiveMultiplier > 1 && (
+                        <span className="ml-2 text-xs text-green-600 font-semibold">×{effectiveMultiplier}</span>
+                      )}
+                    </>
+                  }
+                  onClick={() => navigate("/fan/activities")}
+                />
+              ))}
             </div>
           </section>
 
@@ -373,7 +397,11 @@ export default function FanHome() {
 
             <div className="grid md:grid-cols-3 gap-4">
               {rewards.map((r) => {
-                const discountedCost = Math.round(r.points_cost * (1 - tierEffects.discountPercent / 100));
+                const discountedCost =
+                  tierEffects.discountPercent > 0
+                    ? Math.round((r.points_cost || 0) * (1 - tierEffects.discountPercent / 100))
+                    : r.points_cost || 0;
+
                 const canAfford = effectivePointsBalance >= discountedCost;
 
                 return (
@@ -382,21 +410,18 @@ export default function FanHome() {
                       <h3 className="font-bold">{r.name}</h3>
                       <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
 
-                      {/* ✅ show both original and discounted */}
-                      <div className="mt-3 space-y-1">
+                      <div className="mt-3 flex items-center gap-2">
+                        <Badge className="rounded-full">{discountedCost} pts</Badge>
+
                         {tierEffects.discountPercent > 0 && (
-                          <p className="text-xs text-muted-foreground line-through">{r.points_cost} pts</p>
+                          <Badge variant="secondary" className="rounded-full text-green-700">
+                            -{tierEffects.discountPercent}%
+                          </Badge>
                         )}
 
-                        <div className="flex items-center gap-2 justify-center">
-                          <Badge className="rounded-full">{discountedCost} pts</Badge>
-
-                          {tierEffects.discountPercent > 0 && (
-                            <span className="text-xs text-green-600 font-semibold">
-                              -{tierEffects.discountPercent}%
-                            </span>
-                          )}
-                        </div>
+                        {tierEffects.discountPercent > 0 && (
+                          <span className="text-xs text-muted-foreground line-through">{r.points_cost} pts</span>
+                        )}
                       </div>
 
                       <Button
@@ -435,21 +460,15 @@ function SectionHeader({ title, icon, onClick }: any) {
   );
 }
 
-// ✅ FIX: allow showing multiplier label next to badge
-function InfoCard({ title, badge, multiplier, onClick }: any) {
+function InfoCard({ title, badge, onClick }: any) {
   return (
     <Card className="rounded-2xl border-border/50 hover:border-primary/20 transition-colors">
       <CardContent className="py-4 flex justify-between items-center">
         <div>
           <p className="font-semibold">{title}</p>
-
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="rounded-full">
-              {badge}
-            </Badge>
-
-            {Number(multiplier) > 1 && <span className="text-xs text-green-600 font-semibold">×{multiplier}</span>}
-          </div>
+          <Badge variant="secondary" className="mt-1 rounded-full">
+            {badge}
+          </Badge>
         </div>
 
         <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium">
