@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
-import { Loader2, ArrowLeft, TrendingUp, Activity, Users, Zap, ArrowUpRight } from "lucide-react";
+import { Loader2, ArrowLeft, TrendingUp, Activity, Users, Zap, ArrowUpRight, LogOut, Sparkles } from "lucide-react";
 
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
 
@@ -17,7 +17,7 @@ import type { Club } from "@/types/database";
 export default function ClubAnalytics() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
 
   const isPreviewMode = searchParams.get("preview") === "club_admin";
 
@@ -65,7 +65,6 @@ export default function ClubAnalytics() {
     setDataLoading(true);
 
     try {
-      /** 1️⃣ Get club (same as Dashboard) */
       const { data: clubs } = await supabase.from("clubs").select("*").eq("admin_id", profile.id).limit(1);
 
       if (!clubs?.length) return;
@@ -73,7 +72,6 @@ export default function ClubAnalytics() {
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      /** 2️⃣ ACTIVE FANS (Dashboard truth — KEEP THIS) */
       const { count: fans } = await supabase
         .from("fan_memberships")
         .select("*", { count: "exact", head: true })
@@ -81,7 +79,6 @@ export default function ClubAnalytics() {
 
       setActiveFans(fans ?? 0);
 
-      /** 3️⃣ NEW: SQL TIME-SERIES ANALYTICS (replaces JS aggregation) */
       const { data: tsData, error } = await supabase.rpc("get_club_analytics_timeseries", { p_club_id: clubData.id });
 
       if (!error && tsData) {
@@ -89,14 +86,15 @@ export default function ClubAnalytics() {
         setPointsFlow(tsData.points_flow ?? []);
         const s = tsData.summary ?? {};
         setActiveFans(s.current_fans ?? 0);
-        setTotalIssued(s.current_issued ?? 0);
-        setTotalSpent(s.current_spent ?? 0);
-        setFanGrowthPercent(s.fan_growth_percent ?? 0);
-        setEngagementGrowthPercent(s.engagement_growth_percent ?? 0);
       }
     } finally {
       setDataLoading(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    if (isPreviewMode) navigate("/preview");
+    else { await signOut(); navigate("/"); }
   };
 
   if (!isPreviewMode && (loading || dataLoading)) {
@@ -107,76 +105,65 @@ export default function ClubAnalytics() {
     );
   }
 
-  /** FINAL METRICS */
   const totalIssued = pointsFlow.reduce((s, p) => s + p.issued, 0);
   const totalSpent = pointsFlow.reduce((s, p) => s + p.spent, 0);
   const engagementRate = totalIssued > 0 ? Math.round((totalSpent / totalIssued) * 100) : 0;
 
   const summaryStats = [
-    {
-      label: "Active Fans",
-      value: activeFans,
-      icon: <Users className="h-4 w-4" />,
-      change: "+18%",
-      color: "text-primary",
-    },
-    {
-      label: "Points Issued",
-      value: totalIssued.toLocaleString(),
-      icon: <Zap className="h-4 w-4" />,
-      change: "+24%",
-      color: "text-blue-400",
-    },
-    {
-      label: "Points Spent",
-      value: totalSpent.toLocaleString(),
-      icon: <Activity className="h-4 w-4" />,
-      change: "+32%",
-      color: "text-accent",
-    },
-    {
-      label: "Engagement",
-      value: `${engagementRate}%`,
-      icon: <TrendingUp className="h-4 w-4" />,
-      change: "+5%",
-      color: "text-purple-400",
-    },
+    { label: "Active Fans", value: activeFans, icon: <Users className="h-4 w-4" />, change: "+18%", color: "text-primary", gradient: "from-primary/30 to-primary/5" },
+    { label: "Points Issued", value: totalIssued.toLocaleString(), icon: <Zap className="h-4 w-4" />, change: "+24%", color: "text-blue-400", gradient: "from-blue-500/30 to-blue-500/5" },
+    { label: "Points Spent", value: totalSpent.toLocaleString(), icon: <Activity className="h-4 w-4" />, change: "+32%", color: "text-accent", gradient: "from-accent/30 to-accent/5" },
+    { label: "Engagement", value: `${engagementRate}%`, icon: <TrendingUp className="h-4 w-4" />, change: "+5%", color: "text-purple-400", gradient: "from-purple-500/30 to-purple-500/5" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="club_admin" />}
 
-      {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
-        <div className="relative container py-5 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate("/club/dashboard")} className="rounded-full">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate("/club/dashboard")} className="rounded-full hover:bg-card/60">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+            </Button>
+            <div className="h-5 w-px bg-border/40" />
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
-
-          <div className="h-5 w-px bg-border/40" />
-          <Logo size="sm" />
         </div>
       </header>
 
-      {/* SUMMARY */}
       <main className="container py-10 max-w-6xl space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 p-8 md:p-10">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Analytics</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Performance Overview</h1>
+            <p className="text-white/50 mt-2 max-w-md">Track fan engagement, points economy, and growth trends.</p>
+          </div>
+        </div>
+
+        {/* STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {summaryStats.map((s) => (
-            <Card key={s.label} className="rounded-2xl border-border/40">
-              <CardContent className="pt-5 pb-4 px-4">
+            <Card key={s.label} className="relative overflow-hidden rounded-2xl border-border/40 group card-hover">
+              <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient} opacity-50 pointer-events-none`} />
+              <CardContent className="relative z-10 pt-5 pb-4 px-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${s.color}`}>{s.icon}</div>
-
-                  <div className="flex items-center gap-1 text-primary text-xs font-semibold">
-                    <ArrowUpRight className="h-3 w-3" />
-                    {s.change}
-                  </div>
+                  <div className={`h-9 w-9 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center ${s.color}`}>{s.icon}</div>
+                  <div className="flex items-center gap-1 text-primary text-xs font-semibold"><ArrowUpRight className="h-3 w-3" />{s.change}</div>
                 </div>
-
-                <p className="text-2xl font-bold">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="text-2xl font-display font-bold tracking-tight">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{s.label}</p>
               </CardContent>
             </Card>
           ))}
@@ -185,37 +172,31 @@ export default function ClubAnalytics() {
         {/* CHARTS */}
         <div className="grid lg:grid-cols-2 gap-6">
           <Card className="rounded-2xl border-border/40">
-            <CardHeader>
-              <CardTitle>Fan Growth</CardTitle>
-            </CardHeader>
-
+            <CardHeader><CardTitle className="font-display">Fan Growth</CardTitle></CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={fansGrowth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="fans" strokeWidth={2.5} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" }} />
+                  <Line type="monotone" dataKey="fans" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ fill: "hsl(var(--primary))" }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border-border/40">
-            <CardHeader>
-              <CardTitle>Points Economy</CardTitle>
-            </CardHeader>
-
+            <CardHeader><CardTitle className="font-display">Points Economy</CardTitle></CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={pointsFlow}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="issued" />
-                  <Bar dataKey="spent" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" }} />
+                  <Bar dataKey="issued" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="spent" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

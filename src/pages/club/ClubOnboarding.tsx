@@ -10,13 +10,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/ui/Logo";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X, LogOut, Sparkles } from "lucide-react";
 
 type Step = "club" | "program" | "verification";
 
 export default function ClubOnboarding() {
   const navigate = useNavigate();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>("club");
@@ -285,6 +285,11 @@ export default function ClubOnboarding() {
     navigate("/club/dashboard");
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -296,37 +301,38 @@ export default function ClubOnboarding() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b">
-        <div className="container py-4 flex items-center justify-between">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-5 flex items-center justify-between">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => navigate("/")} className="rounded-full hover:bg-card/60"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
+            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground"><LogOut className="h-4 w-4 mr-2" /> Sign out</Button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Progress */}
-      <div className="container py-8">
+      <div className="container py-10">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-10">
             {(["club", "program", "verification"] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center font-display font-bold transition-all ${
                     step === s
-                      ? "gradient-stadium text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-stadium"
                       : i < ["club", "program", "verification"].indexOf(step)
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted/50 text-muted-foreground border border-border/40"
                   }`}
                 >
                   {i < ["club", "program", "verification"].indexOf(step) ? <CheckCircle className="h-5 w-5" /> : i + 1}
                 </div>
                 {i < 2 && (
                   <div
-                    className={`w-24 md:w-32 h-1 mx-2 ${
-                      i < ["club", "program", "verification"].indexOf(step) ? "bg-primary" : "bg-muted"
+                    className={`w-16 md:w-24 h-0.5 mx-2 rounded-full ${
+                      i < ["club", "program", "verification"].indexOf(step) ? "bg-primary" : "bg-border/40"
                     }`}
                   />
                 )}
@@ -336,9 +342,9 @@ export default function ClubOnboarding() {
 
           {/* Step 1: Club Details */}
           {step === "club" && (
-            <Card>
+            <Card className="rounded-3xl border-border/40">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 font-display">
                   <Building2 className="h-5 w-5 text-primary" />
                   Club Details
                 </CardTitle>
@@ -354,7 +360,7 @@ export default function ClubOnboarding() {
                         <img
                           src={logoPreview}
                           alt="Club logo preview"
-                          className="w-20 h-20 rounded-lg object-cover border"
+                          className="w-20 h-20 rounded-2xl object-cover border border-border/40"
                         />
                         <button
                           type="button"
@@ -366,7 +372,7 @@ export default function ClubOnboarding() {
                       </div>
                     ) : (
                       <div
-                        className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                        className="w-20 h-20 rounded-2xl border-2 border-dashed border-border/40 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
                         onClick={() => fileInputRef.current?.click()}
                       >
                         <Upload className="h-6 w-6 text-muted-foreground" />
@@ -384,7 +390,7 @@ export default function ClubOnboarding() {
                         type="button"
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full"
+                        className="w-full rounded-xl border-border/40"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {logoFile ? "Change Logo" : "Upload Logo"}
@@ -401,7 +407,7 @@ export default function ClubOnboarding() {
                     value={clubName}
                     onChange={(e) => setClubName(e.target.value)}
                     placeholder="Manchester United FC"
-                    required
+                    className="rounded-xl border-border/40"
                   />
                 </div>
 
@@ -413,7 +419,7 @@ export default function ClubOnboarding() {
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
                       placeholder="United Kingdom"
-                      required
+                      className="rounded-xl border-border/40"
                     />
                   </div>
                   <div className="space-y-2">
@@ -423,7 +429,7 @@ export default function ClubOnboarding() {
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="Manchester"
-                      required
+                      className="rounded-xl border-border/40"
                     />
                   </div>
                 </div>
@@ -435,6 +441,7 @@ export default function ClubOnboarding() {
                     value={stadiumName}
                     onChange={(e) => setStadiumName(e.target.value)}
                     placeholder="Old Trafford"
+                    className="rounded-xl border-border/40"
                   />
                 </div>
 
@@ -446,12 +453,13 @@ export default function ClubOnboarding() {
                       id="primaryColor"
                       value={primaryColor}
                       onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-12 h-10 rounded border cursor-pointer"
+                      className="w-12 h-10 rounded-xl border border-border/40 cursor-pointer"
                     />
                     <Input
                       value={primaryColor}
                       onChange={(e) => setPrimaryColor(e.target.value)}
                       placeholder="#1a7a4c"
+                      className="rounded-xl border-border/40"
                     />
                   </div>
                 </div>
@@ -459,7 +467,7 @@ export default function ClubOnboarding() {
                 <Button
                   onClick={handleCreateClub}
                   disabled={!clubName || !country || !city || isSubmitting || isUploadingLogo || !profile}
-                  className="w-full gradient-stadium"
+                  className="w-full rounded-xl"
                 >
                   {isSubmitting || isUploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {isUploadingLogo ? "Uploading Logo..." : "Continue to Program Setup"}
@@ -471,9 +479,9 @@ export default function ClubOnboarding() {
 
           {/* Step 2: Program Setup */}
           {step === "program" && (
-            <Card>
+            <Card className="rounded-3xl border-border/40">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 font-display">
                   <Shield className="h-5 w-5 text-primary" />
                   Loyalty Program
                 </CardTitle>
@@ -487,7 +495,7 @@ export default function ClubOnboarding() {
                     value={programName}
                     onChange={(e) => setProgramName(e.target.value)}
                     placeholder="Red Devils Rewards"
-                    required
+                    className="rounded-xl border-border/40"
                   />
                 </div>
 
@@ -499,6 +507,7 @@ export default function ClubOnboarding() {
                     onChange={(e) => setProgramDescription(e.target.value)}
                     placeholder="Earn points by supporting your team!"
                     rows={3}
+                    className="rounded-xl border-border/40"
                   />
                 </div>
 
@@ -509,6 +518,7 @@ export default function ClubOnboarding() {
                     value={pointsCurrencyName}
                     onChange={(e) => setPointsCurrencyName(e.target.value)}
                     placeholder="Points, Stars, Coins..."
+                    className="rounded-xl border-border/40"
                   />
                   <p className="text-sm text-muted-foreground">Example: "You earned 100 {pointsCurrencyName}!"</p>
                 </div>
@@ -516,7 +526,7 @@ export default function ClubOnboarding() {
                 <Button
                   onClick={handleCreateProgram}
                   disabled={!programName || isSubmitting}
-                  className="w-full gradient-stadium"
+                  className="w-full rounded-xl"
                 >
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Continue to Verification
@@ -528,17 +538,17 @@ export default function ClubOnboarding() {
 
           {/* Step 3: Verification */}
           {step === "verification" && (
-            <Card>
+            <Card className="rounded-3xl border-border/40">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 font-display">
                   <CheckCircle className="h-5 w-5 text-primary" />
                   Club Verification
                 </CardTitle>
                 <CardDescription>Provide at least 2 of 3 requirements to become verified</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
-                  <p className="text-sm text-warning-foreground">
+                <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20">
+                  <p className="text-sm text-muted-foreground">
                     <strong>Why verify?</strong> Only verified clubs can publish programs, appear in search, issue QR
                     codes, and allow fans to earn points.
                   </p>
@@ -551,6 +561,7 @@ export default function ClubOnboarding() {
                     value={officialEmailDomain}
                     onChange={(e) => setOfficialEmailDomain(e.target.value)}
                     placeholder="example.club.com"
+                    className="rounded-xl border-border/40"
                   />
                   <p className="text-sm text-muted-foreground">
                     No Gmail, Yahoo, Outlook, etc. Use your club's official domain.
@@ -564,6 +575,7 @@ export default function ClubOnboarding() {
                     value={publicLink}
                     onChange={(e) => setPublicLink(e.target.value)}
                     placeholder="https://www.yourclub.com"
+                    className="rounded-xl border-border/40"
                   />
                   <p className="text-sm text-muted-foreground">Official website or verified social media page.</p>
                 </div>
@@ -586,13 +598,13 @@ export default function ClubOnboarding() {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={handleSkipVerification} className="flex-1">
+                  <Button variant="outline" onClick={handleSkipVerification} className="flex-1 rounded-xl border-border/40">
                     Skip for Now
                   </Button>
                   <Button
                     onClick={handleSubmitVerification}
                     disabled={isSubmitting}
-                    className="flex-1 gradient-stadium"
+                    className="flex-1 rounded-xl"
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Submit Verification
