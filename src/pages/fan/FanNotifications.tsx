@@ -124,6 +124,8 @@ export default function FanNotifications() {
     setDataLoading(true);
 
     try {
+      console.log("AUTH USER ID:", user?.id);
+      console.log("PROFILE ID:", profile?.id);
       const { data: rows, error } = await supabase
         .from("notifications")
         .select("*")
