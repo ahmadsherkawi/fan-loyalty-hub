@@ -129,6 +129,7 @@ export default function FanNotifications() {
       const { data: rows, error } = await supabase
         .from("notifications")
         .select("*")
+      console.log("ALL NOTIFICATIONS FROM FRONTEND:", rows);
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
 
