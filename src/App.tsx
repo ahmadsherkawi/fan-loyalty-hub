@@ -24,7 +24,7 @@ import ClaimReview from "./pages/club/ClaimReview";
 import ClubAnalytics from "./pages/club/ClubAnalytics";
 import ClubSeasons from "./pages/club/ClubSeasons";
 import TierManagement from "./pages/club/TierManagement";
-import TierManagement from "./pages/club/FanNotifications";
+import FanNotifications from "./pages/club/FanNotifications";
 
 // Fan pages
 import FanHome from "./pages/fan/FanHome";
