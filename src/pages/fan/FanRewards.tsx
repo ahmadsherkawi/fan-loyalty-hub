@@ -73,19 +73,12 @@ export default function FanRewards() {
       setMembership(m);
 
       /* ---------- Program ---------- */
-      const { data: programData } = await supabase
-        .from("loyalty_programs")
-        .select("*")
-        .eq("id", m.program_id)
-        .single();
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
 
       setProgram(programData as LoyaltyProgram);
 
       /* ---------- Rewards ---------- */
-      const { data: rewardsData } = await supabase
-        .from("rewards")
-        .select("*")
-        .eq("program_id", m.program_id);
+      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
 
       setRewards((rewardsData ?? []) as Reward[]);
 
@@ -99,7 +92,7 @@ export default function FanRewards() {
             name,
             description
           )
-        `
+        `,
         )
         .eq("fan_id", profile.id)
         .order("redeemed_at", { ascending: false });
@@ -293,9 +286,7 @@ export default function FanRewards() {
                   <CardContent className="py-4 flex justify-between">
                     <div>
                       <p className="font-semibold">{r.rewards?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(r.redeemed_at).toLocaleDateString()}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
                     <Badge>-{r.points_spent}</Badge>
                   </CardContent>
@@ -311,7 +302,7 @@ export default function FanRewards() {
         isOpen={redemptionModalOpen}
         onClose={() => setRedemptionModalOpen(false)}
         reward={selectedReward}
-        discountPercent={discountPercent}   {/* ⭐ NEW */}
+        discountPercent={discountPercent}
         pointsBalance={balance}
         pointsCurrency={currency}
         onConfirmRedeem={handleConfirmRedeem}
