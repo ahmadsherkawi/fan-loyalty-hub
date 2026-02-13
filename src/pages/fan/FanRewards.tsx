@@ -73,12 +73,19 @@ export default function FanRewards() {
       setMembership(m);
 
       /* ---------- Program ---------- */
-      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      const { data: programData } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .single();
 
       setProgram(programData as LoyaltyProgram);
 
       /* ---------- Rewards ---------- */
-      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
+      const { data: rewardsData } = await supabase
+        .from("rewards")
+        .select("*")
+        .eq("program_id", m.program_id);
 
       setRewards((rewardsData ?? []) as Reward[]);
 
@@ -92,16 +99,14 @@ export default function FanRewards() {
             name,
             description
           )
-        `,
+        `
         )
         .eq("fan_id", profile.id)
         .order("redeemed_at", { ascending: false });
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /* ---------- 🔥 REAL TIER-BASED DISCOUNT ---------- */
-
-      // 1️⃣ get membership tier
+      /* ---------- Tier Discount ---------- */
       const { data: tierState } = await supabase
         .from("membership_tier_state")
         .select("tier_id")
@@ -110,7 +115,6 @@ export default function FanRewards() {
 
       let discount = 0;
 
-      // 2️⃣ get discount for THAT tier only
       if (tierState?.tier_id) {
         const { data: benefitData } = await supabase
           .from("tier_benefits")
@@ -136,11 +140,7 @@ export default function FanRewards() {
   };
 
   /* ================= REDEEM ================= */
-  const handleConfirmRedeem = async (): Promise<{
-    success: boolean;
-    code?: string | null;
-    error?: string;
-  }> => {
+  const handleConfirmRedeem = async () => {
     if (!membership || !selectedReward) {
       return { success: false, error: "Missing required data" };
     }
@@ -199,7 +199,6 @@ export default function FanRewards() {
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container py-4 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/fan/home")}>
@@ -243,12 +242,10 @@ export default function FanRewards() {
           <TabsContent value="available">
             <div className="grid md:grid-cols-3 gap-6 mt-6">
               {rewards.map((reward) => {
-                const discountedCost =
-                  discountPercent > 0
-                    ? Math.round(reward.points_cost * (1 - discountPercent / 100))
-                    : reward.points_cost;
-
-                const canAfford = balance >= discountedCost;
+                const originalCost = reward.points_cost;
+                const discountAmount = Math.round(originalCost * (discountPercent / 100));
+                const finalCost = originalCost - discountAmount;
+                const canAfford = balance >= finalCost;
 
                 return (
                   <Card key={reward.id}>
@@ -256,26 +253,26 @@ export default function FanRewards() {
                       <h3 className="font-semibold">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
-                      {/* original price */}
                       {discountPercent > 0 && (
-                        <p className="text-xs line-through text-muted-foreground mt-2">
-                          {reward.points_cost} {currency}
-                        </p>
+                        <>
+                          <p className="text-xs line-through text-muted-foreground mt-2">
+                            {originalCost} {currency}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            -{discountAmount} {currency} ({discountPercent}% off)
+                          </p>
+                        </>
                       )}
 
-                      {/* discounted price */}
                       <Badge className="mt-2">
-                        Cost: {discountedCost} {currency}
+                        Cost: {finalCost} {currency}
                       </Badge>
 
                       <Button
                         className="mt-4 w-full"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
-                          setSelectedReward({
-                            ...reward,
-                            points_cost: discountedCost,
-                          });
+                          setSelectedReward(reward); // KEEP ORIGINAL
                           setRedemptionModalOpen(true);
                         }}
                       >
@@ -296,7 +293,9 @@ export default function FanRewards() {
                   <CardContent className="py-4 flex justify-between">
                     <div>
                       <p className="font-semibold">{r.rewards?.name}</p>
-                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(r.redeemed_at).toLocaleDateString()}
+                      </p>
                     </div>
                     <Badge>-{r.points_spent}</Badge>
                   </CardContent>
@@ -312,6 +311,7 @@ export default function FanRewards() {
         isOpen={redemptionModalOpen}
         onClose={() => setRedemptionModalOpen(false)}
         reward={selectedReward}
+        discountPercent={discountPercent}   {/* ⭐ NEW */}
         pointsBalance={balance}
         pointsCurrency={currency}
         onConfirmRedeem={handleConfirmRedeem}
