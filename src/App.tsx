@@ -62,7 +62,7 @@ const App = () => {
                 <Route path="/club/claims" element={<ClaimReview />} />
                 <Route path="/club/analytics" element={<ClubAnalytics />} />
                 <Route path="/club/seasons" element={<ClubSeasons />} />
-                <Route path="/club/seasons" element={<FanNotifications />} />
+                <Route path="/club/notification" element={<FanNotifications />} />
 
                 {/* ✅ TIER MANAGEMENT — KEEP THIS EXACT PATH */}
                 <Route path="/club/tiers" element={<TierManagement />} />
