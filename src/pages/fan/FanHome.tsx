@@ -48,7 +48,7 @@ export default function FanHome() {
   const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
+  const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance ?? 0;
 
   /* ================= AUTH ================= */
   useEffect(() => {
@@ -75,11 +75,11 @@ export default function FanHome() {
     setDataLoading(true);
 
     try {
-      const { data: memberships } = await supabase
-        .from("fan_memberships")
-        .select("*")
-        .eq("fan_id", profile.id)
-        .limit(1);
+      const { data: memberships } = await supabase.
+      from("fan_memberships").
+      select("*").
+      eq("fan_id", profile.id).
+      limit(1);
 
       if (!memberships?.length) {
         navigate("/fan/join");
@@ -91,13 +91,13 @@ export default function FanHome() {
 
       /* 🔹 REAL BACKEND MULTIPLIER */
       const { data: multData } = await supabase.rpc("get_membership_multiplier", {
-        p_membership_id: m.id,
+        p_membership_id: m.id
       });
       setMultiplier(Number(multData ?? 1));
 
       /* 🔹 REAL BACKEND DISCOUNT */
       const { data: discountData } = await supabase.rpc("get_membership_discount", {
-        p_membership_id: m.id,
+        p_membership_id: m.id
       });
       setDiscountPercent(Number(discountData ?? 0));
 
@@ -113,19 +113,19 @@ export default function FanHome() {
       const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
       setRewards((rews ?? []) as Reward[]);
 
-      const { data: tiersData } = await supabase
-        .from("tiers")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .order("rank", { ascending: true });
+      const { data: tiersData } = await supabase.
+      from("tiers").
+      select("*").
+      eq("program_id", m.program_id).
+      order("rank", { ascending: true });
 
       const tierList = (tiersData ?? []) as Tier[];
       setTiers(tierList);
 
-      const { data: completions } = await supabase
-        .from("activity_completions")
-        .select("points_earned")
-        .eq("fan_id", profile.id);
+      const { data: completions } = await supabase.
+      from("activity_completions").
+      select("points_earned").
+      eq("fan_id", profile.id);
 
       const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
       setEarnedPoints(totalEarned);
@@ -148,11 +148,11 @@ export default function FanHome() {
         setTierBenefits(benefits ?? []);
       }
 
-      const { count } = await supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-        .eq("is_read", false);
+      const { count } = await supabase.
+      from("notifications").
+      select("*", { count: "exact", head: true }).
+      eq("user_id", profile.id).
+      eq("is_read", false);
 
       setUnreadCount(count ?? 0);
     } finally {
@@ -169,15 +169,15 @@ export default function FanHome() {
     return (
       <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>);
+
   }
 
   const progress =
-    currentTier && nextTier
-      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
-        100
-      : 100;
+  currentTier && nextTier ?
+  (earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold) *
+  100 :
+  100;
 
   return (
     <div className="min-h-screen gradient-hero text-foreground">
@@ -186,17 +186,17 @@ export default function FanHome() {
       {/* TOP BAR */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex justify-between items-center">
+        <div className="relative container py-4 flex justify-between items-center bg-primary-foreground">
           <Logo size="sm" />
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="relative rounded-full text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] flex items-center justify-center text-destructive-foreground">
+              {unreadCount > 0 &&
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] flex items-center justify-center text-destructive-foreground">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
-              )}
+              }
             </Button>
 
             <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")} className="rounded-full text-muted-foreground hover:text-foreground">
@@ -214,7 +214,7 @@ export default function FanHome() {
       {/* HERO */}
       <section className="relative py-16 overflow-hidden">
         <div className="absolute inset-0 stadium-pattern" />
-        <div className="absolute inset-0 pitch-lines" />
+        <div className="absolute inset-0 pitch-lines bg-blue-900" />
         <div className="relative container text-center">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground">{club?.name}</h1>
           <p className="text-muted-foreground mt-2 font-body">{program?.name}</p>
@@ -226,43 +226,43 @@ export default function FanHome() {
               <span className="text-muted-foreground">{program?.points_currency_name ?? "Points"}</span>
             </div>
 
-            {currentTier && (
-              <div className="relative inline-block group mt-4">
+            {currentTier &&
+            <div className="relative inline-block group mt-4">
                 <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full">
                   <Star className="h-3 w-3 mr-1" />
                   {currentTier.name}
                 </Badge>
 
-                {(multiplier > 1 || discountPercent > 0) && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50">
+                {(multiplier > 1 || discountPercent > 0) &&
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50">
                     {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
                     {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
                   </div>
-                )}
+              }
 
-                {nextTier && (
-                  <>
+                {nextTier &&
+              <>
                     <Progress value={progress} className="h-2 bg-muted/20 mt-3" />
                     <p className="text-xs text-muted-foreground mt-1">
                       {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
                     </p>
                   </>
-                )}
+              }
               </div>
-            )}
+            }
           </div>
         </div>
       </section>
 
       {/* CONTENT */}
-      <main className="container py-10 space-y-12">
+      <main className="container py-10 space-y-12 bg-secondary">
         {/* ACTIVITIES */}
         <section>
           <SectionHeader
             title="Activities"
             icon={<Zap className="h-4 w-4 text-primary" />}
-            onClick={() => navigate("/fan/activities")}
-          />
+            onClick={() => navigate("/fan/activities")} />
+
 
           <div className="space-y-3">
             {activities.map((a) => {
@@ -273,9 +273,9 @@ export default function FanHome() {
                   key={a.id}
                   title={a.name}
                   badge={multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
-                  onClick={() => navigate("/fan/activities")}
-                />
-              );
+                  onClick={() => navigate("/fan/activities")} />);
+
+
             })}
           </div>
         </section>
@@ -285,8 +285,8 @@ export default function FanHome() {
           <SectionHeader
             title="Rewards"
             icon={<Gift className="h-4 w-4 text-accent" />}
-            onClick={() => navigate("/fan/rewards")}
-          />
+            onClick={() => navigate("/fan/rewards")} />
+
 
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
@@ -298,9 +298,9 @@ export default function FanHome() {
                   <CardContent className="pt-6">
                     <h3 className="font-display font-bold">{r.name}</h3>
 
-                    {discountPercent > 0 && (
-                      <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
-                    )}
+                    {discountPercent > 0 &&
+                    <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
+                    }
 
                     <Badge className="mt-2 rounded-full bg-accent/20 text-accent border-accent/30">{discounted} pts</Badge>
 
@@ -309,19 +309,19 @@ export default function FanHome() {
                     <Button
                       disabled={!canAfford}
                       className="mt-4 w-full rounded-xl gradient-golden font-semibold"
-                      onClick={() => navigate("/fan/rewards")}
-                    >
+                      onClick={() => navigate("/fan/rewards")}>
+
                       Redeem
                     </Button>
                   </CardContent>
-                </Card>
-              );
+                </Card>);
+
             })}
           </div>
         </section>
       </main>
-    </div>
-  );
+    </div>);
+
 }
 
 /* ---------- reusable ---------- */
@@ -337,8 +337,8 @@ function SectionHeader({ title, icon, onClick }: any) {
       <Button variant="ghost" size="sm" onClick={onClick} className="rounded-full text-muted-foreground hover:text-foreground">
         View all <ChevronRight className="h-4 w-4 ml-1" />
       </Button>
-    </div>
-  );
+    </div>);
+
 }
 
 function InfoCard({ title, badge, onClick }: any) {
@@ -356,6 +356,6 @@ function InfoCard({ title, badge, onClick }: any) {
           Participate
         </Button>
       </CardContent>
-    </Card>
-  );
+    </Card>);
+
 }
