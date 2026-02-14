@@ -10,7 +10,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Gift, Loader2, Trophy, Percent } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut } from "lucide-react";
 
 import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
@@ -24,7 +24,7 @@ interface RedemptionWithReward extends RewardRedemption {
 export default function FanRewards() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, loading } = useAuth();
+  const { profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
@@ -85,15 +85,7 @@ export default function FanRewards() {
       /* ---------- Redemption history ---------- */
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
-        .select(
-          `
-          *,
-          rewards (
-            name,
-            description
-          )
-        `,
-        )
+        .select(`*, rewards (name, description)`)
         .eq("fan_id", profile.id)
         .order("redeemed_at", { ascending: false });
 
@@ -162,10 +154,15 @@ export default function FanRewards() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   /* ================= LOADING ================= */
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -176,47 +173,59 @@ export default function FanRewards() {
 
   /* ================= UI ================= */
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen gradient-hero text-foreground">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate("/fan/home")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
-          <Logo />
         </div>
       </header>
 
-      <main className="container py-8">
-        {/* TITLE + BALANCE */}
-        <div className="flex justify-between mb-6">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Gift className="h-8 w-8 text-accent" />
-            Rewards
-          </h1>
+      {/* HERO */}
+      <section className="relative py-10 overflow-hidden">
+        <div className="absolute inset-0 stadium-pattern" />
+        <div className="relative container">
+          <div className="flex justify-between items-center mb-2">
+            <h1 className="text-3xl md:text-4xl font-display font-bold flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl gradient-golden flex items-center justify-center shadow-golden">
+                <Gift className="h-6 w-6 text-accent-foreground" />
+              </div>
+              Rewards
+            </h1>
 
-          <div className="flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
-            <Trophy className="h-5 w-5 text-primary" />
-            <span className="font-bold">{balance}</span>
-            <span className="text-muted-foreground">{currency}</span>
+            <div className="flex items-center gap-2 glass-dark rounded-full px-5 py-2.5">
+              <Trophy className="h-5 w-5 text-accent" />
+              <span className="font-display font-bold text-accent">{balance}</span>
+              <span className="text-muted-foreground">{currency}</span>
+            </div>
           </div>
+
+          {discountPercent > 0 && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-primary font-semibold">
+              <Percent className="h-4 w-4" />
+              {discountPercent}% tier discount applied
+            </div>
+          )}
         </div>
+      </section>
 
-        {/* DISCOUNT BANNER */}
-        {discountPercent > 0 && (
-          <div className="mb-6 flex items-center gap-2 text-sm text-green-600 font-semibold">
-            <Percent className="h-4 w-4" />
-            {discountPercent}% tier discount applied
-          </div>
-        )}
-
+      <main className="container pb-10">
         <Tabs defaultValue="available">
-          <TabsList className="grid grid-cols-2 max-w-md">
-            <TabsTrigger value="available">Available</TabsTrigger>
-            <TabsTrigger value="history">My Redemptions</TabsTrigger>
+          <TabsList className="grid grid-cols-2 max-w-md rounded-full h-11 bg-card/50 backdrop-blur-sm border border-border/30">
+            <TabsTrigger value="available" className="rounded-full">Available</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-full">My Redemptions</TabsTrigger>
           </TabsList>
 
           {/* AVAILABLE */}
@@ -229,9 +238,9 @@ export default function FanRewards() {
                 const canAfford = balance >= finalCost;
 
                 return (
-                  <Card key={reward.id}>
+                  <Card key={reward.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
                     <CardContent className="pt-6">
-                      <h3 className="font-semibold">{reward.name}</h3>
+                      <h3 className="font-display font-semibold text-foreground">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
                       {discountPercent > 0 && (
@@ -239,18 +248,18 @@ export default function FanRewards() {
                           <p className="text-xs line-through text-muted-foreground mt-2">
                             {originalCost} {currency}
                           </p>
-                          <p className="text-xs text-green-600">
+                          <p className="text-xs text-primary">
                             -{discountAmount} {currency} ({discountPercent}% off)
                           </p>
                         </>
                       )}
 
-                      <Badge className="mt-2">
+                      <Badge className="mt-2 rounded-full bg-accent/20 text-accent border-accent/30">
                         Cost: {finalCost} {currency}
                       </Badge>
 
                       <Button
-                        className="mt-4 w-full"
+                        className="mt-4 w-full rounded-xl gradient-golden font-semibold"
                         disabled={!canAfford || redeeming}
                         onClick={() => {
                           setSelectedReward(reward);
@@ -270,13 +279,13 @@ export default function FanRewards() {
           <TabsContent value="history">
             <div className="space-y-4 mt-6">
               {redemptions.map((r) => (
-                <Card key={r.id}>
+                <Card key={r.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
                   <CardContent className="py-4 flex justify-between">
                     <div>
-                      <p className="font-semibold">{r.rewards?.name}</p>
+                      <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
                       <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
-                    <Badge>-{r.points_spent}</Badge>
+                    <Badge className="rounded-full bg-destructive/20 text-destructive border-destructive/30">-{r.points_spent}</Badge>
                   </CardContent>
                 </Card>
               ))}

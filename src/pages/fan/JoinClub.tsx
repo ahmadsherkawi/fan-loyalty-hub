@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Logo } from "@/components/ui/Logo";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, LogOut } from "lucide-react";
 import { Club, LoyaltyProgram } from "@/types/database";
 
 interface ClubWithProgram extends Club {
@@ -21,7 +21,7 @@ interface ClubWithProgram extends Club {
 export default function JoinClub() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, loading } = useAuth();
+  const { profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
@@ -32,11 +32,9 @@ export default function JoinClub() {
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<ClubWithProgram | null>(null);
 
-  // Search/filter
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
 
-  // Invite-club state
   const [requestClubName, setRequestClubName] = useState("");
   const [requestCountry, setRequestCountry] = useState("");
   const [requestContact, setRequestContact] = useState("");
@@ -105,7 +103,7 @@ export default function JoinClub() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/", { replace: true });
   };
 
@@ -155,7 +153,6 @@ export default function JoinClub() {
     }
   };
 
-  // SEARCH + FILTER
   const countries = Array.from(new Set(clubs.map((c) => c.country).filter(Boolean))).sort();
 
   const filteredClubs = clubs.filter((c) => {
@@ -168,7 +165,6 @@ export default function JoinClub() {
     return matchSearch && matchCountry;
   });
 
-  // INVITE CLUB
   const handleSendJoinRequest = async () => {
     if (!profile || !requestClubName.trim()) return;
 
@@ -205,32 +201,43 @@ export default function JoinClub() {
 
   if (loading || dataLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="absolute top-4 right-4">
-        <Button variant="secondary" onClick={handleSignOut}>
-          Sign out
-        </Button>
-      </div>
-
-      <header className="py-16 gradient-stadium text-center">
-        <Logo size="lg" className="justify-center" />
-        <h1 className="text-3xl font-bold text-primary-foreground mt-6">Choose Your Club</h1>
+    <div className="min-h-screen gradient-hero text-foreground">
+      {/* HEADER */}
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="absolute inset-0 stadium-pattern" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <Logo size="sm" />
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          </Button>
+        </div>
       </header>
+
+      {/* HERO */}
+      <section className="relative py-16 overflow-hidden text-center">
+        <div className="absolute inset-0 pitch-lines" />
+        <div className="relative">
+          <Logo size="lg" className="justify-center" />
+          <h1 className="text-4xl md:text-5xl font-display font-bold mt-6 text-foreground">Choose Your Club</h1>
+          <p className="text-muted-foreground mt-2">Join a loyalty program and start earning rewards</p>
+        </div>
+      </section>
 
       <main className="container py-8 space-y-6">
         {/* SEARCH + FILTER */}
         <div className="grid md:grid-cols-3 gap-4">
-          <Input placeholder="Search club or city..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Search club or city..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/30" />
 
           <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger>
+            <SelectTrigger className="h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/30">
               <SelectValue placeholder="Filter by country" />
             </SelectTrigger>
             <SelectContent>
@@ -246,21 +253,24 @@ export default function JoinClub() {
 
         {/* CLUB GRID */}
         {filteredClubs.length === 0 ? (
-          <Card>
+          <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
             <CardContent className="py-12 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">No clubs found</h3>
+              <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/20 flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-display font-semibold text-foreground">No clubs found</h3>
             </CardContent>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredClubs.map((club) => (
-              <Card key={club.id} className="card-hover">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg">{club.name}</h3>
+              <Card key={club.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
+                <CardContent className="p-6">
+                  <h3 className="font-display font-semibold text-lg text-foreground">{club.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{club.city}, {club.country}</p>
 
                   <Button
-                    className="w-full mt-4"
+                    className="w-full mt-4 rounded-xl gradient-stadium font-semibold shadow-stadium"
                     onClick={() => handleJoinClick(club)}
                     disabled={!club.loyalty_programs?.length || joining === club.id}
                   >
@@ -274,27 +284,31 @@ export default function JoinClub() {
         )}
 
         {/* INVITE CLUB */}
-        <Card>
+        <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-6 space-y-3">
-            <h3 className="font-semibold text-lg">Can’t find your club?</h3>
+            <h3 className="font-display font-semibold text-lg text-foreground">Can't find your club?</h3>
+            <p className="text-sm text-muted-foreground">Let us know and we'll reach out to them</p>
 
             <Input
               placeholder="Club name"
               value={requestClubName}
               onChange={(e) => setRequestClubName(e.target.value)}
+              className="h-12 rounded-xl bg-card/50 border-border/30"
             />
             <Input
               placeholder="Country (optional)"
               value={requestCountry}
               onChange={(e) => setRequestCountry(e.target.value)}
+              className="h-12 rounded-xl bg-card/50 border-border/30"
             />
             <Input
               placeholder="Club email or website (optional)"
               value={requestContact}
               onChange={(e) => setRequestContact(e.target.value)}
+              className="h-12 rounded-xl bg-card/50 border-border/30"
             />
 
-            <Button className="w-full" onClick={handleSendJoinRequest} disabled={requestSending}>
+            <Button className="w-full rounded-xl gradient-golden font-semibold" onClick={handleSendJoinRequest} disabled={requestSending}>
               {requestSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Send request
             </Button>

@@ -167,7 +167,7 @@ export default function FanHome() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -180,76 +180,77 @@ export default function FanHome() {
       : 100;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen gradient-hero text-foreground">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* TOP BAR */}
-      <header className="border-b bg-card">
-        <div className="container py-4 flex justify-between items-center">
-          <Logo />
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-4 flex justify-between items-center">
+          <Logo size="sm" />
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="relative">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="relative rounded-full text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[9px] flex items-center justify-center text-white">
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] flex items-center justify-center text-destructive-foreground">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")} className="rounded-full text-muted-foreground hover:text-foreground">
               <User className="h-5 w-5" />
             </Button>
 
-            <Button variant="ghost" onClick={handleSignOut}>
+            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              Sign out
             </Button>
           </div>
         </div>
       </header>
 
       {/* HERO */}
-      <section
-        className="text-white text-center py-12"
-        style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}
-      >
-        <h1 className="text-3xl font-bold">{club?.name}</h1>
-        <p className="text-white/70">{program?.name}</p>
+      <section className="relative py-16 overflow-hidden">
+        <div className="absolute inset-0 stadium-pattern" />
+        <div className="absolute inset-0 pitch-lines" />
+        <div className="relative container text-center">
+          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground">{club?.name}</h1>
+          <p className="text-muted-foreground mt-2 font-body">{program?.name}</p>
 
-        <div className="mt-6 inline-block bg-white/10 backdrop-blur-xl px-10 py-6 rounded-3xl relative">
-          <div className="flex items-center justify-center gap-3">
-            <Trophy className="h-7 w-7 text-accent" />
-            <span className="text-5xl font-bold">{effectivePointsBalance}</span>
-            <span className="text-white/60">{program?.points_currency_name ?? "Points"}</span>
-          </div>
-
-          {/* TIER HOVER */}
-          {currentTier && (
-            <div className="relative inline-block group mt-3">
-              <Badge className="bg-white/20 text-white border-white/30 rounded-full">
-                <Star className="h-3 w-3 mr-1" />
-                {currentTier.name}
-              </Badge>
-
-              {(multiplier > 1 || discountPercent > 0) && (
-                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl bg-black text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50 shadow-lg">
-                  {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
-                  {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
-                </div>
-              )}
-
-              {nextTier && (
-                <>
-                  <Progress value={progress} className="h-2 bg-white/20 mt-3" />
-                  <p className="text-xs text-white/70 mt-1">
-                    {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
-                  </p>
-                </>
-              )}
+          <div className="mt-8 inline-block glass-dark px-10 py-8 rounded-3xl shadow-stadium">
+            <div className="flex items-center justify-center gap-3">
+              <Trophy className="h-7 w-7 text-accent animate-float" />
+              <span className="text-5xl font-display font-bold text-gradient-accent">{effectivePointsBalance}</span>
+              <span className="text-muted-foreground">{program?.points_currency_name ?? "Points"}</span>
             </div>
-          )}
+
+            {currentTier && (
+              <div className="relative inline-block group mt-4">
+                <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full">
+                  <Star className="h-3 w-3 mr-1" />
+                  {currentTier.name}
+                </Badge>
+
+                {(multiplier > 1 || discountPercent > 0) && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50">
+                    {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
+                    {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
+                  </div>
+                )}
+
+                {nextTier && (
+                  <>
+                    <Progress value={progress} className="h-2 bg-muted/20 mt-3" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -293,21 +294,21 @@ export default function FanHome() {
               const canAfford = effectivePointsBalance >= discounted;
 
               return (
-                <Card key={r.id} className="rounded-2xl border-border/50">
+                <Card key={r.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
                   <CardContent className="pt-6">
-                    <h3 className="font-bold">{r.name}</h3>
+                    <h3 className="font-display font-bold">{r.name}</h3>
 
                     {discountPercent > 0 && (
                       <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
                     )}
 
-                    <Badge className="mt-2 rounded-full">{discounted} pts</Badge>
+                    <Badge className="mt-2 rounded-full bg-accent/20 text-accent border-accent/30">{discounted} pts</Badge>
 
-                    {discountPercent > 0 && <p className="text-xs text-green-600 mt-1">−{discountPercent}% discount</p>}
+                    {discountPercent > 0 && <p className="text-xs text-primary mt-1">−{discountPercent}% discount</p>}
 
                     <Button
                       disabled={!canAfford}
-                      className="mt-4 w-full rounded-xl gradient-golden"
+                      className="mt-4 w-full rounded-xl gradient-golden font-semibold"
                       onClick={() => navigate("/fan/rewards")}
                     >
                       Redeem
@@ -328,12 +329,12 @@ export default function FanHome() {
 function SectionHeader({ title, icon, onClick }: any) {
   return (
     <div className="flex justify-between items-center mb-5">
-      <h2 className="text-xl font-bold flex items-center gap-2.5">
+      <h2 className="text-xl font-display font-bold flex items-center gap-2.5 text-foreground">
         <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">{icon}</div>
         {title}
       </h2>
 
-      <Button variant="ghost" size="sm" onClick={onClick} className="rounded-full">
+      <Button variant="ghost" size="sm" onClick={onClick} className="rounded-full text-muted-foreground hover:text-foreground">
         View all <ChevronRight className="h-4 w-4 ml-1" />
       </Button>
     </div>
@@ -342,16 +343,16 @@ function SectionHeader({ title, icon, onClick }: any) {
 
 function InfoCard({ title, badge, onClick }: any) {
   return (
-    <Card className="rounded-2xl border-border/50 hover:border-primary/20 transition-colors">
+    <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
       <CardContent className="py-4 flex justify-between items-center">
         <div>
-          <p className="font-semibold">{title}</p>
-          <Badge variant="secondary" className="mt-1 rounded-full">
+          <p className="font-semibold text-foreground">{title}</p>
+          <Badge variant="secondary" className="mt-1 rounded-full bg-primary/10 text-primary border-primary/20">
             {badge}
           </Badge>
         </div>
 
-        <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium">
+        <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium font-semibold">
           Participate
         </Button>
       </CardContent>

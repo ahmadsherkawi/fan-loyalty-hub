@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FanLeaderboard } from "@/components/ui/FanLeaderboard";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership } from "@/types/database";
 
 interface LeaderboardEntry {
@@ -20,7 +20,7 @@ interface LeaderboardEntry {
 export default function FanLeaderboardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { previewPointsBalance } = usePreviewMode();
 
   const isPreviewMode = searchParams.get("preview") === "fan";
@@ -98,7 +98,6 @@ export default function FanLeaderboardPage() {
     setDataLoading(true);
 
     try {
-      // membership
       const { data: memberships, error: mErr } = await (supabase as any)
         .from("fan_memberships")
         .select("*")
@@ -114,7 +113,6 @@ export default function FanLeaderboardPage() {
 
       const m = memberships[0] as FanMembership;
 
-      // club
       const { data: clubData, error: cErr } = await (supabase as any)
         .from("clubs")
         .select("*")
@@ -123,7 +121,6 @@ export default function FanLeaderboardPage() {
       if (cErr) throw cErr;
       setClub(clubData as Club);
 
-      // program
       const { data: programData, error: pErr } = await (supabase as any)
         .from("loyalty_programs")
         .select("*")
@@ -132,7 +129,6 @@ export default function FanLeaderboardPage() {
       if (pErr) throw pErr;
       setProgram(programData as LoyaltyProgram);
 
-      // leaderboard from view
       const { data: rows, error: lErr } = await (supabase as any)
         .from("club_leaderboard")
         .select("*")
@@ -157,30 +153,41 @@ export default function FanLeaderboardPage() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen gradient-hero text-foreground">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
-        <div className="container py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
-            className="text-primary-foreground hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
+              className="rounded-full text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
-          <Logo />
         </div>
       </header>
 

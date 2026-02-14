@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, BellOff, CheckCircle2, Gift, Trophy, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, BellOff, CheckCircle2, Gift, Trophy, Zap, LogOut } from "lucide-react";
 
 import type { Club, FanMembership } from "@/types/database";
 
@@ -25,7 +25,7 @@ interface NotificationRow {
 export default function FanNotifications() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
   const { previewPointsBalance } = usePreviewMode();
 
@@ -35,7 +35,6 @@ export default function FanNotifications() {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  /** ---------- SAFE unread counter ---------- */
   const unreadCount = notifications.filter((n) => n.is_read === false).length;
 
   /* ================= INIT ================= */
@@ -90,7 +89,7 @@ export default function FanNotifications() {
     if (profile) {
       fetchNotifications();
       fetchClub();
-      subscribeToRealtime(); // 🔥 Phase 1.2
+      subscribeToRealtime();
     }
   }, [loading, user, profile, isPreviewMode]);
 
@@ -107,9 +106,7 @@ export default function FanNotifications() {
 
       if (memberships?.length) {
         const m = memberships[0] as FanMembership;
-
         const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).limit(1);
-
         if (clubData?.length) setClub(clubData[0] as Club);
       }
     } catch {
@@ -127,14 +124,11 @@ export default function FanNotifications() {
       console.log("AUTH USER ID:", user.id);
       console.log("PROFILE ID:", profile?.id);
 
-      // 🔥 fetch ALL rows first (no filter)
       const { data: allRows, error: allError } = await supabase.from("notifications").select("*");
-
       console.log("ALL NOTIFICATIONS FROM FRONTEND:", allRows);
 
       if (allError) throw allError;
 
-      // 🔥 now fetch only this user's rows (correct filter)
       const { data: rows, error } = await supabase
         .from("notifications")
         .select("*")
@@ -176,9 +170,7 @@ export default function FanNotifications() {
         },
         (payload) => {
           const newNotif = payload.new as NotificationRow;
-
           setNotifications((prev) => [{ ...newNotif, is_read: newNotif.is_read === true }, ...prev]);
-
           toast({
             title: "New notification",
             description: "You received a new update.",
@@ -195,18 +187,14 @@ export default function FanNotifications() {
   /* ================= MARK SINGLE ================= */
   const markAsRead = async (notification: NotificationRow) => {
     if (notification.is_read) return;
-
     setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)));
-
     await supabase.from("notifications").update({ is_read: true }).eq("id", notification.id);
   };
 
   /* ================= MARK ALL ================= */
   const markAllAsRead = async () => {
     if (unreadCount === 0) return;
-
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-
     await supabase.from("notifications").update({ is_read: true }).eq("user_id", profile?.id).eq("is_read", false);
   };
 
@@ -226,10 +214,15 @@ export default function FanNotifications() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   /* ================= LOADING ================= */
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -237,33 +230,40 @@ export default function FanNotifications() {
 
   /* ================= UI ================= */
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen gradient-hero text-foreground">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
-      <header className="border-b" style={{ backgroundColor: club?.primary_color || "hsl(var(--primary))" }}>
-        <div className="container py-4 flex items-center justify-between">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="absolute inset-0 stadium-pattern" />
+
+        <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
-              className="text-primary-foreground hover:bg-white/10"
+              className="rounded-full text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <Logo />
+            <Logo size="sm" />
           </div>
-
-          {unreadCount > 0 && <Badge variant="destructive">{unreadCount}</Badge>}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && <Badge className="bg-destructive text-destructive-foreground rounded-full">{unreadCount}</Badge>}
+            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            </Button>
+          </div>
         </div>
 
-        <div className="container pb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary-foreground">Notifications</h1>
+        <div className="relative container pb-8 flex justify-between items-center">
+          <h1 className="text-3xl font-display font-bold text-foreground">Notifications</h1>
 
           {unreadCount > 0 && (
-            <Button size="sm" variant="secondary" onClick={markAllAsRead}>
+            <Button size="sm" onClick={markAllAsRead} className="rounded-full gradient-stadium font-semibold">
               Mark all as read
             </Button>
           )}
@@ -274,31 +274,33 @@ export default function FanNotifications() {
       <main className="container py-8 max-w-2xl mx-auto">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center py-20 text-center gap-4">
-            <BellOff className="h-10 w-10 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">No Notifications</h2>
-            <p className="text-sm text-muted-foreground">You’re all caught up.</p>
+            <div className="h-16 w-16 rounded-2xl bg-muted/20 flex items-center justify-center">
+              <BellOff className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-display font-semibold text-foreground">No Notifications</h2>
+            <p className="text-sm text-muted-foreground">You're all caught up.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {notifications.map((n) => (
               <Card
                 key={n.id}
-                className={`border-border/50 ${n.is_read ? "opacity-70" : ""}`}
+                className={`rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover cursor-pointer ${n.is_read ? "opacity-60" : ""}`}
                 onClick={() => markAsRead(n)}
               >
                 <CardContent className="py-4 flex justify-between items-center">
                   <div>
-                    <p className="font-medium flex items-center gap-2">
+                    <p className="font-semibold flex items-center gap-2 text-foreground">
                       {n.type === "points_earned" && <Trophy className="h-4 w-4 text-accent" />}
                       {n.type === "reward_redeemed" && <Gift className="h-4 w-4 text-accent" />}
-                      {n.type === "tier_upgraded" && <CheckCircle2 className="h-4 w-4 text-accent" />}
-                      {n.type === "new_activity" && <Zap className="h-4 w-4 text-accent" />}
+                      {n.type === "tier_upgraded" && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                      {n.type === "new_activity" && <Zap className="h-4 w-4 text-primary" />}
                       {getMessage(n)}
                     </p>
                     <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
                   </div>
 
-                  {!n.is_read && <Badge variant="destructive">New</Badge>}
+                  {!n.is_read && <Badge className="bg-destructive text-destructive-foreground rounded-full">New</Badge>}
                 </CardContent>
               </Card>
             ))}

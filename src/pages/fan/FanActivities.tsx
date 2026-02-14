@@ -13,7 +13,7 @@ import { QRScannerModal } from "@/components/ui/QRScannerModal";
 import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, LogOut } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type Activity = Database["public"]["Tables"]["activities"]["Row"];
@@ -25,7 +25,7 @@ type VerificationMethod = Database["public"]["Enums"]["verification_method"];
 export default function FanActivities() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, loading } = useAuth();
+  const { profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
   const { previewPointsBalance, addPreviewPoints, completedPreviewActivities, markActivityCompleted } =
@@ -63,7 +63,6 @@ export default function FanActivities() {
     setDataLoading(true);
 
     try {
-      // Membership
       const { data: memberships, error: mErr } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -80,7 +79,6 @@ export default function FanActivities() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      // ✅ FIX: fetch multiplier after we have membership id
       const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
         p_membership_id: m.id,
       });
@@ -90,7 +88,6 @@ export default function FanActivities() {
       const multValue = Number(multData ?? 1);
       setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
 
-      // Program
       const { data: prog, error: pErr } = await supabase
         .from("loyalty_programs")
         .select("*")
@@ -100,7 +97,6 @@ export default function FanActivities() {
       if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
-      // Activities
       const { data: acts, error: aErr } = await (supabase as any)
         .from("activities")
         .select("*")
@@ -110,7 +106,6 @@ export default function FanActivities() {
       if (aErr) throw aErr;
       setActivities((acts || []) as unknown as Activity[]);
 
-      // Completions
       const { data: comps, error: cErr } = await supabase
         .from("activity_completions")
         .select("*")
@@ -119,7 +114,6 @@ export default function FanActivities() {
       if (cErr) throw cErr;
       setCompletions((comps || []) as ActivityCompletion[]);
 
-      // Pending manual claims
       const { data: claims, error: clErr } = await supabase
         .from("manual_claims")
         .select("activity_id")
@@ -162,10 +156,9 @@ export default function FanActivities() {
 
   const hasPendingClaim = (activityId: string) => pendingClaims.includes(activityId);
 
-  // Single source of truth completion
   const completeViaRpc = async (activity: Activity) => {
     if (isPreviewMode) {
-      const previewMultiplier = 1; // preview simplicity
+      const previewMultiplier = 1;
       const previewFinal = Math.round(activity.points_awarded * previewMultiplier);
 
       addPreviewPoints(previewFinal);
@@ -180,14 +173,12 @@ export default function FanActivities() {
 
     if (!membership) return;
 
-    // ✅ FIX: capture RPC response data
     const { data, error } = await supabase.rpc("complete_activity", {
       p_membership_id: membership.id,
       p_activity_id: activity.id,
     });
     if (error) throw error;
 
-    // Fallback if RPC returns nothing
     const earned =
       data?.final_points != null
         ? Number(data.final_points)
@@ -207,15 +198,12 @@ export default function FanActivities() {
     await fetchData();
   };
 
-  // Decide what happens when user clicks an activity
   const handleStart = (activity: Activity) => {
-    // Guard: already done
     if (isCompleted(activity.id)) {
       toast({ title: "Already completed", description: "You have already completed this activity." });
       return;
     }
 
-    // Guard: manual proof already pending
     if (activity.verification_method === "manual_proof" && hasPendingClaim(activity.id)) {
       toast({
         title: "Pending review",
@@ -246,7 +234,6 @@ export default function FanActivities() {
       return;
     }
 
-    // Fallback
     completeViaRpc(activity).catch((err: any) => {
       toast({
         title: "Error",
@@ -256,11 +243,9 @@ export default function FanActivities() {
     });
   };
 
-  // Manual proof submit
   const handleSubmitProof = async (proofDescription: string, proofUrl: string | null) => {
     if (!selectedActivity) return;
 
-    // Validate basic input
     if (!proofDescription?.trim()) {
       toast({
         title: "Add a short description",
@@ -270,7 +255,6 @@ export default function FanActivities() {
       return;
     }
 
-    // Double guard: pending or completed
     if (hasPendingClaim(selectedActivity.id)) {
       toast({
         title: "Pending review",
@@ -337,7 +321,6 @@ export default function FanActivities() {
     }
   };
 
-  // QR success
   const handleQRSuccess = async () => {
     if (!selectedActivity) return;
 
@@ -357,7 +340,6 @@ export default function FanActivities() {
     }
   };
 
-  // Location success
   const handleLocationSuccess = async () => {
     if (!selectedActivity) return;
 
@@ -377,7 +359,6 @@ export default function FanActivities() {
     }
   };
 
-  // Poll/Quiz submit
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
     if (!selectedActivity) return;
 
@@ -402,6 +383,11 @@ export default function FanActivities() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   const icons: Record<VerificationMethod, React.ComponentType<{ className?: string }>> = {
     qr_scan: QrCode,
     location_checkin: MapPin,
@@ -411,40 +397,55 @@ export default function FanActivities() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen gradient-hero text-foreground">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      <header className="border-b bg-card">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+      {/* HEADER */}
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
-          <Logo />
         </div>
       </header>
 
-      <main className="container py-8">
-        <div className="flex justify-between mb-6">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary" />
-            Activities
-          </h1>
+      {/* HERO SECTION */}
+      <section className="relative py-10 overflow-hidden">
+        <div className="absolute inset-0 stadium-pattern" />
+        <div className="relative container">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl md:text-4xl font-display font-bold flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl gradient-stadium flex items-center justify-center shadow-stadium">
+                <Zap className="h-6 w-6 text-primary-foreground" />
+              </div>
+              Activities
+            </h1>
 
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            {effectivePointsBalance} {program?.points_currency_name || "Points"}
-          </Badge>
+            <Badge className="text-lg px-5 py-2.5 rounded-full glass-dark border-accent/30 text-accent font-display">
+              {effectivePointsBalance} {program?.points_currency_name || "Points"}
+            </Badge>
+          </div>
         </div>
+      </section>
 
+      <main className="container pb-10">
         {activities.length === 0 ? (
-          <Card>
+          <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
             <CardContent className="py-10 text-center">
               <p className="text-muted-foreground">No activities available yet.</p>
             </CardContent>
@@ -457,36 +458,34 @@ export default function FanActivities() {
               const pending = hasPendingClaim(activity.id);
 
               return (
-                <Card key={activity.id} className={completed ? "border-success/50 bg-success/5" : ""}>
-                  <CardContent className="py-4 flex justify-between items-center gap-4">
+                <Card key={activity.id} className={`rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover ${completed ? "border-l-4 border-l-primary opacity-75" : ""}`}>
+                  <CardContent className="py-5 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
                         <Icon className="h-5 w-5 text-primary" />
                       </div>
 
                       <div>
-                        <p className="font-semibold">{activity.name}</p>
-
-                        {/* ✅ show multiplied points + multiplier badge */}
+                        <p className="font-display font-semibold text-foreground">{activity.name}</p>
                         <p className="text-sm text-muted-foreground">
                           +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
                           {program?.points_currency_name || "Points"}
                           {multiplier > 1 && (
-                            <span className="ml-2 text-xs text-green-600 font-semibold">×{multiplier}</span>
+                            <span className="ml-2 text-xs text-primary font-semibold">×{multiplier}</span>
                           )}
                         </p>
                       </div>
                     </div>
 
                     {completed ? (
-                      <Badge className="bg-success text-success-foreground">
+                      <Badge className="bg-primary/20 text-primary border-primary/30 rounded-full">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Done
                       </Badge>
                     ) : pending ? (
-                      <Badge variant="outline">Pending</Badge>
+                      <Badge variant="outline" className="rounded-full border-accent/30 text-accent">Pending</Badge>
                     ) : (
-                      <Button onClick={() => handleStart(activity)}>Start</Button>
+                      <Button onClick={() => handleStart(activity)} className="rounded-full gradient-stadium font-semibold shadow-stadium">Start</Button>
                     )}
                   </CardContent>
                 </Card>

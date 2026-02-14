@@ -95,7 +95,7 @@ export default function AuthPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center gradient-hero">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -103,19 +103,21 @@ export default function AuthPage() {
 
   if (showConfirmationMessage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background relative">
-        <div className="absolute inset-0 gradient-mesh opacity-30" />
-        <Card className="w-full max-w-md text-center relative z-10 rounded-3xl border-border/50 shadow-lg">
+      <div className="min-h-screen flex items-center justify-center gradient-hero relative p-4">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="absolute inset-0 stadium-pattern" />
+        <Card className="w-full max-w-md text-center relative z-10 rounded-3xl border-border/30 bg-card/80 backdrop-blur-xl shadow-lg">
           <CardHeader className="pb-4">
-            <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+            <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 shadow-stadium">
               <CheckCircle2 className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="font-display text-2xl">Check your email</CardTitle>
-            <CardDescription className="text-base">We sent a verification link to {registeredEmail}</CardDescription>
+            <CardTitle className="font-display text-2xl text-foreground">Check your email</CardTitle>
+            <CardDescription className="text-base text-muted-foreground">We sent a verification link to {registeredEmail}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
               variant="link"
+              className="text-primary"
               onClick={() => {
                 setShowConfirmationMessage(false);
                 setActiveTab("signin");
@@ -131,25 +133,27 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative p-4">
-      <div className="absolute inset-0 gradient-mesh opacity-30" />
+    <div className="min-h-screen flex items-center justify-center gradient-hero relative p-4">
+      <div className="absolute inset-0 gradient-mesh opacity-40" />
+      <div className="absolute inset-0 stadium-pattern" />
+      <div className="absolute inset-0 pitch-lines" />
 
-      <Card className="w-full max-w-md relative z-10 rounded-3xl border-border/50 shadow-xl">
+      <Card className="w-full max-w-md relative z-10 rounded-3xl border-border/30 bg-card/80 backdrop-blur-xl shadow-xl">
         <CardHeader className="text-center pb-2">
           <Logo className="mx-auto mb-6" />
-          <CardTitle className="font-display text-2xl tracking-tight">
+          <CardTitle className="font-display text-2xl tracking-tight text-foreground">
             {activeTab === "signup" ? "Create your account" : "Welcome back"}
           </CardTitle>
-          <CardDescription className="text-base">
+          <CardDescription className="text-base text-muted-foreground">
             {activeTab === "signup" ? "Join the football loyalty revolution" : "Sign in to continue"}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="pt-2">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full h-11">
-              <TabsTrigger value="signup" className="rounded-full">Sign Up</TabsTrigger>
-              <TabsTrigger value="signin" className="rounded-full">Sign In</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full h-11 bg-muted/30 backdrop-blur-sm">
+              <TabsTrigger value="signup" className="rounded-full font-semibold">Sign Up</TabsTrigger>
+              <TabsTrigger value="signin" className="rounded-full font-semibold">Sign In</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signup">
@@ -159,21 +163,21 @@ export default function AuthPage() {
                   onValueChange={(v) => setSignUpRole(v as UserRole)}
                   className="grid grid-cols-2 gap-3"
                 >
-                  <Label className="flex items-center gap-2.5 border border-border/60 rounded-2xl p-4 cursor-pointer hover:border-primary/40 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <Label className="flex items-center gap-2.5 border border-border/40 rounded-2xl p-4 cursor-pointer hover:border-primary/40 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                     <RadioGroupItem value="fan" />
                     <Users className="h-4 w-4 text-primary" /> Fan
                   </Label>
-                  <Label className="flex items-center gap-2.5 border border-border/60 rounded-2xl p-4 cursor-pointer hover:border-accent/40 transition-colors has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+                  <Label className="flex items-center gap-2.5 border border-border/40 rounded-2xl p-4 cursor-pointer hover:border-accent/40 transition-colors has-[:checked]:border-accent has-[:checked]:bg-accent/5">
                     <RadioGroupItem value="club_admin" />
                     <Building2 className="h-4 w-4 text-accent" /> Club
                   </Label>
                 </RadioGroup>
 
-                <Input placeholder="Full Name" value={signUpName} onChange={(e) => setSignUpName(e.target.value)} className="h-12 rounded-xl" />
-                <Input type="email" placeholder="Email" value={signUpEmail} onChange={(e) => setSignUpEmail(e.target.value)} className="h-12 rounded-xl" />
-                <Input type="password" placeholder="Password" value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} className="h-12 rounded-xl" />
+                <Input placeholder="Full Name" value={signUpName} onChange={(e) => setSignUpName(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border/30" />
+                <Input type="email" placeholder="Email" value={signUpEmail} onChange={(e) => setSignUpEmail(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border/30" />
+                <Input type="password" placeholder="Password" value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border/30" />
 
-                <Button type="submit" className="w-full h-12 rounded-xl gradient-stadium font-semibold text-base" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12 rounded-xl gradient-stadium font-semibold text-base shadow-stadium" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create account
                 </Button>
@@ -182,10 +186,10 @@ export default function AuthPage() {
 
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
-                <Input type="email" placeholder="Email" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="h-12 rounded-xl" />
-                <Input type="password" placeholder="Password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="h-12 rounded-xl" />
+                <Input type="email" placeholder="Email" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border/30" />
+                <Input type="password" placeholder="Password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border/30" />
 
-                <Button type="submit" className="w-full h-12 rounded-xl gradient-stadium font-semibold text-base" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12 rounded-xl gradient-stadium font-semibold text-base shadow-stadium" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Sign in
                 </Button>
