@@ -234,7 +234,7 @@ export default function FanHome() {
                 </Badge>
 
                 {(multiplier > 1 || discountPercent > 0) &&
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50">
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50 bg-secondary">
                     {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
                     {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
                   </div>
