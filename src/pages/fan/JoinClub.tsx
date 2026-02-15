@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Logo } from "@/components/ui/Logo";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle, LogOut } from "lucide-react";
+import { Loader2, AlertCircle, LogOut, Sparkles } from "lucide-react";
 import { Club, LoyaltyProgram } from "@/types/database";
 
 interface ClubWithProgram extends Club {
@@ -201,18 +201,17 @@ export default function JoinClub() {
 
   if (loading || dataLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
+    <div className="min-h-screen bg-background">
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="absolute inset-0 stadium-pattern" />
         <div className="relative container py-4 flex items-center justify-between">
           <Logo size="sm" />
           <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
@@ -221,31 +220,40 @@ export default function JoinClub() {
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="relative py-16 overflow-hidden text-center">
-        <div className="absolute inset-0 pitch-lines" />
-        <div className="relative">
-          <Logo size="lg" className="justify-center" />
-          <h1 className="text-4xl md:text-5xl font-display font-bold mt-6 text-foreground">Choose Your Club</h1>
-          <p className="text-muted-foreground mt-2">Join a loyalty program and start earning rewards</p>
-        </div>
-      </section>
+      <main className="container py-10 space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
 
-      <main className="container py-8 space-y-6">
+          <div className="relative z-10 p-8 md:p-10 text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Get Started</span>
+            </div>
+            <Logo size="lg" className="justify-center" />
+            <h1 className="text-3xl md:text-4xl font-display font-bold mt-6 text-white tracking-tight">Choose Your Club</h1>
+            <p className="text-white/50 mt-2">Join a loyalty program and start earning rewards</p>
+          </div>
+        </div>
+
         {/* SEARCH + FILTER */}
         <div className="grid md:grid-cols-3 gap-4">
-          <Input placeholder="Search club or city..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/30" />
-
+          <Input
+            placeholder="Search club or city..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-12 rounded-xl bg-card border-border/40"
+          />
           <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger className="h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/30">
+            <SelectTrigger className="h-12 rounded-xl bg-card border-border/40">
               <SelectValue placeholder="Filter by country" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All countries</SelectItem>
               {countries.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
+                <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -253,7 +261,7 @@ export default function JoinClub() {
 
         {/* CLUB GRID */}
         {filteredClubs.length === 0 ? (
-          <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
+          <Card className="rounded-2xl border-border/40">
             <CardContent className="py-12 text-center">
               <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/20 flex items-center justify-center">
                 <AlertCircle className="h-8 w-8 text-muted-foreground" />
@@ -262,10 +270,11 @@ export default function JoinClub() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredClubs.map((club) => (
-              <Card key={club.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
-                <CardContent className="p-6">
+              <Card key={club.id} className="relative overflow-hidden rounded-2xl border-border/40 card-hover">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
+                <CardContent className="relative z-10 p-6">
                   <h3 className="font-display font-semibold text-lg text-foreground">{club.name}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{club.city}, {club.country}</p>
 
@@ -284,8 +293,9 @@ export default function JoinClub() {
         )}
 
         {/* INVITE CLUB */}
-        <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-6 space-y-3">
+        <Card className="relative overflow-hidden rounded-2xl border-border/40">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
+          <CardContent className="relative z-10 p-6 space-y-3">
             <h3 className="font-display font-semibold text-lg text-foreground">Can't find your club?</h3>
             <p className="text-sm text-muted-foreground">Let us know and we'll reach out to them</p>
 
@@ -293,19 +303,19 @@ export default function JoinClub() {
               placeholder="Club name"
               value={requestClubName}
               onChange={(e) => setRequestClubName(e.target.value)}
-              className="h-12 rounded-xl bg-card/50 border-border/30"
+              className="h-12 rounded-xl bg-card border-border/40"
             />
             <Input
               placeholder="Country (optional)"
               value={requestCountry}
               onChange={(e) => setRequestCountry(e.target.value)}
-              className="h-12 rounded-xl bg-card/50 border-border/30"
+              className="h-12 rounded-xl bg-card border-border/40"
             />
             <Input
               placeholder="Club email or website (optional)"
               value={requestContact}
               onChange={(e) => setRequestContact(e.target.value)}
-              className="h-12 rounded-xl bg-card/50 border-border/30"
+              className="h-12 rounded-xl bg-card border-border/40"
             />
 
             <Button className="w-full rounded-xl gradient-golden font-semibold" onClick={handleSendJoinRequest} disabled={requestSending}>
