@@ -10,7 +10,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut, Sparkles } from "lucide-react";
 
 import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
@@ -57,7 +57,6 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
-      /* ---------- Membership ---------- */
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
@@ -72,17 +71,12 @@ export default function FanRewards() {
       const m = memberships[0] as FanMembership;
       setMembership(m);
 
-      /* ---------- Program ---------- */
       const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-
       setProgram(programData as LoyaltyProgram);
 
-      /* ---------- Rewards ---------- */
       const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
-
       setRewards((rewardsData ?? []) as Reward[]);
 
-      /* ---------- Redemption history ---------- */
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
         .select(`*, rewards (name, description)`)
@@ -91,13 +85,11 @@ export default function FanRewards() {
 
       setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
 
-      /* ---------- REAL backend discount ---------- */
       const { data: discountData, error: discountError } = await supabase.rpc("get_membership_discount", {
         p_membership_id: m.id,
       });
 
       if (discountError) throw discountError;
-
       setDiscountPercent(Number(discountData ?? 0));
     } catch (err) {
       console.error("FanRewards fetch error:", err);
@@ -141,13 +133,11 @@ export default function FanRewards() {
       return { success: true };
     } catch (err: any) {
       const message = err?.message || "Redemption failed.";
-
       toast({
         title: "Redemption failed",
         description: message,
         variant: "destructive",
       });
-
       return { success: false, error: message };
     } finally {
       setRedeeming(false);
@@ -159,10 +149,9 @@ export default function FanRewards() {
     navigate("/");
   };
 
-  /* ================= LOADING ================= */
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -171,9 +160,8 @@ export default function FanRewards() {
   const balance = membership?.points_balance ?? 0;
   const currency = program?.points_currency_name ?? "Points";
 
-  /* ================= UI ================= */
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
+    <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
@@ -182,8 +170,7 @@ export default function FanRewards() {
         <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
             <Logo size="sm" />
           </div>
@@ -193,44 +180,48 @@ export default function FanRewards() {
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="relative py-10 overflow-hidden">
-        <div className="absolute inset-0 stadium-pattern" />
-        <div className="relative container">
-          <div className="flex justify-between items-center mb-2">
-            <h1 className="text-3xl md:text-4xl font-display font-bold flex items-center gap-3">
-              <div className="h-12 w-12 rounded-2xl gradient-golden flex items-center justify-center shadow-golden">
-                <Gift className="h-6 w-6 text-accent-foreground" />
+      <main className="container py-10 space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+
+          <div className="relative z-10 p-8 md:p-10">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-accent" />
+                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Redeem</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Rewards</h1>
               </div>
-              Rewards
-            </h1>
 
-            <div className="flex items-center gap-2 glass-dark rounded-full px-5 py-2.5">
-              <Trophy className="h-5 w-5 text-accent" />
-              <span className="font-display font-bold text-accent">{balance}</span>
-              <span className="text-muted-foreground">{currency}</span>
+              <div className="glass-dark rounded-2xl px-5 py-3 flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-accent" />
+                <span className="font-display font-bold text-accent">{balance}</span>
+                <span className="text-white/50 text-sm">{currency}</span>
+              </div>
             </div>
+
+            {discountPercent > 0 && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-accent font-semibold">
+                <Percent className="h-4 w-4" />
+                {discountPercent}% tier discount applied
+              </div>
+            )}
           </div>
-
-          {discountPercent > 0 && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-primary font-semibold">
-              <Percent className="h-4 w-4" />
-              {discountPercent}% tier discount applied
-            </div>
-          )}
         </div>
-      </section>
 
-      <main className="container pb-10">
+        {/* TABS */}
         <Tabs defaultValue="available">
-          <TabsList className="grid grid-cols-2 max-w-md rounded-full h-11 bg-card/50 backdrop-blur-sm border border-border/30">
+          <TabsList className="grid grid-cols-2 max-w-md rounded-full h-11 bg-card border border-border/40">
             <TabsTrigger value="available" className="rounded-full">Available</TabsTrigger>
             <TabsTrigger value="history" className="rounded-full">My Redemptions</TabsTrigger>
           </TabsList>
 
-          {/* AVAILABLE */}
           <TabsContent value="available">
-            <div className="grid md:grid-cols-3 gap-6 mt-6">
+            <div className="grid md:grid-cols-3 gap-4 mt-6">
               {rewards.map((reward) => {
                 const originalCost = reward.points_cost;
                 const discountAmount = Math.round(originalCost * (discountPercent / 100));
@@ -238,23 +229,20 @@ export default function FanRewards() {
                 const canAfford = balance >= finalCost;
 
                 return (
-                  <Card key={reward.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
-                    <CardContent className="pt-6">
+                  <Card key={reward.id} className="relative overflow-hidden rounded-2xl border-border/40 card-hover">
+                    <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none" />
+                    <CardContent className="relative z-10 pt-6">
                       <h3 className="font-display font-semibold text-foreground">{reward.name}</h3>
                       <p className="text-sm text-muted-foreground">{reward.description}</p>
 
                       {discountPercent > 0 && (
                         <>
-                          <p className="text-xs line-through text-muted-foreground mt-2">
-                            {originalCost} {currency}
-                          </p>
-                          <p className="text-xs text-primary">
-                            -{discountAmount} {currency} ({discountPercent}% off)
-                          </p>
+                          <p className="text-xs line-through text-muted-foreground mt-2">{originalCost} {currency}</p>
+                          <p className="text-xs text-primary">-{discountAmount} {currency} ({discountPercent}% off)</p>
                         </>
                       )}
 
-                      <Badge className="mt-2 rounded-full bg-accent/20 text-accent border-accent/30">
+                      <Badge className="mt-2 rounded-full bg-accent/10 text-accent border-accent/20">
                         Cost: {finalCost} {currency}
                       </Badge>
 
@@ -275,17 +263,17 @@ export default function FanRewards() {
             </div>
           </TabsContent>
 
-          {/* HISTORY */}
           <TabsContent value="history">
-            <div className="space-y-4 mt-6">
+            <div className="space-y-3 mt-6">
               {redemptions.map((r) => (
-                <Card key={r.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
-                  <CardContent className="py-4 flex justify-between">
+                <Card key={r.id} className="relative overflow-hidden rounded-2xl border-border/40">
+                  <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent pointer-events-none" />
+                  <CardContent className="relative z-10 py-4 flex justify-between">
                     <div>
                       <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
                       <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
-                    <Badge className="rounded-full bg-destructive/20 text-destructive border-destructive/30">-{r.points_spent}</Badge>
+                    <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">-{r.points_spent}</Badge>
                   </CardContent>
                 </Card>
               ))}
@@ -294,7 +282,6 @@ export default function FanRewards() {
         </Tabs>
       </main>
 
-      {/* MODAL */}
       <RewardRedemptionModal
         isOpen={redemptionModalOpen}
         onClose={() => setRedemptionModalOpen(false)}

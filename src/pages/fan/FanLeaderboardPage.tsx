@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FanLeaderboard } from "@/components/ui/FanLeaderboard";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
-import { ArrowLeft, Loader2, LogOut } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, Sparkles } from "lucide-react";
 import { Club, LoyaltyProgram, FanMembership } from "@/types/database";
 
 interface LeaderboardEntry {
@@ -160,28 +160,22 @@ export default function FanLeaderboardPage() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
+    <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")}
-              className="rounded-full text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+            <Button variant="ghost" size="sm" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
             <Logo size="sm" />
           </div>
@@ -191,7 +185,24 @@ export default function FanLeaderboardPage() {
         </div>
       </header>
 
-      <main className="container py-8">
+      <main className="container py-10 space-y-10">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+
+          <div className="relative z-10 p-8 md:p-10">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Rankings</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
+              {club?.name || "Club"} Leaderboard
+            </h1>
+            <p className="text-white/50 mt-1">See where you stand among fellow fans</p>
+          </div>
+        </div>
+
         <div className="max-w-2xl mx-auto">
           <FanLeaderboard
             fans={leaderboard}

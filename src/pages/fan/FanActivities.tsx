@@ -13,7 +13,7 @@ import { QRScannerModal } from "@/components/ui/QRScannerModal";
 import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, LogOut } from "lucide-react";
+import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, LogOut, Sparkles } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type Activity = Database["public"]["Tables"]["activities"]["Row"];
@@ -397,24 +397,23 @@ export default function FanActivities() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>);
-
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
+    <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex items-center justify-between bg-primary-foreground">
+        <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
             <Logo size="sm" />
           </div>
@@ -424,75 +423,84 @@ export default function FanActivities() {
         </div>
       </header>
 
-      {/* HERO SECTION */}
-      <section className="relative py-10 overflow-hidden">
-        <div className="absolute inset-0 stadium-pattern bg-teal-950" />
-        <div className="relative container">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl md:text-4xl font-display font-bold flex items-center gap-3">
-              <div className="h-12 w-12 rounded-2xl gradient-stadium flex items-center justify-center shadow-stadium">
-                <Zap className="h-6 w-6 text-primary-foreground" />
-              </div>
-              Activities
-            </h1>
+      <main className="container py-10 space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
 
-            <Badge className="text-lg px-5 py-2.5 rounded-full glass-dark border-accent/30 text-accent font-display">
-              {effectivePointsBalance} {program?.points_currency_name || "Points"}
-            </Badge>
+          <div className="relative z-10 p-8 md:p-10 flex justify-between items-center">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Earn Points</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight flex items-center gap-3">
+                Activities
+              </h1>
+            </div>
+
+            <div className="glass-dark rounded-2xl px-5 py-3 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-accent" />
+              <span className="font-display font-bold text-accent">{effectivePointsBalance}</span>
+              <span className="text-white/50 text-sm">{program?.points_currency_name || "Points"}</span>
+            </div>
           </div>
         </div>
-      </section>
 
-      <main className="container pb-10 bg-teal-950">
-        {activities.length === 0 ?
-        <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
+        {/* ACTIVITIES LIST */}
+        {activities.length === 0 ? (
+          <Card className="rounded-2xl border-border/40">
             <CardContent className="py-10 text-center">
               <p className="text-muted-foreground">No activities available yet.</p>
             </CardContent>
-          </Card> :
-
-        <div className="space-y-4">
+          </Card>
+        ) : (
+          <div className="space-y-3">
             {activities.map((activity) => {
-            const Icon = icons[activity.verification_method];
-            const completed = isCompleted(activity.id);
-            const pending = hasPendingClaim(activity.id);
+              const Icon = icons[activity.verification_method];
+              const completed = isCompleted(activity.id);
+              const pending = hasPendingClaim(activity.id);
 
-            return (
-              <Card key={activity.id} className={`rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover ${completed ? "border-l-4 border-l-primary opacity-75" : ""}`}>
-                  <CardContent className="py-5 flex justify-between items-center gap-4">
+              return (
+                <Card
+                  key={activity.id}
+                  className={`relative overflow-hidden rounded-2xl border-border/40 card-hover ${completed ? "opacity-60" : ""}`}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+                  <CardContent className="relative z-10 py-5 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
+                      <div className="h-10 w-10 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center text-primary">
+                        <Icon className="h-5 w-5" />
                       </div>
-
                       <div>
                         <p className="font-display font-semibold text-foreground">{activity.name}</p>
                         <p className="text-sm text-muted-foreground">
                           +{Math.round((activity.points_awarded || 0) * (multiplier || 1))}{" "}
                           {program?.points_currency_name || "Points"}
-                          {multiplier > 1 &&
-                        <span className="ml-2 text-xs text-primary font-semibold">×{multiplier}</span>
-                        }
+                          {multiplier > 1 && (
+                            <span className="ml-2 text-xs text-primary font-semibold">×{multiplier}</span>
+                          )}
                         </p>
                       </div>
                     </div>
 
-                    {completed ?
-                  <Badge className="bg-primary/20 text-primary border-primary/30 rounded-full">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Done
-                      </Badge> :
-                  pending ?
-                  <Badge variant="outline" className="rounded-full border-accent/30 text-accent">Pending</Badge> :
-
-                  <Button onClick={() => handleStart(activity)} className="rounded-full gradient-stadium font-semibold shadow-stadium">Start</Button>
-                  }
+                    {completed ? (
+                      <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full">
+                        <CheckCircle className="h-3 w-3 mr-1" /> Done
+                      </Badge>
+                    ) : pending ? (
+                      <Badge variant="outline" className="rounded-full border-accent/30 text-accent">Pending</Badge>
+                    ) : (
+                      <Button onClick={() => handleStart(activity)} className="rounded-full gradient-stadium font-semibold shadow-stadium">Start</Button>
+                    )}
                   </CardContent>
-                </Card>);
-
-          })}
+                </Card>
+              );
+            })}
           </div>
-        }
+        )}
       </main>
 
       {/* Manual Proof */}
@@ -506,8 +514,8 @@ export default function FanActivities() {
         pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSubmit={handleSubmitProof}
-        isLoading={submittingProof} />
-
+        isLoading={submittingProof}
+      />
 
       {/* QR Scanner */}
       <QRScannerModal
@@ -521,8 +529,8 @@ export default function FanActivities() {
         pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleQRSuccess}
-        isLoading={processingQR} />
-
+        isLoading={processingQR}
+      />
 
       {/* Location Check-in */}
       <LocationCheckinModal
@@ -538,25 +546,25 @@ export default function FanActivities() {
         pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
         pointsCurrencyName={program?.points_currency_name || "Points"}
         onSuccess={handleLocationSuccess}
-        isLoading={processingLocation} />
-
+        isLoading={processingLocation}
+      />
 
       {/* Poll/Quiz */}
-      {selectedActivity?.in_app_config &&
-      <PollQuizParticipation
-        isOpen={pollQuizModalOpen}
-        onClose={() => {
-          setPollQuizModalOpen(false);
-          setSelectedActivity(null);
-        }}
-        activityName={selectedActivity.name}
-        config={selectedActivity.in_app_config as unknown as InAppConfig}
-        pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
-        pointsCurrency={program?.points_currency_name || "Points"}
-        onSubmit={handlePollQuizSubmit}
-        isPreview={isPreviewMode} />
-
-      }
-    </div>);
-
+      {selectedActivity?.in_app_config && (
+        <PollQuizParticipation
+          isOpen={pollQuizModalOpen}
+          onClose={() => {
+            setPollQuizModalOpen(false);
+            setSelectedActivity(null);
+          }}
+          activityName={selectedActivity.name}
+          config={selectedActivity.in_app_config as unknown as InAppConfig}
+          pointsAwarded={selectedActivity ? Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)) : 0}
+          pointsCurrency={program?.points_currency_name || "Points"}
+          onSubmit={handlePollQuizSubmit}
+          isPreview={isPreviewMode}
+        />
+      )}
+    </div>
+  );
 }

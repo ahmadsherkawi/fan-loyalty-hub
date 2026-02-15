@@ -15,7 +15,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { BadgeDisplay, computeFanBadges, BadgeDefinition } from "@/components/ui/BadgeDisplay";
 
-import { ArrowLeft, Loader2, Trophy, LogOut } from "lucide-react";
+import { ArrowLeft, Loader2, Trophy, LogOut, Sparkles } from "lucide-react";
 
 import type {
   Club,
@@ -150,7 +150,7 @@ export default function FanProfilePage() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -170,26 +170,17 @@ export default function FanProfilePage() {
 
   const progress =
     currentTier && nextTier
-      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) *
-        100
+      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) * 100
       : 100;
 
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
-      <header className="relative overflow-hidden">
-        <div className="absolute inset-0 gradient-mesh opacity-60" />
-        <div className="absolute inset-0 stadium-pattern" />
-
+    <div className="min-h-screen bg-background">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/fan/home")}
-              className="rounded-full text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
             <Logo size="sm" />
           </div>
@@ -197,44 +188,54 @@ export default function FanProfilePage() {
             <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
         </div>
-
-        <div className="relative container py-10 flex flex-col md:flex-row md:items-center gap-6">
-          <Avatar className="h-24 w-24 border-4 border-primary/30 shadow-stadium">
-            <AvatarFallback className="text-3xl font-display font-bold bg-primary/20 text-primary">
-              {displayName.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">{displayName}</h1>
-            <p className="text-muted-foreground">{club?.name}</p>
-
-            {currentTier && (
-              <div className="mt-4 glass-dark rounded-2xl px-5 py-4 max-w-md">
-                <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full mb-2">
-                  <Trophy className="h-3 w-3 mr-1" />
-                  {currentTier.name}
-                </Badge>
-
-                {nextTier ? (
-                  <>
-                    <Progress value={progress} className="h-2 bg-muted/20" />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Highest tier reached</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </header>
 
-      <main className="container py-10">
+      <main className="container py-10 space-y-10">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+
+          <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6">
+            <Avatar className="h-24 w-24 border-4 border-primary/30 shadow-stadium">
+              <AvatarFallback className="text-3xl font-display font-bold bg-primary/20 text-primary">
+                {displayName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Profile</span>
+              </div>
+              <h1 className="text-3xl font-display font-bold text-white">{displayName}</h1>
+              <p className="text-white/50">{club?.name}</p>
+
+              {currentTier && (
+                <div className="mt-4 glass-dark rounded-2xl px-5 py-4 max-w-md">
+                  <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full mb-2">
+                    <Trophy className="h-3 w-3 mr-1" />
+                    {currentTier.name}
+                  </Badge>
+
+                  {nextTier ? (
+                    <>
+                      <Progress value={progress} className="h-2 bg-white/10" />
+                      <p className="text-xs text-white/40 mt-2">
+                        {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-white/40">Highest tier reached</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 max-w-md mx-auto mb-8 rounded-full h-11 bg-card/50 backdrop-blur-sm border border-border/30">
+          <TabsList className="grid grid-cols-3 max-w-md mx-auto mb-8 rounded-full h-11 bg-card border border-border/40">
             <TabsTrigger value="badges" className="rounded-full">Badges</TabsTrigger>
             <TabsTrigger value="activities" className="rounded-full">Activities</TabsTrigger>
             <TabsTrigger value="rewards" className="rounded-full">Rewards</TabsTrigger>
@@ -246,10 +247,11 @@ export default function FanProfilePage() {
 
           <TabsContent value="activities">
             {completions.map((c) => (
-              <Card key={c.id} className="mb-3 rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
-                <CardContent className="py-4 flex justify-between">
+              <Card key={c.id} className="mb-3 relative overflow-hidden rounded-2xl border-border/40">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+                <CardContent className="relative z-10 py-4 flex justify-between">
                   <span className="font-semibold text-foreground">{c.activities?.name}</span>
-                  <Badge className="rounded-full bg-primary/20 text-primary border-primary/30">+{c.points_earned}</Badge>
+                  <Badge className="rounded-full bg-primary/10 text-primary border-primary/20">+{c.points_earned}</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -257,10 +259,11 @@ export default function FanProfilePage() {
 
           <TabsContent value="rewards">
             {redemptions.map((r) => (
-              <Card key={r.id} className="mb-3 rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm">
-                <CardContent className="py-4 flex justify-between">
+              <Card key={r.id} className="mb-3 relative overflow-hidden rounded-2xl border-border/40">
+                <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent pointer-events-none" />
+                <CardContent className="relative z-10 py-4 flex justify-between">
                   <span className="font-semibold text-foreground">{r.rewards?.name}</span>
-                  <Badge className="rounded-full bg-destructive/20 text-destructive border-destructive/30">-{r.points_spent}</Badge>
+                  <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">-{r.points_spent}</Badge>
                 </CardContent>
               </Card>
             ))}

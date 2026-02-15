@@ -5,13 +5,13 @@ import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star } from "lucide-react";
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles, TrendingUp } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 
@@ -167,102 +167,105 @@ export default function FanHome() {
 
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>);
-
+      </div>
+    );
   }
 
   const progress =
-  currentTier && nextTier ?
-  (earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold) *
-  100 :
-  100;
+    currentTier && nextTier
+      ? ((earnedPoints - currentTier.points_threshold) / (nextTier.points_threshold - currentTier.points_threshold)) * 100
+      : 100;
 
   return (
-    <div className="min-h-screen gradient-hero text-foreground">
+    <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
 
-      {/* TOP BAR */}
+      {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex justify-between items-center bg-primary-foreground">
-          <Logo size="sm" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Logo size="sm" />
+            <div className="h-6 w-px bg-border/40" />
+            <span className="font-display font-bold text-foreground tracking-tight">{club?.name}</span>
+          </div>
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => navigate("/fan/notifications")} className="relative rounded-full text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />
-              {unreadCount > 0 &&
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] flex items-center justify-center text-destructive-foreground">
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] flex items-center justify-center text-destructive-foreground">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
-              }
+              )}
             </Button>
-
             <Button variant="ghost" size="icon" onClick={() => navigate("/fan/profile")} className="rounded-full text-muted-foreground hover:text-foreground">
               <User className="h-5 w-5" />
             </Button>
-
             <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign out
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
             </Button>
           </div>
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="relative py-16 overflow-hidden">
-        <div className="absolute inset-0 stadium-pattern" />
-        <div className="absolute inset-0 pitch-lines bg-blue-900" />
-        <div className="relative container text-center">
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground">{club?.name}</h1>
-          <p className="text-muted-foreground mt-2 font-body">{program?.name}</p>
+      <main className="container py-10 space-y-10">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="mt-8 inline-block glass-dark px-10 py-8 rounded-3xl shadow-stadium">
-            <div className="flex items-center justify-center gap-3">
+          <div className="relative z-10 p-8 md:p-10">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Fan Hub</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">{club?.name}</h1>
+            <p className="text-white/50 mt-1">{program?.name}</p>
+
+            <div className="mt-6 inline-flex items-center gap-3 glass-dark px-8 py-5 rounded-2xl">
               <Trophy className="h-7 w-7 text-accent animate-float" />
-              <span className="text-5xl font-display font-bold text-gradient-accent">{effectivePointsBalance}</span>
-              <span className="text-muted-foreground">{program?.points_currency_name ?? "Points"}</span>
+              <span className="text-4xl font-display font-bold text-gradient-accent">{effectivePointsBalance}</span>
+              <span className="text-white/50">{program?.points_currency_name ?? "Points"}</span>
             </div>
 
-            {currentTier &&
-            <div className="relative inline-block group mt-4">
+            {currentTier && (
+              <div className="mt-4 max-w-xs">
                 <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full">
                   <Star className="h-3 w-3 mr-1" />
                   {currentTier.name}
                 </Badge>
 
-                {(multiplier > 1 || discountPercent > 0) &&
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-xl glass-dark text-foreground text-xs p-3 opacity-0 group-hover:opacity-100 transition z-50 bg-secondary">
-                    {multiplier > 1 && <p>✨ {multiplier}× activity points</p>}
-                    {discountPercent > 0 && <p>🎁 {discountPercent}% reward discount</p>}
+                {(multiplier > 1 || discountPercent > 0) && (
+                  <div className="mt-2 flex gap-3 text-xs text-white/60">
+                    {multiplier > 1 && <span>✨ {multiplier}× points</span>}
+                    {discountPercent > 0 && <span>🎁 {discountPercent}% discount</span>}
                   </div>
-              }
+                )}
 
-                {nextTier &&
-              <>
-                    <Progress value={progress} className="h-2 bg-muted/20 mt-3" />
-                    <p className="text-xs text-muted-foreground mt-1">
+                {nextTier && (
+                  <>
+                    <Progress value={progress} className="h-2 bg-white/10 mt-3" />
+                    <p className="text-xs text-white/40 mt-1">
                       {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
                     </p>
                   </>
-              }
+                )}
               </div>
-            }
+            )}
           </div>
         </div>
-      </section>
 
-      {/* CONTENT */}
-      <main className="container py-10 space-y-12 bg-secondary">
         {/* ACTIVITIES */}
-        <section>
+        <div>
           <SectionHeader
             title="Activities"
             icon={<Zap className="h-4 w-4 text-primary" />}
-            onClick={() => navigate("/fan/activities")} />
-
+            onClick={() => navigate("/fan/activities")}
+          />
 
           <div className="space-y-3">
             {activities.map((a) => {
@@ -273,20 +276,20 @@ export default function FanHome() {
                   key={a.id}
                   title={a.name}
                   badge={multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
-                  onClick={() => navigate("/fan/activities")} />);
-
-
+                  onClick={() => navigate("/fan/activities")}
+                />
+              );
             })}
           </div>
-        </section>
+        </div>
 
         {/* REWARDS */}
-        <section>
+        <div>
           <SectionHeader
             title="Rewards"
             icon={<Gift className="h-4 w-4 text-accent" />}
-            onClick={() => navigate("/fan/rewards")} />
-
+            onClick={() => navigate("/fan/rewards")}
+          />
 
           <div className="grid md:grid-cols-3 gap-4">
             {rewards.map((r) => {
@@ -294,34 +297,35 @@ export default function FanHome() {
               const canAfford = effectivePointsBalance >= discounted;
 
               return (
-                <Card key={r.id} className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
-                  <CardContent className="pt-6">
-                    <h3 className="font-display font-bold">{r.name}</h3>
+                <Card key={r.id} className="relative overflow-hidden rounded-2xl border-border/40 card-hover">
+                  <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none" />
+                  <CardContent className="relative z-10 pt-6">
+                    <h3 className="font-display font-bold text-foreground">{r.name}</h3>
 
-                    {discountPercent > 0 &&
-                    <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
-                    }
+                    {discountPercent > 0 && (
+                      <p className="text-xs line-through text-muted-foreground">{r.points_cost} pts</p>
+                    )}
 
-                    <Badge className="mt-2 rounded-full bg-accent/20 text-accent border-accent/30">{discounted} pts</Badge>
+                    <Badge className="mt-2 rounded-full bg-accent/10 text-accent border-accent/20">{discounted} pts</Badge>
 
                     {discountPercent > 0 && <p className="text-xs text-primary mt-1">−{discountPercent}% discount</p>}
 
                     <Button
                       disabled={!canAfford}
                       className="mt-4 w-full rounded-xl gradient-golden font-semibold"
-                      onClick={() => navigate("/fan/rewards")}>
-
+                      onClick={() => navigate("/fan/rewards")}
+                    >
                       Redeem
                     </Button>
                   </CardContent>
-                </Card>);
-
+                </Card>
+              );
             })}
           </div>
-        </section>
+        </div>
       </main>
-    </div>);
-
+    </div>
+  );
 }
 
 /* ---------- reusable ---------- */
@@ -329,33 +333,32 @@ export default function FanHome() {
 function SectionHeader({ title, icon, onClick }: any) {
   return (
     <div className="flex justify-between items-center mb-5">
-      <h2 className="text-xl font-display font-bold flex items-center gap-2.5 text-foreground">
-        <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">{icon}</div>
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+        <TrendingUp className="h-4 w-4" />
         {title}
       </h2>
-
       <Button variant="ghost" size="sm" onClick={onClick} className="rounded-full text-muted-foreground hover:text-foreground">
         View all <ChevronRight className="h-4 w-4 ml-1" />
       </Button>
-    </div>);
-
+    </div>
+  );
 }
 
 function InfoCard({ title, badge, onClick }: any) {
   return (
-    <Card className="rounded-3xl border-border/30 bg-card/50 backdrop-blur-sm card-hover">
-      <CardContent className="py-4 flex justify-between items-center">
+    <Card className="relative overflow-hidden rounded-2xl border-border/40 card-hover">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
+      <CardContent className="relative z-10 py-4 flex justify-between items-center">
         <div>
           <p className="font-semibold text-foreground">{title}</p>
           <Badge variant="secondary" className="mt-1 rounded-full bg-primary/10 text-primary border-primary/20">
             {badge}
           </Badge>
         </div>
-
-        <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium font-semibold">
+        <Button size="sm" onClick={onClick} className="rounded-full gradient-stadium font-semibold shadow-stadium">
           Participate
         </Button>
       </CardContent>
-    </Card>);
-
+    </Card>
+  );
 }
