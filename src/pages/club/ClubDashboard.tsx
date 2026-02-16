@@ -227,6 +227,14 @@ export default function ClubDashboard() {
           <div className="flex items-center gap-4">
             <Logo />
             <div className="h-6 w-px bg-border/40" />
+            {/* Club Logo */}
+            {club?.logo_url ? (
+              <img src={club.logo_url} alt={club.name} className="w-8 h-8 rounded-full object-cover border border-border/30" />
+            ) : (
+              <div className="w-8 h-8 rounded-full flex items-center justify-center border border-border/30" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
+                <span className="text-xs font-bold text-white">{club?.name?.charAt(0)}</span>
+              </div>
+            )}
             <span className="font-display font-bold text-foreground tracking-tight">{club?.name}</span>
 
             {verified &&
@@ -266,16 +274,28 @@ export default function ClubDashboard() {
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-8 md:p-10 bg-popover-foreground">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-accent" />
-              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Command Center</span>
+            <div className="flex items-start gap-6">
+              {/* Large Club Logo in Hero */}
+              {club?.logo_url ? (
+                <img src={club.logo_url} alt={club.name} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-white/10 shadow-lg flex-shrink-0" />
+              ) : (
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center border-2 border-white/10 shadow-lg flex-shrink-0" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
+                  <span className="text-3xl font-display font-bold text-white">{club?.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-accent" />
+                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Command Center</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
+                  Dashboard
+                </h1>
+                <p className="text-white/50 mt-2 max-w-lg">
+                  Monitor your fan loyalty ecosystem — track engagement, manage activities, and grow your community.
+                </p>
+              </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
-              Dashboard
-            </h1>
-            <p className="text-white/50 mt-2 max-w-lg">
-              Monitor your fan loyalty ecosystem — track engagement, manage activities, and grow your community.
-            </p>
           </div>
         </div>
 

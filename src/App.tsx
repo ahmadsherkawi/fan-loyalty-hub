@@ -33,6 +33,7 @@ import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import FanProfilePage from "./pages/fan/FanProfilePage";
 import JoinClub from "./pages/fan/JoinClub";
 import FanNotifications from "./pages/fan/FanNotifications"; // ✅ FIXED IMPORT
+import SystemAdmin from "./pages/SystemAdmin";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,8 @@ const App = () => {
                 <Route path="/fan/profile" element={<FanProfilePage />} />
                 <Route path="/fan/join" element={<JoinClub />} />
                 <Route path="/fan/notifications" element={<FanNotifications />} /> {/* ✅ CORRECT ROUTE */}
+                {/* System Admin */}
+                <Route path="/admin" element={<SystemAdmin />} />
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
