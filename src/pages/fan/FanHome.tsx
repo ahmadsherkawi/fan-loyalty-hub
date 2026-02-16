@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
-import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles, TrendingUp } from "lucide-react";
+import { Trophy, Zap, Gift, LogOut, Loader2, ChevronRight, Users, User, Bell, Star, Sparkles, TrendingUp, Camera } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 
@@ -47,6 +47,8 @@ export default function FanHome() {
 
   const [dataLoading, setDataLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance ?? 0;
 
@@ -165,6 +167,34 @@ export default function FanHome() {
     navigate("/");
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setAvatarUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${profile.id}/avatar.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("fan-avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error("Avatar upload error:", uploadError);
+        return;
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from("fan-avatars")
+        .getPublicUrl(filePath);
+
+      setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -219,12 +249,37 @@ export default function FanHome() {
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-8 md:p-10">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-accent" />
-              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Fan Hub</span>
+            <div className="flex items-start gap-6">
+              {/* Fan Avatar */}
+              <div className="relative group flex-shrink-0">
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl border-2 border-white/10 shadow-lg overflow-hidden bg-card/30">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <User className="h-10 w-10 text-white/30" />
+                    </div>
+                  )}
+                </div>
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
+                  {avatarUploading ? (
+                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white" />
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                </label>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-accent" />
+                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Fan Hub</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">{club?.name}</h1>
+                <p className="text-white/50 mt-1">{profile?.full_name} · {program?.name}</p>
+              </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">{club?.name}</h1>
-            <p className="text-white/50 mt-1">{program?.name}</p>
 
             <div className="mt-6 inline-flex items-center gap-3 glass-dark px-8 py-5 rounded-2xl">
               <Trophy className="h-7 w-7 text-accent animate-float" />
