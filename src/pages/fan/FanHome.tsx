@@ -169,12 +169,12 @@ export default function FanHome() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    if (!file || !user) return;
 
     setAvatarUploading(true);
     try {
       const fileExt = file.name.split(".").pop();
-      const filePath = `${profile.id}/avatar.${fileExt}`;
+      const filePath = `${user.id}/avatar.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("fan-avatars")
