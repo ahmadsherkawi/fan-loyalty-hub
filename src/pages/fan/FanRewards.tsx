@@ -21,6 +21,12 @@ interface RedemptionWithReward extends RewardRedemption {
   };
 }
 
+interface RewardWithIntelligence extends Reward {
+  final_cost?: number;
+  days_to_reach?: number | null;
+  points_needed?: number | null;
+}
+
 export default function FanRewards() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -31,7 +37,7 @@ export default function FanRewards() {
 
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
-  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [rewards, setRewards] = useState<RewardWithIntelligence[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
@@ -75,7 +81,6 @@ export default function FanRewards() {
       setProgram(programData as LoyaltyProgram);
 
       const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
-      setRewards((rewardsData ?? []) as Reward[]);
 
       const { data: redemptionsData } = await supabase
         .from("reward_redemptions")
@@ -91,6 +96,36 @@ export default function FanRewards() {
 
       if (discountError) throw discountError;
       setDiscountPercent(Number(discountData ?? 0));
+
+      /* ================= SMART REWARD RECOMMENDATIONS ================= */
+      const { data: recData, error: recError } = await supabase.rpc("get_reward_recommendations", {
+        p_membership_id: m.id,
+      });
+
+      if (recError) throw recError;
+
+      const baseRewards = (rewardsData ?? []) as Reward[];
+
+      const enriched: RewardWithIntelligence[] = baseRewards.map((r) => {
+        const rec = recData?.find((x: any) => x.id === r.id);
+
+        return {
+          ...r,
+          final_cost: rec?.final_cost ?? r.points_cost,
+          days_to_reach: rec?.days_to_reach ?? null,
+          points_needed: rec?.points_needed ?? null,
+        };
+      });
+
+      /* sort by smartest unlock order */
+      enriched.sort((a, b) => {
+        if ((a.points_needed ?? Infinity) !== (b.points_needed ?? Infinity)) {
+          return (a.points_needed ?? Infinity) - (b.points_needed ?? Infinity);
+        }
+        return (a.days_to_reach ?? Infinity) - (b.days_to_reach ?? Infinity);
+      });
+
+      setRewards(enriched);
     } catch (err) {
       console.error("FanRewards fetch error:", err);
       toast({
@@ -120,6 +155,8 @@ export default function FanRewards() {
       });
 
       if (error) throw error;
+
+      const currency = program?.points_currency_name ?? "Points";
 
       toast({
         title: "Reward redeemed!",
@@ -169,12 +206,20 @@ export default function FanRewards() {
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/fan/home")}
+              className="rounded-full text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
             <Logo size="sm" />
           </div>
-          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            onClick={handleSignOut}
+            className="rounded-full text-muted-foreground hover:text-foreground"
+          >
             <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
         </div>
@@ -216,8 +261,12 @@ export default function FanRewards() {
         {/* TABS */}
         <Tabs defaultValue="available">
           <TabsList className="grid grid-cols-2 max-w-md rounded-full h-11 bg-card border border-border/40">
-            <TabsTrigger value="available" className="rounded-full">Available</TabsTrigger>
-            <TabsTrigger value="history" className="rounded-full">My Redemptions</TabsTrigger>
+            <TabsTrigger value="available" className="rounded-full">
+              Available
+            </TabsTrigger>
+            <TabsTrigger value="history" className="rounded-full">
+              My Redemptions
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="available">
@@ -225,7 +274,7 @@ export default function FanRewards() {
               {rewards.map((reward) => {
                 const originalCost = reward.points_cost;
                 const discountAmount = Math.round(originalCost * (discountPercent / 100));
-                const finalCost = originalCost - discountAmount;
+                const finalCost = reward.final_cost ?? originalCost - discountAmount;
                 const canAfford = balance >= finalCost;
 
                 return (
@@ -237,14 +286,24 @@ export default function FanRewards() {
 
                       {discountPercent > 0 && (
                         <>
-                          <p className="text-xs line-through text-muted-foreground mt-2">{originalCost} {currency}</p>
-                          <p className="text-xs text-primary">-{discountAmount} {currency} ({discountPercent}% off)</p>
+                          <p className="text-xs line-through text-muted-foreground mt-2">
+                            {originalCost} {currency}
+                          </p>
+                          <p className="text-xs text-primary">
+                            -{discountAmount} {currency} ({discountPercent}% off)
+                          </p>
                         </>
                       )}
 
                       <Badge className="mt-2 rounded-full bg-accent/10 text-accent border-accent/20">
                         Cost: {finalCost} {currency}
                       </Badge>
+
+                      {reward.days_to_reach !== null && reward.days_to_reach !== undefined && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ~{Math.ceil(reward.days_to_reach)} days to unlock
+                        </p>
+                      )}
 
                       <Button
                         className="mt-4 w-full rounded-xl gradient-golden font-semibold"
@@ -273,7 +332,9 @@ export default function FanRewards() {
                       <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
                       <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
                     </div>
-                    <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">-{r.points_spent}</Badge>
+                    <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">
+                      -{r.points_spent}
+                    </Badge>
                   </CardContent>
                 </Card>
               ))}
