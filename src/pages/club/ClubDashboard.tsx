@@ -29,6 +29,7 @@ import {
   Camera } from
 "lucide-react";
 
+import { toast } from "sonner";
 import type { Club, LoyaltyProgram } from "@/types/database";
 
 interface Stats {
@@ -67,11 +68,13 @@ export default function ClubDashboard() {
       const fileExt = file.name.split(".").pop();
       const filePath = `${club.id}/logo.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("club-logos").upload(filePath, file, { upsert: true });
-      if (uploadError) { console.error("Logo upload error:", uploadError); return; }
+      if (uploadError) { console.error("Logo upload error:", uploadError); toast.error("Failed to upload logo: " + uploadError.message); return; }
       const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(filePath);
       const newUrl = urlData.publicUrl + "?t=" + Date.now();
-      await supabase.from("clubs").update({ logo_url: newUrl }).eq("id", club.id);
+      const { error: updateError } = await supabase.from("clubs").update({ logo_url: newUrl }).eq("id", club.id);
+      if (updateError) { toast.error("Failed to save logo URL"); return; }
       setClub((prev) => prev ? { ...prev, logo_url: newUrl } : prev);
+      toast.success("Club logo updated!");
     } finally {
       setLogoUploading(false);
     }

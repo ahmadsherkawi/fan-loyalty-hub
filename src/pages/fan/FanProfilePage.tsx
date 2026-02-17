@@ -16,6 +16,7 @@ import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { BadgeDisplay, computeFanBadges, BadgeDefinition } from "@/components/ui/BadgeDisplay";
 
 import { ArrowLeft, Loader2, Trophy, LogOut, Sparkles, Camera, User } from "lucide-react";
+import { toast } from "sonner";
 
 import type {
   Club,
@@ -169,9 +170,10 @@ export default function FanProfilePage() {
       const fileExt = file.name.split(".").pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("fan-avatars").upload(filePath, file, { upsert: true });
-      if (uploadError) { console.error("Avatar upload error:", uploadError); return; }
+      if (uploadError) { console.error("Avatar upload error:", uploadError); toast.error("Failed to upload avatar: " + uploadError.message); return; }
       const { data: publicUrl } = supabase.storage.from("fan-avatars").getPublicUrl(filePath);
       setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
+      toast.success("Profile picture updated!");
     } finally {
       setAvatarUploading(false);
     }
