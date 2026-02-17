@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreviewMode } from "@/contexts/PreviewModeContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ interface Tier {
   name: string;
   rank: number;
   points_threshold: number;
+  perks: any;
 }
 
 export default function FanHome() {
@@ -163,7 +165,19 @@ export default function FanHome() {
 
       if (current?.id) {
         const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
-        setTierBenefits(benefits ?? []);
+        if (benefits && benefits.length > 0) {
+          setTierBenefits(benefits);
+        } else if (current.perks) {
+          // Fallback: use perks from the tier itself
+          const perksArray = Array.isArray(current.perks) ? current.perks : [current.perks];
+          setTierBenefits(perksArray.map((p: any, i: number) => ({
+            id: `perk-${i}`,
+            name: typeof p === "string" ? p : p?.name || p?.description || "Perk",
+            description: typeof p === "string" ? p : p?.description || ""
+          })));
+        } else {
+          setTierBenefits([]);
+        }
       }
 
       const { count } = await supabase.
@@ -198,6 +212,7 @@ export default function FanHome() {
 
       if (uploadError) {
         console.error("Avatar upload error:", uploadError);
+        toast.error("Failed to upload avatar: " + uploadError.message);
         return;
       }
 
@@ -206,6 +221,7 @@ export default function FanHome() {
         .getPublicUrl(filePath);
 
       setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
+      toast.success("Profile picture updated!");
     } finally {
       setAvatarUploading(false);
     }
