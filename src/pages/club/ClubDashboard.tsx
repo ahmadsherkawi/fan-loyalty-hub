@@ -25,7 +25,8 @@ import {
   ChevronRight,
   TrendingUp,
   Sparkles,
-  Crown } from
+  Crown,
+  Camera } from
 "lucide-react";
 
 import type { Club, LoyaltyProgram } from "@/types/database";
@@ -56,6 +57,25 @@ export default function ClubDashboard() {
     points: 0
   });
   const [dataLoading, setDataLoading] = useState(true);
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !club || club.id === "preview") return;
+    setLogoUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${club.id}/logo.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("club-logos").upload(filePath, file, { upsert: true });
+      if (uploadError) { console.error("Logo upload error:", uploadError); return; }
+      const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(filePath);
+      const newUrl = urlData.publicUrl + "?t=" + Date.now();
+      await supabase.from("clubs").update({ logo_url: newUrl }).eq("id", club.id);
+      setClub((prev) => prev ? { ...prev, logo_url: newUrl } : prev);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (isPreview) {
@@ -275,14 +295,24 @@ export default function ClubDashboard() {
 
           <div className="relative z-10 p-8 md:p-10 bg-popover-foreground">
             <div className="flex items-start gap-6">
-              {/* Large Club Logo in Hero */}
-              {club?.logo_url ? (
-                <img src={club.logo_url} alt={club.name} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-white/10 shadow-lg flex-shrink-0" />
-              ) : (
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center border-2 border-white/10 shadow-lg flex-shrink-0" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
-                  <span className="text-3xl font-display font-bold text-white">{club?.name?.charAt(0)}</span>
-                </div>
-              )}
+              {/* Large Club Logo in Hero with upload */}
+              <div className="relative group flex-shrink-0">
+                {club?.logo_url ? (
+                  <img src={club.logo_url} alt={club.name} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-white/10 shadow-lg" />
+                ) : (
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center border-2 border-white/10 shadow-lg" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
+                    <span className="text-3xl font-display font-bold text-white">{club?.name?.charAt(0)}</span>
+                  </div>
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
+                  {logoUploading ? (
+                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white" />
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={logoUploading} />
+                </label>
+              </div>
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-accent" />

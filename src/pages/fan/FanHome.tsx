@@ -52,6 +52,22 @@ export default function FanHome() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : membership?.points_balance ?? 0;
 
+  /* ================= LOAD EXISTING AVATAR ================= */
+  useEffect(() => {
+    if (!user) return;
+    const loadAvatar = async () => {
+      const { data } = await supabase.storage.from("fan-avatars").list(user.id);
+      if (data && data.length > 0) {
+        const avatarFile = data.find((f) => f.name.startsWith("avatar"));
+        if (avatarFile) {
+          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${user.id}/${avatarFile.name}`);
+          setAvatarUrl(urlData.publicUrl + "?t=" + Date.now());
+        }
+      }
+    };
+    loadAvatar();
+  }, [user]);
+
   /* ================= AUTH ================= */
   useEffect(() => {
     if (loading) return;
@@ -298,6 +314,18 @@ export default function FanHome() {
                   <div className="mt-2 flex gap-3 text-xs text-white/60">
                     {multiplier > 1 && <span>✨ {multiplier}× points</span>}
                     {discountPercent > 0 && <span>🎁 {discountPercent}% discount</span>}
+                  </div>
+                )}
+
+                {tierBenefits.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs text-white/50 font-semibold uppercase tracking-wider">Your Benefits</p>
+                    {tierBenefits.map((b: any) => (
+                      <div key={b.id} className="flex items-center gap-2 text-xs text-white/70">
+                        <Sparkles className="h-3 w-3 text-accent" />
+                        <span>{b.name || b.description || "Perk"}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 

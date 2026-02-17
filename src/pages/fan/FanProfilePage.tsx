@@ -15,7 +15,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { BadgeDisplay, computeFanBadges, BadgeDefinition } from "@/components/ui/BadgeDisplay";
 
-import { ArrowLeft, Loader2, Trophy, LogOut, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Trophy, LogOut, Sparkles, Camera, User } from "lucide-react";
 
 import type {
   Club,
@@ -69,6 +69,8 @@ export default function FanProfilePage() {
 
   const [dataLoading, setDataLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("badges");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -143,6 +145,38 @@ export default function FanProfilePage() {
     if (!loading && profile) fetchData();
   }, [loading, user, profile]);
 
+  // Load existing avatar
+  useEffect(() => {
+    if (!user) return;
+    const loadAvatar = async () => {
+      const { data } = await supabase.storage.from("fan-avatars").list(user.id);
+      if (data && data.length > 0) {
+        const avatarFile = data.find((f) => f.name.startsWith("avatar"));
+        if (avatarFile) {
+          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${user.id}/${avatarFile.name}`);
+          setAvatarUrl(urlData.publicUrl + "?t=" + Date.now());
+        }
+      }
+    };
+    loadAvatar();
+  }, [user]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setAvatarUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("fan-avatars").upload(filePath, file, { upsert: true });
+      if (uploadError) { console.error("Avatar upload error:", uploadError); return; }
+      const { data: publicUrl } = supabase.storage.from("fan-avatars").getPublicUrl(filePath);
+      setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
@@ -197,11 +231,31 @@ export default function FanProfilePage() {
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6">
-            <Avatar className="h-24 w-24 border-4 border-primary/30 shadow-stadium">
-              <AvatarFallback className="text-3xl font-display font-bold bg-primary/20 text-primary">
-                {displayName.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
+            {/* Club Logo */}
+            {club?.logo_url && (
+              <img src={club.logo_url} alt={club.name} className="w-14 h-14 rounded-xl object-cover border border-white/10 shadow-lg" />
+            )}
+
+            {/* Fan Avatar with upload */}
+            <div className="relative group flex-shrink-0">
+              <div className="h-24 w-24 rounded-2xl border-4 border-primary/30 shadow-stadium overflow-hidden bg-card/30">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-primary/20">
+                    <span className="text-3xl font-display font-bold text-primary">{displayName.charAt(0)}</span>
+                  </div>
+                )}
+              </div>
+              <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
+                {avatarUploading ? (
+                  <Loader2 className="h-5 w-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-5 w-5 text-white" />
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
+              </label>
+            </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
