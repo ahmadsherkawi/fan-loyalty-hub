@@ -72,6 +72,11 @@ export default function ClubAnalytics() {
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
+      // Get program
+      const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("club_id", clubData.id).limit(1);
+      const programId = programs?.[0]?.id;
+
+      // Get fan count
       const { count: fans } = await supabase
         .from("fan_memberships")
         .select("*", { count: "exact", head: true })
@@ -79,14 +84,80 @@ export default function ClubAnalytics() {
 
       setActiveFans(fans ?? 0);
 
-      const { data: tsData, error } = await supabase.rpc("get_club_analytics_timeseries", { p_club_id: clubData.id });
+      // Get points data directly from activity_completions and reward_redemptions
+      // For points issued (from activity completions)
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned, completed_at")
+        .order("completed_at", { ascending: true });
 
-      if (!error && tsData) {
-        setFansGrowth(tsData.fan_growth ?? []);
-        setPointsFlow(tsData.points_flow ?? []);
-        const s = tsData.summary ?? {};
-        setActiveFans(s.current_fans ?? 0);
-      }
+      // For points spent (from reward redemptions)
+      const { data: redemptions } = await supabase
+        .from("reward_redemptions")
+        .select("points_spent, redeemed_at")
+        .order("redeemed_at", { ascending: true });
+
+      // Calculate monthly data
+      const monthlyData: { [key: string]: { issued: number; spent: number; fans: number } } = {};
+      
+      // Process completions for issued points
+      completions?.forEach((c: { points_earned: number; completed_at: string }) => {
+        const month = new Date(c.completed_at).toLocaleString('default', { month: 'short' });
+        if (!monthlyData[month]) monthlyData[month] = { issued: 0, spent: 0, fans: 0 };
+        monthlyData[month].issued += c.points_earned || 0;
+      });
+
+      // Process redemptions for spent points
+      redemptions?.forEach((r: { points_spent: number; redeemed_at: string }) => {
+        const month = new Date(r.redeemed_at).toLocaleString('default', { month: 'short' });
+        if (!monthlyData[month]) monthlyData[month] = { issued: 0, spent: 0, fans: 0 };
+        monthlyData[month].spent += r.points_spent || 0;
+      });
+
+      // Convert to arrays for charts
+      const last5Months = Object.keys(monthlyData).slice(-5);
+      const pointsFlowData = last5Months.map(month => ({
+        month,
+        issued: monthlyData[month].issued,
+        spent: monthlyData[month].spent
+      }));
+
+      // Fan growth data - simpler approximation based on membership dates
+      const { data: memberships } = await supabase
+        .from("fan_memberships")
+        .select("joined_at")
+        .eq("club_id", clubData.id)
+        .order("joined_at", { ascending: true });
+
+      const fanGrowthData: { month: string; fans: number }[] = [];
+      let cumulativeFans = 0;
+      const monthlyFans: { [key: string]: number } = {};
+      
+      memberships?.forEach((m: { joined_at: string }) => {
+        const month = new Date(m.joined_at).toLocaleString('default', { month: 'short' });
+        monthlyFans[month] = (monthlyFans[month] || 0) + 1;
+      });
+
+      Object.entries(monthlyFans).slice(-5).forEach(([month, count]) => {
+        cumulativeFans += count;
+        fanGrowthData.push({ month, fans: cumulativeFans });
+      });
+
+      setPointsFlow(pointsFlowData.length > 0 ? pointsFlowData : [
+        { month: "Jan", issued: 0, spent: 0 },
+        { month: "Feb", issued: 0, spent: 0 },
+        { month: "Mar", issued: 0, spent: 0 },
+        { month: "Apr", issued: 0, spent: 0 },
+        { month: "May", issued: 0, spent: 0 }
+      ]);
+      
+      setFansGrowth(fanGrowthData.length > 0 ? fanGrowthData : [
+        { month: "Jan", fans: 0 },
+        { month: "Feb", fans: 0 },
+        { month: "Mar", fans: 0 },
+        { month: "Apr", fans: 0 },
+        { month: "May", fans: fans ?? 0 }
+      ]);
     } finally {
       setDataLoading(false);
     }

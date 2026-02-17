@@ -1,6 +1,6 @@
 import { Trophy, Medal, Award, Crown, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ interface LeaderboardFan {
   points: number;
   rank: number;
   isCurrentUser?: boolean;
+  avatar_url?: string | null;
 }
 
 interface FanLeaderboardProps {
@@ -96,6 +97,7 @@ export function FanLeaderboard({
             {/* 2nd Place */}
             <div className="flex flex-col items-center">
               <Avatar className="h-12 w-12 border-2 border-gray-400">
+                <AvatarImage src={topThree[1]?.avatar_url || undefined} />
                 <AvatarFallback className="bg-gray-100 text-gray-600 font-bold">
                   {topThree[1]?.name.charAt(0) || "?"}
                 </AvatarFallback>
@@ -115,6 +117,7 @@ export function FanLeaderboard({
             <div className="flex flex-col items-center -mb-4">
               <Crown className="h-6 w-6 text-yellow-500 mb-1" />
               <Avatar className="h-16 w-16 border-4 border-yellow-500 ring-2 ring-yellow-200">
+                <AvatarImage src={topThree[0]?.avatar_url || undefined} />
                 <AvatarFallback className="bg-yellow-100 text-yellow-700 font-bold text-xl">
                   {topThree[0]?.name.charAt(0) || "?"}
                 </AvatarFallback>
@@ -133,6 +136,7 @@ export function FanLeaderboard({
             {/* 3rd Place */}
             <div className="flex flex-col items-center">
               <Avatar className="h-12 w-12 border-2 border-amber-600">
+                <AvatarImage src={topThree[2]?.avatar_url || undefined} />
                 <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
                   {topThree[2]?.name.charAt(0) || "?"}
                 </AvatarFallback>
@@ -173,6 +177,7 @@ export function FanLeaderboard({
                     fan.rank === 3 && "ring-2 ring-amber-500",
                   )}
                 >
+                  <AvatarImage src={fan.avatar_url || undefined} />
                   <AvatarFallback
                     className={cn(
                       fan.rank === 1 && "bg-yellow-100 text-yellow-700",

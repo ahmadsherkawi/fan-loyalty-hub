@@ -46,6 +46,9 @@ interface Tier {
   id: string;
   name: string;
   points_threshold: number;
+  multiplier?: number;
+  discount_percent?: number;
+  perks?: any;
 }
 
 export default function FanProfilePage() {
@@ -146,32 +149,52 @@ export default function FanProfilePage() {
     if (!loading && profile) fetchData();
   }, [loading, user, profile]);
 
-  // Load existing avatar
+  // Load existing avatar - consistent with FanHome
   useEffect(() => {
-    if (!user) return;
+    if (isPreviewMode) return;
+    if (!profile?.id) return;
+
     const loadAvatar = async () => {
-      const { data } = await supabase.storage.from("fan-avatars").list(user.id);
+      // First, try to get avatar_url from the profile (database)
+      if (profile.avatar_url) {
+        setAvatarUrl(profile.avatar_url + "?t=" + Date.now());
+        return;
+      }
+
+      // Fallback: check storage bucket
+      const { data } = await supabase.storage.from("fan-avatars").list(profile.id);
       if (data && data.length > 0) {
         const avatarFile = data.find((f) => f.name.startsWith("avatar"));
         if (avatarFile) {
-          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${user.id}/${avatarFile.name}`);
+          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${profile.id}/${avatarFile.name}`);
           setAvatarUrl(urlData.publicUrl + "?t=" + Date.now());
         }
       }
     };
     loadAvatar();
-  }, [user]);
+  }, [profile, isPreviewMode]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !profile?.id) return;
     setAvatarUploading(true);
     try {
       const fileExt = file.name.split(".").pop();
-      const filePath = `${user.id}/avatar.${fileExt}`;
+      const filePath = `${profile.id}/avatar.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("fan-avatars").upload(filePath, file, { upsert: true });
       if (uploadError) { console.error("Avatar upload error:", uploadError); toast.error("Failed to upload avatar: " + uploadError.message); return; }
       const { data: publicUrl } = supabase.storage.from("fan-avatars").getPublicUrl(filePath);
+      
+      // Save avatar_url to profile in database for consistency
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl.publicUrl })
+        .eq("id", profile.id);
+
+      if (updateError) {
+        console.error("Failed to update profile avatar_url:", updateError);
+      }
+      
       setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
       toast.success("Profile picture updated!");
     } finally {
@@ -220,9 +243,19 @@ export default function FanProfilePage() {
             </Button>
             <Logo size="sm" />
           </div>
-          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate("/fan/profile/edit")} 
+              className="rounded-full"
+            >
+              <User className="h-4 w-4 mr-2" /> Edit Profile
+            </Button>
+            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -233,11 +266,6 @@ export default function FanProfilePage() {
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6">
-            {/* Club Logo */}
-            {club?.logo_url && (
-              <img src={club.logo_url} alt={club.name} className="w-14 h-14 rounded-xl object-cover border border-white/10 shadow-lg" />
-            )}
-
             {/* Fan Avatar with upload */}
             <div className="relative group flex-shrink-0">
               <div className="h-24 w-24 rounded-2xl border-4 border-primary/30 shadow-stadium overflow-hidden bg-card/30">

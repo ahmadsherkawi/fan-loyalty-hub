@@ -26,8 +26,8 @@ import {
   TrendingUp,
   Sparkles,
   Crown,
-  Camera } from
-"lucide-react";
+  Camera,
+  Settings } from "lucide-react";
 
 import { toast } from "sonner";
 import type { Club, LoyaltyProgram } from "@/types/database";
@@ -236,7 +236,8 @@ export default function ClubDashboard() {
   const navLinks = [
   { label: "Seasons", icon: <Calendar className="h-4 w-4" />, path: "/club/seasons" },
   { label: "Analytics", icon: <BarChart3 className="h-4 w-4" />, path: "/club/analytics" },
-  { label: "Tiers", icon: <Crown className="h-4 w-4" />, path: "/club/tiers" }];
+  { label: "Tiers", icon: <Crown className="h-4 w-4" />, path: "/club/tiers" },
+  { label: "Settings", icon: <Settings className="h-4 w-4" />, path: "/club/profile" }];
 
 
   return (

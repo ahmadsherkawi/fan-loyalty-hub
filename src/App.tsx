@@ -24,6 +24,7 @@ import ClaimReview from "./pages/club/ClaimReview";
 import ClubAnalytics from "./pages/club/ClubAnalytics";
 import ClubSeasons from "./pages/club/ClubSeasons";
 import TierManagement from "./pages/club/TierManagement";
+import ClubProfileEdit from "./pages/club/ClubProfileEdit";
 
 // Fan pages
 import FanHome from "./pages/fan/FanHome";
@@ -31,8 +32,9 @@ import FanActivities from "./pages/fan/FanActivities";
 import FanRewards from "./pages/fan/FanRewards";
 import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
 import FanProfilePage from "./pages/fan/FanProfilePage";
+import FanProfileEdit from "./pages/fan/FanProfileEdit";
 import JoinClub from "./pages/fan/JoinClub";
-import FanNotifications from "./pages/fan/FanNotifications"; // ✅ FIXED IMPORT
+import FanNotifications from "./pages/fan/FanNotifications";
 import SystemAdmin from "./pages/SystemAdmin";
 
 const queryClient = new QueryClient();
@@ -64,12 +66,14 @@ const App = () => {
                 <Route path="/club/seasons" element={<ClubSeasons />} />
                 {/* ✅ Tier management */}
                 <Route path="/club/tiers" element={<TierManagement />} />
+                <Route path="/club/profile" element={<ClubProfileEdit />} />
                 {/* ================= FAN ================= */}
                 <Route path="/fan/home" element={<FanHome />} />
                 <Route path="/fan/activities" element={<FanActivities />} />
                 <Route path="/fan/rewards" element={<FanRewards />} />
                 <Route path="/fan/leaderboard" element={<FanLeaderboardPage />} />
                 <Route path="/fan/profile" element={<FanProfilePage />} />
+                <Route path="/fan/profile/edit" element={<FanProfileEdit />} />
                 <Route path="/fan/join" element={<JoinClub />} />
                 <Route path="/fan/notifications" element={<FanNotifications />} /> {/* ✅ CORRECT ROUTE */}
                 {/* System Admin */}

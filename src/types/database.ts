@@ -12,7 +12,17 @@ export interface Profile {
   id: string;
   user_id: string;
   email: string;
+  username: string | null;
   full_name: string | null;
+  phone: string | null;
+  date_of_birth: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  preferred_language: string | null;
+  notifications_enabled: boolean | null;
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -22,11 +32,24 @@ export interface Club {
   id: string;
   admin_id: string;
   name: string;
+  slug: string | null;
   logo_url: string | null;
+  banner_url: string | null;
+  description: string | null;
+  founded_year: number | null;
   primary_color: string | null;
+  secondary_color: string | null;
   country: string;
   city: string;
   stadium_name: string | null;
+  stadium_capacity: number | null;
+  website_url: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  social_facebook: string | null;
+  social_twitter: string | null;
+  social_instagram: string | null;
+  social_youtube: string | null;
   season_start: string | null;
   season_end: string | null;
   status: ClubStatus;
@@ -149,6 +172,7 @@ export interface RewardRedemption {
   points_spent: number;
   redemption_code: string | null;
   fulfilled_at: string | null;
+  completed_at: string | null;
   redeemed_at: string;
 }
 
@@ -168,4 +192,50 @@ export interface ActivityWithCompletion extends Activity {
 export interface RewardWithAvailability extends Reward {
   isAvailable: boolean;
   remainingQuantity: number | null;
+}
+
+// Tier types
+export interface Tier {
+  id: string;
+  program_id: string;
+  name: string;
+  rank: number;
+  points_threshold: number;
+  multiplier: number;
+  discount_percent: number;
+  perks: Record<string, unknown>[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TierBenefit {
+  id: string;
+  tier_id: string;
+  benefit_type: string;
+  benefit_value: string;
+  benefit_label: string;
+  created_at: string;
+}
+
+// Notification types
+export type NotificationType =
+  | "points_earned"
+  | "reward_redeemed"
+  | "tier_upgraded"
+  | "new_activity"
+  | "claim_approved"
+  | "claim_rejected"
+  | "smart_nudge"
+  | "streak_reminder"
+  | "new_reward"
+  | "proximity_nudge";
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string | null;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
 }

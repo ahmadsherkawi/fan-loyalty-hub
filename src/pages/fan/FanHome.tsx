@@ -26,6 +26,7 @@ import {
   Sparkles,
   TrendingUp,
   Camera,
+  BarChart3,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -35,6 +36,8 @@ interface Tier {
   name: string;
   rank: number;
   points_threshold: number;
+  multiplier?: number;
+  discount_percent?: number;
   perks: any;
 }
 
@@ -68,21 +71,30 @@ export default function FanHome() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
-  /* ================= LOAD EXISTING AVATAR ================= */
+  /* ================= LOAD AVATAR FROM PROFILE (consistent with FanProfilePage) ================= */
   useEffect(() => {
-    if (!user) return;
+    if (isPreviewMode) return;
+    if (!profile?.id) return;
+
     const loadAvatar = async () => {
-      const { data } = await supabase.storage.from("fan-avatars").list(user.id);
+      // First, try to get avatar_url from the profile (database)
+      if (profile.avatar_url) {
+        setAvatarUrl(profile.avatar_url + "?t=" + Date.now());
+        return;
+      }
+
+      // Fallback: check storage bucket
+      const { data } = await supabase.storage.from("fan-avatars").list(profile.id);
       if (data && data.length > 0) {
         const avatarFile = data.find((f) => f.name.startsWith("avatar"));
         if (avatarFile) {
-          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${user.id}/${avatarFile.name}`);
+          const { data: urlData } = supabase.storage.from("fan-avatars").getPublicUrl(`${profile.id}/${avatarFile.name}`);
           setAvatarUrl(urlData.publicUrl + "?t=" + Date.now());
         }
       }
     };
     loadAvatar();
-  }, [user]);
+  }, [profile, isPreviewMode]);
 
   /* ================= AUTH ================= */
   useEffect(() => {
@@ -178,22 +190,70 @@ export default function FanHome() {
       setNextTier(next);
 
       if (current?.id) {
-        const { data: benefits } = await supabase.from("tier_benefits").select("*").eq("tier_id", current.id);
+        // Get tier benefits from tier_benefits table
+        const { data: benefits } = await supabase
+          .from("tier_benefits")
+          .select("*")
+          .eq("tier_id", current.id);
+        
         if (benefits && benefits.length > 0) {
-          setTierBenefits(benefits);
+          // Map the tier_benefits to the expected format
+          setTierBenefits(
+            benefits.map((b: any) => ({
+              id: b.id,
+              name: b.benefit_label || b.benefit_type,
+              description: `${b.benefit_type === 'points_multiplier' ? 'Earn ' + b.benefit_value + 'x points' : b.benefit_value + '% off rewards'}`,
+              benefit_type: b.benefit_type,
+              benefit_value: b.benefit_value,
+            }))
+          );
         } else if (current.perks) {
           // Fallback: use perks from the tier itself
           const perksArray = Array.isArray(current.perks) ? current.perks : [current.perks];
           setTierBenefits(
-            perksArray.map((p: any, i: number) => ({
-              id: `perk-${i}`,
-              name: typeof p === "string" ? p : p?.name || p?.description || "Perk",
-              description: typeof p === "string" ? p : p?.description || "",
-            })),
+            perksArray.map((p: any, i: number) => {
+              // Handle different perk formats
+              if (typeof p === "string") {
+                return {
+                  id: `perk-${i}`,
+                  name: p,
+                  description: p,
+                };
+              } else if (typeof p === "object" && p !== null) {
+                return {
+                  id: `perk-${i}`,
+                  name: p.name || p.title || p.description || `Benefit ${i + 1}`,
+                  description: p.description || p.name || "",
+                };
+              }
+              return {
+                id: `perk-${i}`,
+                name: `Benefit ${i + 1}`,
+                description: "",
+              };
+            }),
           );
         } else {
-          setTierBenefits([]);
+          // Default benefits based on multiplier and discount
+          const defaultBenefits = [];
+          if (current.multiplier && current.multiplier > 1) {
+            defaultBenefits.push({
+              id: `${current.id}-multiplier`,
+              name: "Points Multiplier",
+              description: `Earn ${current.multiplier}x points on all activities`,
+            });
+          }
+          if (current.discount_percent && current.discount_percent > 0) {
+            defaultBenefits.push({
+              id: `${current.id}-discount`,
+              name: "Reward Discount",
+              description: `Get ${current.discount_percent}% off on reward redemptions`,
+            });
+          }
+          setTierBenefits(defaultBenefits);
         }
+      } else {
+        setTierBenefits([]);
       }
 
       const { count } = await supabase
@@ -215,12 +275,12 @@ export default function FanHome() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !profile?.id) return;
 
     setAvatarUploading(true);
     try {
       const fileExt = file.name.split(".").pop();
-      const filePath = `${user.id}/avatar.${fileExt}`;
+      const filePath = `${profile.id}/avatar.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("fan-avatars")
@@ -233,8 +293,19 @@ export default function FanHome() {
       }
 
       const { data: publicUrl } = supabase.storage.from("fan-avatars").getPublicUrl(filePath);
+      const newAvatarUrl = publicUrl.publicUrl + "?t=" + Date.now();
 
-      setAvatarUrl(publicUrl.publicUrl + "?t=" + Date.now());
+      // Save avatar_url to profile in database for consistency
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl.publicUrl })
+        .eq("id", profile.id);
+
+      if (updateError) {
+        console.error("Failed to update profile avatar_url:", updateError);
+      }
+
+      setAvatarUrl(newAvatarUrl);
       toast.success("Profile picture updated!");
     } finally {
       setAvatarUploading(false);
@@ -270,6 +341,15 @@ export default function FanHome() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/fan/leaderboard")}
+              className="relative rounded-full text-muted-foreground hover:text-foreground"
+              title="Leaderboard"
+            >
+              <BarChart3 className="h-5 w-5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"

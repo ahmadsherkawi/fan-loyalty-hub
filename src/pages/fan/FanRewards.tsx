@@ -10,7 +10,8 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut, Sparkles } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut, Sparkles, Clock, CheckCircle, Copy } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
 
 import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
 
@@ -18,6 +19,7 @@ interface RedemptionWithReward extends RewardRedemption {
   rewards?: {
     name: string;
     description: string | null;
+    redemption_method?: string;
   };
 }
 
@@ -167,7 +169,14 @@ export default function FanRewards() {
       setSelectedReward(null);
       await fetchData();
 
-      return { success: true };
+      return { 
+        success: true, 
+        final_cost: data.final_cost,
+        balance_after: data.balance_after,
+        redemption_code: data.redemption_code,
+        redemption_method: data.redemption_method,
+        reward_name: data.reward_name
+      };
     } catch (err: any) {
       const message = err?.message || "Redemption failed.";
       toast({
@@ -324,20 +333,73 @@ export default function FanRewards() {
 
           <TabsContent value="history">
             <div className="space-y-3 mt-6">
-              {redemptions.map((r) => (
-                <Card key={r.id} className="relative overflow-hidden rounded-2xl border-border/40">
-                  <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent pointer-events-none" />
-                  <CardContent className="relative z-10 py-4 flex justify-between">
-                    <div>
-                      <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
-                      <p className="text-sm text-muted-foreground">{new Date(r.redeemed_at).toLocaleDateString()}</p>
-                    </div>
-                    <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">
-                      -{r.points_spent}
-                    </Badge>
+              {redemptions.length === 0 ? (
+                <Card className="rounded-2xl border-border/40">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    No redemptions yet. Redeem your first reward!
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                redemptions.map((r) => {
+                  const isFulfilled = r.fulfilled_at !== null;
+                  const redemptionMethod = r.rewards?.redemption_method || "manual_fulfillment";
+                  
+                  const copyCode = (code: string) => {
+                    navigator.clipboard.writeText(code);
+                    sonnerToast.success("Code copied!");
+                  };
+                  
+                  return (
+                    <Card key={r.id} className="relative overflow-hidden rounded-2xl border-border/40">
+                      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
+                      <CardContent className="relative z-10 py-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
+                              {isFulfilled ? (
+                                <Badge className="bg-green-100 text-green-700 border-green-200">
+                                  <CheckCircle className="h-3 w-3 mr-1" /> Fulfilled
+                                </Badge>
+                              ) : redemptionMethod === "manual_fulfillment" ? (
+                                <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                                  <Clock className="h-3 w-3 mr-1" /> Pending
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                  Ready to Use
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {new Date(r.redeemed_at).toLocaleDateString()}
+                            </p>
+                            
+                            {r.redemption_code && (
+                              <div className="mt-3 flex items-center gap-2">
+                                <div className="bg-muted rounded-lg px-3 py-1.5 font-mono text-sm">
+                                  {r.redemption_code}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => copyCode(r.redemption_code!)}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">
+                            -{r.points_spent}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -40,6 +40,7 @@ import {
   Calendar,
   LogOut,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
 import type { Activity, ActivityFrequency, VerificationMethod, LoyaltyProgram } from "@/types/database";
 
@@ -93,6 +94,9 @@ export default function ActivityBuilder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [qrActivity, setQrActivity] = useState<Activity | null>(null);
+  const [pollResultsActivity, setPollResultsActivity] = useState<Activity | null>(null);
+  const [pollResults, setPollResults] = useState<{ option: string; count: number; percentage: number }[]>([]);
+  const [loadingPollResults, setLoadingPollResults] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -421,6 +425,57 @@ export default function ActivityBuilder() {
     }
   };
 
+  const handleViewPollResults = async (activity: Activity) => {
+    setPollResultsActivity(activity);
+    setLoadingPollResults(true);
+    
+    try {
+      // Fetch all completions for this activity with metadata
+      const { data: completions, error } = await supabase
+        .from("activity_completions")
+        .select("metadata")
+        .eq("activity_id", activity.id);
+      
+      if (error) throw error;
+      
+      // Get the poll config
+      const config = activity.in_app_config as InAppConfig | null;
+      if (!config || !config.options) {
+        setPollResults([]);
+        return;
+      }
+      
+      // Count responses for each option
+      const optionCounts: { [key: string]: number } = {};
+      config.options.forEach(opt => {
+        optionCounts[opt.id] = 0;
+      });
+      
+      let totalResponses = 0;
+      completions?.forEach((c: { metadata?: { selectedOption?: string } }) => {
+        const selectedOption = c.metadata?.selectedOption;
+        if (selectedOption && Object.prototype.hasOwnProperty.call(optionCounts, selectedOption)) {
+          optionCounts[selectedOption]++;
+          totalResponses++;
+        }
+      });
+      
+      // Calculate percentages and format results
+      const results = config.options.map(opt => ({
+        option: opt.text,
+        count: optionCounts[opt.id] || 0,
+        percentage: totalResponses > 0 ? Math.round((optionCounts[opt.id] / totalResponses) * 100) : 0
+      }));
+      
+      setPollResults(results);
+    } catch (error) {
+      console.error("Error loading poll results:", error);
+      setPollResults([]);
+    } finally {
+      setLoadingPollResults(false);
+    }
+  };
+
   if (!isPreviewMode && (loading || dataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -603,6 +658,9 @@ export default function ActivityBuilder() {
                       {activity.verification_method === "qr_scan" && activity.qr_code_data && (
                         <Button variant="outline" size="sm" onClick={() => setQrActivity(activity)} className="gap-1 rounded-full border-border/40"><QrCode className="h-4 w-4" />View QR</Button>
                       )}
+                      {activity.verification_method === "in_app_completion" && activity.in_app_config && (
+                        <Button variant="outline" size="sm" onClick={() => handleViewPollResults(activity)} className="gap-1 rounded-full border-border/40"><BarChart3 className="h-4 w-4" />Results</Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => openEditDialog(activity)} className="rounded-full"><Edit className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive rounded-full" onClick={() => handleDelete(activity.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -619,6 +677,57 @@ export default function ActivityBuilder() {
             <DialogContent className="rounded-2xl border-border/40">
               <DialogHeader><DialogTitle className="font-display">QR Code: {qrActivity.name}</DialogTitle></DialogHeader>
               <QRCodeDisplay data={qrActivity.qr_code_data || ""} activityName={qrActivity.name} />
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Poll Results Modal */}
+        {pollResultsActivity && (
+          <Dialog open={!!pollResultsActivity} onOpenChange={() => { setPollResultsActivity(null); setPollResults([]); }}>
+            <DialogContent className="rounded-2xl border-border/40 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Poll Results: {pollResultsActivity.name}
+                </DialogTitle>
+                <DialogDescription>
+                  {(pollResultsActivity.in_app_config as any)?.question}
+                </DialogDescription>
+              </DialogHeader>
+              
+              {loadingPollResults ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : pollResults.length === 0 ? (
+                <div className="text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No responses yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4 py-4">
+                  {pollResults.map((result, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{result.option}</span>
+                        <span className="text-muted-foreground">{result.count} votes ({result.percentage}%)</span>
+                      </div>
+                      <div className="h-3 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          style={{ width: `${result.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="pt-4 border-t text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Total responses: {pollResults.reduce((sum, r) => sum + r.count, 0)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         )}

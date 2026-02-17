@@ -370,7 +370,35 @@ export default function FanActivities() {
     }
 
     try {
-      await completeViaRpc(selectedActivity);
+      // Store the selected option in metadata for poll results tracking
+      if (isPoll && !isPreviewMode && membership) {
+        // We need to manually complete the activity to include metadata
+        const { error: completionError } = await supabase.from("activity_completions").insert({
+          activity_id: selectedActivity.id,
+          fan_id: profile?.id,
+          membership_id: membership.id,
+          points_earned: Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1)),
+          metadata: { selectedOption: selectedOptionId }
+        });
+        
+        if (completionError) throw completionError;
+        
+        // Update points balance
+        await supabase.rpc("award_points", {
+          p_membership_id: membership.id,
+          p_points: Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1))
+        });
+        
+        const earned = Math.round((selectedActivity.points_awarded || 0) * (multiplier || 1));
+        toast({
+          title: "Activity Completed!",
+          description: `You earned ${earned} ${program?.points_currency_name || "Points"}${multiplier > 1 ? ` (×${multiplier})` : ""}.`
+        });
+        
+        await fetchData();
+      } else {
+        await completeViaRpc(selectedActivity);
+      }
 
       setPollQuizModalOpen(false);
       setSelectedActivity(null);
