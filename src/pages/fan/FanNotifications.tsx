@@ -188,9 +188,9 @@ export default function FanNotifications() {
   };
 
   const markAllAsRead = async () => {
-    if (unreadCount === 0) return;
+    if (unreadCount === 0 || !user) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    await supabase.from("notifications").update({ is_read: true }).eq("user_id", profile?.id).eq("is_read", false);
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false);
   };
 
   const getMessage = (notif: NotificationRow) => {
