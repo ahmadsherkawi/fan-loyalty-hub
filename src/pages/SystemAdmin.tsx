@@ -40,18 +40,9 @@ import type { Club, ClubVerification, Profile } from "@/types/database";
 // ADMIN AUTHENTICATION
 // ============================================
 
-interface AdminSession {
-  id: string;
-  username: string;
-  expiresAt: number;
-}
-
-// Version 4 - Force complete reset
-const ADMIN_SESSION_KEY = "clubpass_admin_auth_session_v4";
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+// Admin credentials - these should match a Supabase Auth user with profile role = 'system_admin'
 
 // IMMEDIATELY clear OLD admin session keys when this module loads
-// This runs before any component code - but NOT V4 (the current version)
 if (typeof window !== 'undefined') {
   const keysToClear = [
     'clubpass_admin_session',
@@ -59,93 +50,22 @@ if (typeof window !== 'undefined') {
     'clubpass_admin_auth_session_v1',
     'clubpass_admin_auth_session_v2',
     'clubpass_admin_auth_session_v3'
-    // NOT clearing V4 - that's the current version for session persistence
   ];
   keysToClear.forEach(key => localStorage.removeItem(key));
-  console.log('[SystemAdmin Module V4] Cleared old admin session keys');
 }
 
-// Simple hash function for password verification
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Pre-computed hash for "admin" password
-const ADMIN_PASSWORD_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
-
-function getStoredAdminSession(): AdminSession | null {
-  console.log('[getStoredAdminSession] Checking localStorage for key:', ADMIN_SESSION_KEY);
+// Check if user is admin by querying their profile role
+async function checkAdminRole(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
   
-  try {
-    const stored = localStorage.getItem(ADMIN_SESSION_KEY);
-    console.log('[getStoredAdminSession] Stored value:', stored);
-    
-    if (!stored) {
-      console.log('[getStoredAdminSession] No stored session found');
-      return null;
-    }
-    
-    const session = JSON.parse(stored) as unknown;
-    
-    // Validate session object has all required properties
-    if (
-      !session ||
-      typeof session !== 'object' ||
-      !('id' in session) ||
-      !('username' in session) ||
-      !('expiresAt' in session) ||
-      typeof (session as AdminSession).id !== 'string' ||
-      typeof (session as AdminSession).username !== 'string' ||
-      typeof (session as AdminSession).expiresAt !== 'number'
-    ) {
-      // Invalid session data, clear it
-      console.log('[getStoredAdminSession] Invalid session structure, clearing');
-      localStorage.removeItem(ADMIN_SESSION_KEY);
-      return null;
-    }
-    
-    const validSession = session as AdminSession;
-    
-    // Check if session has expired
-    if (Date.now() > validSession.expiresAt) {
-      console.log('[getStoredAdminSession] Session expired, clearing');
-      localStorage.removeItem(ADMIN_SESSION_KEY);
-      return null;
-    }
-    
-    // Validate username is 'admin' (only allowed admin)
-    if (validSession.username !== 'admin') {
-      console.log('[getStoredAdminSession] Invalid username, clearing');
-      localStorage.removeItem(ADMIN_SESSION_KEY);
-      return null;
-    }
-    
-    console.log('[getStoredAdminSession] Valid session found:', validSession.username);
-    return validSession;
-  } catch (error) {
-    console.log('[getStoredAdminSession] Error parsing session:', error);
-    // Any error, clear the storage
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    return null;
-  }
-}
-
-function storeAdminSession(username: string): AdminSession {
-  const session: AdminSession = {
-    id: crypto.randomUUID(),
-    username,
-    expiresAt: Date.now() + SESSION_DURATION
-  };
-  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
-  return session;
-}
-
-function clearAdminSession(): void {
-  localStorage.removeItem(ADMIN_SESSION_KEY);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  
+  return profile?.role === 'system_admin';
 }
 
 // ============================================
@@ -209,8 +129,8 @@ interface ClubRequest {
 // ADMIN LOGIN COMPONENT
 // ============================================
 
-function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => void }) {
-  const [username, setUsername] = useState("");
+function AdminLoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -221,23 +141,40 @@ function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => voi
     setLoading(true);
 
     try {
-      // Verify credentials
-      if (username !== "admin") {
-        setError("Invalid username or password");
+      // Sign in with Supabase Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (authError) {
+        setError("Invalid email or password");
         setLoading(false);
         return;
       }
 
-      const passwordHash = await hashPassword(password);
-      if (passwordHash !== ADMIN_PASSWORD_HASH) {
-        setError("Invalid username or password");
+      if (!data.user) {
+        setError("Login failed. Please try again.");
         setLoading(false);
         return;
       }
 
-      // Create session
-      const session = storeAdminSession(username);
-      onLogin(session);
+      // Check if user has admin role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .single();
+
+      if (!profile || profile.role !== 'system_admin') {
+        // Sign out if not admin
+        await supabase.auth.signOut();
+        setError("Access denied. Admin privileges required.");
+        setLoading(false);
+        return;
+      }
+
+      onLogin();
     } catch {
       setError("Login failed. Please try again.");
     } finally {
@@ -294,16 +231,16 @@ function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => voi
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="admin@clubpass.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="h-12 rounded-xl bg-muted/10 border-border/40"
                     required
-                    autoComplete="username"
+                    autoComplete="email"
                   />
                 </div>
                 <div className="space-y-2">
@@ -337,11 +274,6 @@ function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => voi
               </form>
             </CardContent>
           </Card>
-
-          {/* Default credentials hint */}
-          <p className="text-center text-xs text-muted-foreground">
-            Default credentials: <span className="font-mono bg-muted px-1.5 py-0.5 rounded">admin</span> / <span className="font-mono bg-muted px-1.5 py-0.5 rounded">admin</span>
-          </p>
         </div>
       </div>
     </div>
@@ -353,14 +285,13 @@ function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => voi
 // ============================================
 
 export default function SystemAdmin() {
-  console.log('[SystemAdmin] Component mounted - checking authentication...');
-  
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // Admin auth state
-  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
 
   // Data state
   const [dataLoading, setDataLoading] = useState(false);
@@ -396,75 +327,76 @@ export default function SystemAdmin() {
 
   // Check for existing session on mount
   useEffect(() => {
-    console.log('[SystemAdmin V4] useEffect - checking for existing session...');
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Check if user has admin role
+        const isAdminUser = await checkAdminRole();
+        if (isAdminUser) {
+          setIsAdmin(true);
+          setAdminEmail(session.user.email || null);
+        } else {
+          setIsAdmin(false);
+        }
+      }
+      
+      setCheckingSession(false);
+    };
     
-    // Clear only OLD version keys (not current V4)
-    const oldKeys = [
-      'clubpass_admin_session',
-      'clubpass_admin_auth_session',
-      'clubpass_admin_auth_session_v1',
-      'clubpass_admin_auth_session_v2',
-      'clubpass_admin_auth_session_v3'
-    ];
-    oldKeys.forEach(key => localStorage.removeItem(key));
+    checkSession();
     
-    // Check if we have a valid V4 session
-    const session = getStoredAdminSession();
-    console.log('[SystemAdmin V4] Session check result:', session);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const isAdminUser = await checkAdminRole();
+        if (isAdminUser) {
+          setIsAdmin(true);
+          setAdminEmail(session.user.email || null);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setIsAdmin(false);
+        setAdminEmail(null);
+      }
+    });
     
-    setAdminSession(session);
-    setCheckingSession(false);
+    return () => subscription.unsubscribe();
   }, []);
 
   // Load data when admin is authenticated
   useEffect(() => {
-    if (adminSession) {
+    if (isAdmin) {
       fetchAllData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminSession]);
+  }, [isAdmin]);
 
-  const handleAdminLogin = (session: AdminSession) => {
-    setAdminSession(session);
+  const handleAdminLogin = () => {
+    setIsAdmin(true);
+    const { data: { session } } = supabase.auth.getSession();
+    setAdminEmail(session?.user?.email || null);
     toast({
       title: "Welcome, Admin!",
       description: "You have successfully logged in."
     });
   };
 
-  const handleAdminLogout = () => {
-    console.log('[SystemAdmin V4] handleAdminLogout called - clearing all sessions');
-    
-    // Clear ALL possible admin session keys including V4
-    const allKeys = [
-      'clubpass_admin_session',
-      'clubpass_admin_auth_session',
-      'clubpass_admin_auth_session_v1',
-      'clubpass_admin_auth_session_v2',
-      'clubpass_admin_auth_session_v3',
-      'clubpass_admin_auth_session_v4'  // Explicitly include V4
-    ];
-    allKeys.forEach(key => localStorage.removeItem(key));
-    
-    setAdminSession(null);
-    setCheckingSession(false);
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAdmin(false);
+    setAdminEmail(null);
     
     toast({
       title: "Logged out",
       description: "You have been signed out."
     });
     
-    // Force page reload to clear any cached state
-    window.location.reload();
+    navigate("/");
   };
 
   const fetchAllData = useCallback(async () => {
-    // Double-check that we have a valid session before fetching
-    const currentSession = getStoredAdminSession();
-    if (!currentSession) {
-      console.log('[Admin] No valid session, skipping data fetch');
-      return;
-    }
+    const isAdminUser = await checkAdminRole();
+    if (!isAdminUser) return;
     
     setDataLoading(true);
     try {
@@ -848,33 +780,72 @@ export default function SystemAdmin() {
     try {
       setActionLoading(true);
 
-      const { data: programs } = await supabase.from("loyalty_programs").select("id").eq("club_id", clubId);
+      // Get programs for this club
+      const { data: programs, error: programsError } = await supabase
+        .from("loyalty_programs")
+        .select("id")
+        .eq("club_id", clubId);
+      
+      if (programsError) {
+        console.error("Error fetching programs:", programsError);
+      }
+      
       const programIds = programs?.map(p => p.id) || [];
 
       if (programIds.length > 0) {
-        const { data: activities } = await supabase.from("activities").select("id").in("program_id", programIds);
+        const { data: activities, error: activitiesError } = await supabase
+          .from("activities")
+          .select("id")
+          .in("program_id", programIds);
+        
+        if (activitiesError) {
+          console.error("Error fetching activities:", activitiesError);
+        }
+        
         const activityIds = activities?.map(a => a.id) || [];
 
         if (activityIds.length > 0) {
-          await supabase.from("activity_completions").delete().in("activity_id", activityIds);
-          await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+          const { error: completionsError } = await supabase.from("activity_completions").delete().in("activity_id", activityIds);
+          if (completionsError) console.error("Error deleting completions:", completionsError);
+          
+          const { error: claimsError } = await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+          if (claimsError) console.error("Error deleting claims:", claimsError);
         }
 
-        const { data: rewards } = await supabase.from("rewards").select("id").in("program_id", programIds);
+        const { data: rewards, error: rewardsError } = await supabase
+          .from("rewards")
+          .select("id")
+          .in("program_id", programIds);
+        
+        if (rewardsError) {
+          console.error("Error fetching rewards:", rewardsError);
+        }
+        
         const rewardIds = rewards?.map(r => r.id) || [];
 
         if (rewardIds.length > 0) {
-          await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+          const { error: redemptionsError } = await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+          if (redemptionsError) console.error("Error deleting redemptions:", redemptionsError);
         }
 
-        await supabase.from("rewards").delete().in("program_id", programIds);
-        await supabase.from("activities").delete().in("program_id", programIds);
-        await supabase.from("tiers").delete().in("program_id", programIds);
+        const { error: delRewardsError } = await supabase.from("rewards").delete().in("program_id", programIds);
+        if (delRewardsError) console.error("Error deleting rewards:", delRewardsError);
+        
+        const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
+        if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
+        
+        const { error: delTiersError } = await supabase.from("tiers").delete().in("program_id", programIds);
+        if (delTiersError) console.error("Error deleting tiers:", delTiersError);
       }
 
-      await supabase.from("fan_memberships").delete().eq("club_id", clubId);
-      await supabase.from("club_verifications").delete().eq("club_id", clubId);
-      await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
+      const { error: membershipsError } = await supabase.from("fan_memberships").delete().eq("club_id", clubId);
+      if (membershipsError) console.error("Error deleting memberships:", membershipsError);
+      
+      const { error: verificationsError } = await supabase.from("club_verifications").delete().eq("club_id", clubId);
+      if (verificationsError) console.error("Error deleting verifications:", verificationsError);
+      
+      const { error: delProgramsError } = await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
+      if (delProgramsError) console.error("Error deleting programs:", delProgramsError);
 
       const { data: clubData } = await supabase.from("clubs").select("admin_id").eq("id", clubId).single();
 
@@ -885,7 +856,8 @@ export default function SystemAdmin() {
       }
 
       if (clubData?.admin_id) {
-        await supabase.from("profiles").delete().eq("id", clubData.admin_id);
+        const { error: profileError } = await supabase.from("profiles").delete().eq("id", clubData.admin_id);
+        if (profileError) console.error("Error deleting admin profile:", profileError);
       }
 
       toast({ title: "Club Deleted", description: `${clubName} and all associated data have been removed.` });
@@ -895,14 +867,12 @@ export default function SystemAdmin() {
       toast({ title: "Error", description: "Failed to delete club", variant: "destructive" });
     } finally {
       setActionLoading(false);
+      setClubToDelete(null);
     }
   };
 
-  // Loading state - always show spinner while checking session
-  console.log('[SystemAdmin] Render - checkingSession:', checkingSession, 'adminSession:', adminSession?.username || 'null');
-  
+  // Loading state
   if (checkingSession) {
-    console.log('[SystemAdmin] Showing loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -913,27 +883,12 @@ export default function SystemAdmin() {
     );
   }
 
-  // Show login if not authenticated - this is ALWAYS the case now
-  if (!adminSession) {
-    console.log('[SystemAdmin V4] Showing LOGIN SCREEN (no session)');
-    return (
-      <>
-        {/* Fixed Banner at top of login screen */}
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-green-400 to-teal-500 text-black px-4 py-3 text-center shadow-xl">
-          <span className="font-bold text-lg">🔐 LOGIN SCREEN V4 - Session Cleared</span>
-          <span className="ml-4 bg-black/20 px-3 py-1 rounded text-sm font-mono">admin / admin</span>
-        </div>
-        <div className="bg-blue-600 text-white px-4 py-2 text-center text-xs fixed top-[52px] left-0 right-0 z-[9998]">
-          💡 If you see dashboard instead, press <strong>Ctrl+Shift+R</strong> (or Cmd+Shift+R on Mac) to hard refresh
-        </div>
-        <div className="pt-20">
-          <AdminLoginScreen onLogin={handleAdminLogin} />
-        </div>
-      </>
-    );
+  // Show login if not authenticated
+  if (!isAdmin) {
+    return <AdminLoginScreen onLogin={handleAdminLogin} />;
   }
 
-  console.log('[SystemAdmin] Showing DASHBOARD for user:', adminSession.username);
+
 
   // Dashboard
   const filteredClubs = clubs.filter((c) =>
@@ -961,22 +916,6 @@ export default function SystemAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* PROMINENT DEBUG BANNER - VISIBLE ON DASHBOARD */}
-      <div className="sticky top-0 z-[9999] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 text-black px-4 py-3 flex items-center justify-center gap-4 shadow-xl">
-        <span className="font-bold text-lg">🔐 DASHBOARD V4 LOADED</span>
-        <span className="text-sm">| Session: {adminSession?.username || 'unknown'}</span>
-        <Button 
-          size="sm" 
-          onClick={handleAdminLogout}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg shadow-lg"
-        >
-          <LogOut className="h-4 w-4 mr-2" /> SIGN OUT
-        </Button>
-      </div>
-      <div className="bg-blue-600 text-white px-4 py-2 text-center text-xs">
-        💡 If you don't see this banner, press <strong>Ctrl+Shift+R</strong> (or Cmd+Shift+R on Mac) to hard refresh
-      </div>
-      
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
@@ -990,7 +929,7 @@ export default function SystemAdmin() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {adminSession?.username || 'Unknown'}</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {adminEmail || 'Admin'}</span>
             <Button variant="ghost" size="sm" onClick={fetchAllData} className="rounded-full text-muted-foreground hover:text-foreground">
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
