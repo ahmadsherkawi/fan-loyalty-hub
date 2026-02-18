@@ -24,21 +24,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  // Fetch profile by user_id
+  // Fetch profile by user_id, also check user_roles table for role
   const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
-      const { data, error } = await supabase
+      // First, fetch the profile
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (error) {
-        console.error("[Auth] Error fetching profile:", error);
+      if (profileError) {
+        console.error("[Auth] Error fetching profile:", profileError);
         return null;
       }
 
-      return data as Profile | null;
+      if (!profileData) {
+        return null;
+      }
+
+      // If profile has no role or role is 'fan', check user_roles table
+      if (!profileData.role || profileData.role === 'fan') {
+        console.log("[Auth] Checking user_roles table for role...");
+        
+        // Try to get role from user_roles table using RPC function
+        const { data: roleFromTable, error: roleError } = await supabase
+          .rpc("get_user_role", { p_user_id: userId });
+
+        if (!roleError && roleFromTable) {
+          console.log("[Auth] Found role in user_roles table:", roleFromTable);
+          
+          // Update profile with the correct role from user_roles
+          if (roleFromTable !== profileData.role) {
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({ role: roleFromTable })
+              .eq("user_id", userId);
+            
+            if (!updateError) {
+              profileData.role = roleFromTable;
+              console.log("[Auth] Updated profile role to:", roleFromTable);
+            }
+          }
+        }
+      }
+
+      return profileData as Profile | null;
     } catch (err) {
       console.error("[Auth] Exception fetching profile:", err);
       return null;
