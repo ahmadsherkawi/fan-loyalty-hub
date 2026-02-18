@@ -228,7 +228,8 @@ export default function ClubDashboard() {
     { icon: <Zap className="h-5 w-5" />, label: "Activities", value: stats.activities, gradient: "from-blue-500/30 to-blue-500/5", iconColor: "text-blue-400" },
     { icon: <Gift className="h-5 w-5" />, label: "Rewards", value: stats.rewards, gradient: "from-accent/30 to-accent/5", iconColor: "text-accent" },
     { icon: <FileCheck className="h-5 w-5" />, label: "Pending", value: stats.claims, gradient: "from-orange-500/30 to-orange-500/5", iconColor: "text-orange-400" },
-    { icon: <Trophy className="h-5 w-5" />, label: "Points", value: stats.points, gradient: "from-purple-500/30 to-purple-500/5", iconColor: "text-purple-400" ];
+    { icon: <Trophy className="h-5 w-5" />, label: "Points", value: stats.points, gradient: "from-purple-500/30 to-purple-500/5", iconColor: "text-purple-400" }
+  ];
 
   // Actions are disabled for unverified clubs
   const actions = [
