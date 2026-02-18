@@ -237,119 +237,111 @@ export default function FanProfilePage() {
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Logo size="sm" />
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => navigate("/fan/profile/edit")} 
-              className="rounded-full"
-            >
-              <User className="h-4 w-4 mr-2" /> Edit Profile
+            <Button variant="outline" size="sm" onClick={() => navigate("/fan/profile/edit")} className="rounded-full border-border/50 text-xs h-9">
+              <User className="h-3.5 w-3.5 mr-1.5" /> Edit Profile
             </Button>
-            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container py-10 space-y-10">
+      <main className="container py-8 space-y-6">
+        {/* Hero card */}
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6">
-            {/* Fan Avatar with upload */}
-            <div className="relative group flex-shrink-0">
-              <div className="h-24 w-24 rounded-2xl border-4 border-primary/30 shadow-stadium overflow-hidden bg-card/30">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary/20">
-                    <span className="text-3xl font-display font-bold text-primary">{displayName.charAt(0)}</span>
+          <div className="relative z-10 p-6 md:p-10">
+            <div className="flex flex-col md:flex-row md:items-end gap-6">
+              {/* Avatar */}
+              <div className="relative group flex-shrink-0">
+                <div className="h-24 w-24 rounded-3xl border-4 border-white/15 shadow-stadium overflow-hidden bg-white/10">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-4xl font-display font-bold text-white/40">{displayName.charAt(0)}</span>
+                    </div>
+                  )}
+                </div>
+                <label className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-3xl">
+                  {avatarUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                </label>
+              </div>
+
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">My Profile</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white">{displayName}</h1>
+                <p className="text-white/50 text-sm mt-0.5">{club?.name}</p>
+
+                {currentTier && (
+                  <div className="mt-4 glass-dark rounded-2xl px-5 py-4 inline-block max-w-xs">
+                    <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full mb-2">
+                      <Trophy className="h-3 w-3 mr-1.5" />
+                      {currentTier.name} Tier
+                    </Badge>
+                    {nextTier ? (
+                      <>
+                        <Progress value={progress} className="h-1.5 bg-white/10" />
+                        <p className="text-xs text-white/40 mt-1.5">{nextTier.points_threshold - earnedPoints} pts to {nextTier.name}</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-white/40">🏆 Highest tier reached</p>
+                    )}
                   </div>
                 )}
               </div>
-              <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
-                {avatarUploading ? (
-                  <Loader2 className="h-5 w-5 text-white animate-spin" />
-                ) : (
-                  <Camera className="h-5 w-5 text-white" />
-                )}
-                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
-              </label>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="h-4 w-4 text-accent" />
-                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Profile</span>
-              </div>
-              <h1 className="text-3xl font-display font-bold text-white">{displayName}</h1>
-              <p className="text-white/50">{club?.name}</p>
-
-              {currentTier && (
-                <div className="mt-4 glass-dark rounded-2xl px-5 py-4 max-w-md">
-                  <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full mb-2">
-                    <Trophy className="h-3 w-3 mr-1" />
-                    {currentTier.name}
-                  </Badge>
-
-                  {nextTier ? (
-                    <>
-                      <Progress value={progress} className="h-2 bg-white/10" />
-                      <p className="text-xs text-white/40 mt-2">
-                        {nextTier.points_threshold - earnedPoints} pts to {nextTier.name}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-white/40">Highest tier reached</p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
 
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 max-w-md mx-auto mb-8 rounded-full h-11 bg-card border border-border/40">
-            <TabsTrigger value="badges" className="rounded-full">Badges</TabsTrigger>
-            <TabsTrigger value="activities" className="rounded-full">Activities</TabsTrigger>
-            <TabsTrigger value="rewards" className="rounded-full">Rewards</TabsTrigger>
+          <TabsList className="grid grid-cols-3 max-w-sm mx-auto rounded-full h-10 bg-card border border-border/40 p-1">
+            <TabsTrigger value="badges" className="rounded-full text-xs font-semibold">Badges</TabsTrigger>
+            <TabsTrigger value="activities" className="rounded-full text-xs font-semibold">Activities</TabsTrigger>
+            <TabsTrigger value="rewards" className="rounded-full text-xs font-semibold">Rewards</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="badges">
+          <TabsContent value="badges" className="mt-6">
             <BadgeDisplay badges={badges} title="All Badges" showAll />
           </TabsContent>
 
-          <TabsContent value="activities">
-            {completions.map((c) => (
-              <Card key={c.id} className="mb-3 relative overflow-hidden rounded-2xl border-border/40">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-                <CardContent className="relative z-10 py-4 flex justify-between">
-                  <span className="font-semibold text-foreground">{c.activities?.name}</span>
-                  <Badge className="rounded-full bg-primary/10 text-primary border-primary/20">+{c.points_earned}</Badge>
-                </CardContent>
-              </Card>
+          <TabsContent value="activities" className="mt-6 space-y-3">
+            {completions.length === 0 ? (
+              <div className="rounded-3xl bg-card border border-border/40 p-10 text-center text-muted-foreground text-sm">No activities completed yet</div>
+            ) : completions.map((c) => (
+              <div key={c.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 px-5 py-4 flex justify-between items-center card-hover">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/6 to-transparent rounded-3xl pointer-events-none" />
+                <span className="font-semibold text-foreground text-sm relative z-10">{c.activities?.name}</span>
+                <Badge className="relative z-10 rounded-full bg-primary/15 text-primary border-primary/25 text-xs">+{c.points_earned}</Badge>
+              </div>
             ))}
           </TabsContent>
 
-          <TabsContent value="rewards">
-            {redemptions.map((r) => (
-              <Card key={r.id} className="mb-3 relative overflow-hidden rounded-2xl border-border/40">
-                <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent pointer-events-none" />
-                <CardContent className="relative z-10 py-4 flex justify-between">
-                  <span className="font-semibold text-foreground">{r.rewards?.name}</span>
-                  <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">-{r.points_spent}</Badge>
-                </CardContent>
-              </Card>
+          <TabsContent value="rewards" className="mt-6 space-y-3">
+            {redemptions.length === 0 ? (
+              <div className="rounded-3xl bg-card border border-border/40 p-10 text-center text-muted-foreground text-sm">No rewards redeemed yet</div>
+            ) : redemptions.map((r) => (
+              <div key={r.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 px-5 py-4 flex justify-between items-center card-hover">
+                <div className="absolute inset-0 bg-gradient-to-r from-destructive/5 to-transparent rounded-3xl pointer-events-none" />
+                <span className="font-semibold text-foreground text-sm relative z-10">{r.rewards?.name}</span>
+                <Badge className="relative z-10 rounded-full bg-destructive/10 text-destructive border-destructive/20 text-xs">-{r.points_spent}</Badge>
+              </div>
             ))}
           </TabsContent>
         </Tabs>

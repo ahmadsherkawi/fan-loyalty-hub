@@ -214,72 +214,61 @@ export default function FanRewards() {
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/fan/home")}
-              className="rounded-full text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Logo size="sm" />
           </div>
-          <Button
-            variant="ghost"
-            onClick={handleSignOut}
-            className="rounded-full text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+            <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
           </Button>
         </div>
       </header>
 
-      <main className="container py-10 space-y-10">
+      <main className="container py-8 space-y-8">
         {/* HERO */}
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="relative z-10 p-8 md:p-10">
-            <div className="flex justify-between items-center">
+          <div className="relative z-10 p-6 md:p-10">
+            <div className="flex justify-between items-center gap-4 flex-wrap">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-4 w-4 text-accent" />
-                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Redeem</span>
+                  <Sparkles className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Redeem</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Rewards</h1>
               </div>
 
-              <div className="glass-dark rounded-2xl px-5 py-3 flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent" />
-                <span className="font-display font-bold text-accent">{balance}</span>
-                <span className="text-white/50 text-sm">{currency}</span>
+              <div className="flex items-center gap-3">
+                {discountPercent > 0 && (
+                  <div className="glass-dark rounded-2xl px-4 py-2.5 flex items-center gap-1.5 text-sm text-accent font-semibold">
+                    <Percent className="h-4 w-4" />
+                    {discountPercent}% off
+                  </div>
+                )}
+                <div className="glass-dark rounded-2xl px-5 py-3 flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-accent" />
+                  <span className="font-display font-bold text-gradient-accent">{balance}</span>
+                  <span className="text-white/50 text-sm">{currency}</span>
+                </div>
               </div>
             </div>
-
-            {discountPercent > 0 && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-accent font-semibold">
-                <Percent className="h-4 w-4" />
-                {discountPercent}% tier discount applied
-              </div>
-            )}
           </div>
         </div>
 
         {/* TABS */}
         <Tabs defaultValue="available">
-          <TabsList className="grid grid-cols-2 max-w-md rounded-full h-11 bg-card border border-border/40">
-            <TabsTrigger value="available" className="rounded-full">
-              Available
-            </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-full">
-              My Redemptions
-            </TabsTrigger>
+          <TabsList className="grid grid-cols-2 max-w-sm rounded-full h-10 bg-card border border-border/40 p-1">
+            <TabsTrigger value="available" className="rounded-full text-xs font-semibold">Available</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-full text-xs font-semibold">My Redemptions</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="available">
-            <div className="grid md:grid-cols-3 gap-4 mt-6">
+          <TabsContent value="available" className="mt-6">
+            <div className="grid md:grid-cols-3 gap-4">
               {rewards.map((reward) => {
                 const originalCost = reward.points_cost;
                 const discountAmount = Math.round(originalCost * (discountPercent / 100));
@@ -287,119 +276,81 @@ export default function FanRewards() {
                 const canAfford = balance >= finalCost;
 
                 return (
-                  <Card key={reward.id} className="relative overflow-hidden rounded-2xl border-border/40 card-hover">
-                    <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none" />
-                    <CardContent className="relative z-10 pt-6">
-                      <h3 className="font-display font-semibold text-foreground">{reward.name}</h3>
-                      <p className="text-sm text-muted-foreground">{reward.description}</p>
-
-                      {discountPercent > 0 && (
-                        <>
-                          <p className="text-xs line-through text-muted-foreground mt-2">
-                            {originalCost} {currency}
-                          </p>
-                          <p className="text-xs text-primary">
-                            -{discountAmount} {currency} ({discountPercent}% off)
-                          </p>
-                        </>
-                      )}
-
-                      <Badge className="mt-2 rounded-full bg-accent/10 text-accent border-accent/20">
-                        Cost: {finalCost} {currency}
+                  <div key={reward.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 card-hover flex flex-col gap-3">
+                    <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-3xl" />
+                    <div className="relative z-10 flex items-start justify-between gap-2">
+                      <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
+                        <Gift className="h-5 w-5 text-accent" />
+                      </div>
+                      <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs shrink-0">
+                        {finalCost} {currency}
                       </Badge>
-
-                      {reward.days_to_reach !== null && reward.days_to_reach !== undefined && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          ~{Math.ceil(reward.days_to_reach)} days to unlock
-                        </p>
+                    </div>
+                    <div className="relative z-10 flex-1">
+                      <h3 className="font-display font-bold text-foreground text-sm">{reward.name}</h3>
+                      {reward.description && <p className="text-xs text-muted-foreground mt-0.5">{reward.description}</p>}
+                      {discountPercent > 0 && (
+                        <p className="text-xs text-primary mt-1">−{discountPercent}% discount applied</p>
                       )}
-
-                      <Button
-                        className="mt-4 w-full rounded-xl gradient-golden font-semibold"
-                        disabled={!canAfford || redeeming}
-                        onClick={() => {
-                          setSelectedReward(reward);
-                          setRedemptionModalOpen(true);
-                        }}
-                      >
-                        Redeem
-                      </Button>
-                    </CardContent>
-                  </Card>
+                      {reward.days_to_reach !== null && reward.days_to_reach !== undefined && (
+                        <p className="text-xs text-muted-foreground mt-1">~{Math.ceil(reward.days_to_reach)} days to unlock</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      className="relative z-10 w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
+                      disabled={!canAfford || redeeming}
+                      onClick={() => { setSelectedReward(reward); setRedemptionModalOpen(true); }}
+                    >
+                      {canAfford ? "Redeem" : "Need more points"}
+                    </Button>
+                  </div>
                 );
               })}
             </div>
           </TabsContent>
 
-          <TabsContent value="history">
-            <div className="space-y-3 mt-6">
+          <TabsContent value="history" className="mt-6">
+            <div className="space-y-3">
               {redemptions.length === 0 ? (
-                <Card className="rounded-2xl border-border/40">
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    No redemptions yet. Redeem your first reward!
-                  </CardContent>
-                </Card>
-              ) : (
-                redemptions.map((r) => {
-                  const isFulfilled = r.fulfilled_at !== null;
-                  const redemptionMethod = r.rewards?.redemption_method || "manual_fulfillment";
-                  
-                  const copyCode = (code: string) => {
-                    navigator.clipboard.writeText(code);
-                    sonnerToast.success("Code copied!");
-                  };
-                  
-                  return (
-                    <Card key={r.id} className="relative overflow-hidden rounded-2xl border-border/40">
-                      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
-                      <CardContent className="relative z-10 py-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-display font-semibold text-foreground">{r.rewards?.name}</p>
-                              {isFulfilled ? (
-                                <Badge className="bg-green-100 text-green-700 border-green-200">
-                                  <CheckCircle className="h-3 w-3 mr-1" /> Fulfilled
-                                </Badge>
-                              ) : redemptionMethod === "manual_fulfillment" ? (
-                                <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                                  <Clock className="h-3 w-3 mr-1" /> Pending
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-blue-100 text-blue-700 border-blue-200">
-                                  Ready to Use
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {new Date(r.redeemed_at).toLocaleDateString()}
-                            </p>
-                            
-                            {r.redemption_code && (
-                              <div className="mt-3 flex items-center gap-2">
-                                <div className="bg-muted rounded-lg px-3 py-1.5 font-mono text-sm">
-                                  {r.redemption_code}
-                                </div>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => copyCode(r.redemption_code!)}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20">
-                            -{r.points_spent}
-                          </Badge>
+                <div className="rounded-3xl bg-card border border-border/40 p-12 text-center text-muted-foreground text-sm">
+                  No redemptions yet. Redeem your first reward!
+                </div>
+              ) : redemptions.map((r) => {
+                const isFulfilled = r.fulfilled_at !== null;
+                const redemptionMethod = r.rewards?.redemption_method || "manual_fulfillment";
+                const copyCode = (code: string) => { navigator.clipboard.writeText(code); sonnerToast.success("Code copied!"); };
+
+                return (
+                  <div key={r.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 px-5 py-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-accent/5 to-transparent rounded-3xl pointer-events-none" />
+                    <div className="relative z-10 flex justify-between items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-foreground text-sm">{r.rewards?.name}</p>
+                          {isFulfilled ? (
+                            <Badge className="rounded-full bg-green-500/15 text-green-600 border-green-500/25 text-xs"><CheckCircle className="h-3 w-3 mr-1" />Fulfilled</Badge>
+                          ) : redemptionMethod === "manual_fulfillment" ? (
+                            <Badge className="rounded-full bg-orange-500/15 text-orange-600 border-orange-500/25 text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+                          ) : (
+                            <Badge className="rounded-full bg-primary/15 text-primary border-primary/25 text-xs">Ready</Badge>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
+                        <p className="text-xs text-muted-foreground mt-1">{new Date(r.redeemed_at).toLocaleDateString()}</p>
+                        {r.redemption_code && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="bg-muted rounded-xl px-3 py-1.5 font-mono text-xs">{r.redemption_code}</div>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-xl" onClick={() => copyCode(r.redemption_code!)}>
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20 text-xs shrink-0">-{r.points_spent}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </TabsContent>
         </Tabs>

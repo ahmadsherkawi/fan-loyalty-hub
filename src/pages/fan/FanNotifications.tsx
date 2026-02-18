@@ -319,114 +319,93 @@ export default function FanNotifications() {
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Logo size="sm" />
           </div>
           <div className="flex items-center gap-2">
-            {unreadCount > 0 && <Badge className="bg-destructive text-destructive-foreground rounded-full">{unreadCount}</Badge>}
-            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-2" /> Sign out
+            {unreadCount > 0 && <Badge className="bg-destructive text-destructive-foreground rounded-full text-xs h-6 px-2">{unreadCount}</Badge>}
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container py-10 space-y-10">
+      <main className="container py-8 space-y-8">
         {/* HERO */}
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="relative z-10 p-8 md:p-10 flex justify-between items-center">
+          <div className="relative z-10 p-6 md:p-10 flex justify-between items-center gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-accent" />
-                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Smart Updates</span>
+                <Sparkles className="h-3.5 w-3.5 text-accent" />
+                <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Smart Updates</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Notifications</h1>
-              <p className="text-white/50 mt-2 text-sm">AI-powered nudges personalized just for you</p>
+              <p className="text-white/50 mt-1 text-sm">AI-powered nudges personalized just for you</p>
             </div>
-
             {unreadCount > 0 && (
-              <Button size="sm" onClick={markAllAsRead} className="rounded-full gradient-stadium font-semibold shadow-stadium">
-                Mark all as read
+              <Button size="sm" onClick={markAllAsRead} className="rounded-full gradient-stadium font-semibold shadow-stadium text-xs">
+                Mark all read
               </Button>
             )}
           </div>
         </div>
 
-        {/* NOTIFICATIONS LIST */}
-        <div className="max-w-2xl mx-auto">
+        {/* LIST */}
+        <div className="max-w-2xl mx-auto space-y-3">
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center py-20 text-center gap-4">
-              <div className="h-16 w-16 rounded-2xl bg-muted/20 flex items-center justify-center">
-                <BellOff className="h-8 w-8 text-muted-foreground" />
+            <div className="rounded-3xl bg-card border border-border/40 p-16 flex flex-col items-center gap-4 text-center">
+              <div className="h-14 w-14 rounded-3xl bg-muted/30 flex items-center justify-center">
+                <BellOff className="h-7 w-7 text-muted-foreground" />
               </div>
-              <h2 className="text-lg font-display font-semibold text-foreground">All Caught Up!</h2>
-              <p className="text-sm text-muted-foreground">No new notifications. We'll notify you when there's something new.</p>
+              <div>
+                <h2 className="text-base font-display font-semibold text-foreground">All Caught Up!</h2>
+                <p className="text-sm text-muted-foreground mt-1">No new notifications yet.</p>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {notifications.map((n) => (
-                <Card
-                  key={n.id}
-                  className={`relative overflow-hidden rounded-2xl border-border/40 card-hover cursor-pointer transition-all ${n.is_read ? "opacity-60" : ""}`}
-                  onClick={() => handleNotificationAction(n)}
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${getNotificationColor(n.type)} pointer-events-none`} />
-                  <CardContent className="relative z-10 py-4 px-5">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center">
-                        {getNotificationIcon(n.type)}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-foreground">
-                            {n.data?.title || n.type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                          </p>
-                          {!n.is_read && (
-                            <Badge className="bg-accent text-accent-foreground rounded-full text-xs">New</Badge>
-                          )}
-                        </div>
-                        
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {n.data?.message || "You have a new notification"}
-                        </p>
-                        
-                        <p className="text-xs text-muted-foreground/60">{formatTimeAgo(n.created_at)}</p>
-                      </div>
-
-                      {n.data?.actionUrl && !n.is_read && (
-                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+          ) : notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`relative overflow-hidden rounded-3xl bg-card border border-border/50 card-hover cursor-pointer ${n.is_read ? "opacity-60" : ""}`}
+              onClick={() => handleNotificationAction(n)}
+            >
+              <div className={`absolute inset-0 bg-gradient-to-br ${getNotificationColor(n.type)} pointer-events-none rounded-3xl`} />
+              <div className="relative z-10 px-5 py-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-2xl bg-card/80 border border-border/30 flex items-center justify-center">
+                    {getNotificationIcon(n.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-semibold text-foreground text-sm">
+                        {n.data?.title || n.type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </p>
+                      {!n.is_read && (
+                        <Badge className="bg-accent text-accent-foreground rounded-full text-[10px] h-4 px-1.5">New</Badge>
                       )}
                     </div>
-
-                    {/* Action button if available */}
-                    {n.data?.actionLabel && !n.is_read && (
-                      <div className="mt-3 ml-14">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="rounded-full text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleNotificationAction(n);
-                          }}
-                        >
-                          {n.data.actionLabel}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                    <p className="text-xs text-muted-foreground mb-1.5">{n.data?.message || "You have a new notification"}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{formatTimeAgo(n.created_at)}</p>
+                  </div>
+                  {n.data?.actionUrl && !n.is_read && <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />}
+                </div>
+                {n.data?.actionLabel && !n.is_read && (
+                  <div className="mt-3 ml-14">
+                    <Button size="sm" variant="outline" className="rounded-full text-xs h-7" onClick={(e) => { e.stopPropagation(); handleNotificationAction(n); }}>
+                      {n.data.actionLabel}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </main>
     </div>
