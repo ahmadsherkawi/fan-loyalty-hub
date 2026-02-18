@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Logo } from "@/components/ui/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/database";
-import { Building2, Users, Loader2, CheckCircle2, Sparkles, Mail, ArrowLeft } from "lucide-react";
+import { Building2, Users, Loader2, CheckCircle2, Sparkles, Mail, ArrowLeft, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
 const signUpSchema = z.object({
@@ -26,7 +26,7 @@ const signInSchema = z.object({
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signUp, signIn, user, profile, loading } = useAuth();
+  const { signUp, signIn, user, profile, loading, profileError } = useAuth();
   const { toast } = useToast();
 
   const defaultRole = (searchParams.get("role") as UserRole) || "fan";
@@ -36,6 +36,7 @@ export default function AuthPage() {
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
@@ -45,13 +46,41 @@ export default function AuthPage() {
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
 
+  // Handle navigation after successful authentication
   useEffect(() => {
     if (loading) return;
+
     if (user && profile?.role) {
-      // User is authenticated and profile is loaded - redirect to appropriate page
-      navigate(profile.role === "club_admin" ? "/club/onboarding" : "/fan/join", { replace: true });
+      console.log("[AuthPage] User authenticated with role:", profile.role);
+      setIsRedirecting(true);
+      
+      // Navigate to appropriate page based on role
+      const redirectPath = profile.role === "club_admin" ? "/club/onboarding" : "/fan/join";
+      
+      // Small delay to ensure state updates are processed
+      setTimeout(() => {
+        navigate(redirectPath, { replace: true });
+      }, 100);
+    } else if (user && !profile && !profileError) {
+      // User exists but profile is being loaded
+      console.log("[AuthPage] User authenticated, waiting for profile...");
+    } else if (user && profileError) {
+      // Profile loading failed
+      console.error("[AuthPage] Profile error:", profileError);
+      setIsRedirecting(false);
     }
-  }, [loading, user, profile, navigate]);
+  }, [loading, user, profile, profileError, navigate]);
+
+  // Show error toast if profile loading fails
+  useEffect(() => {
+    if (profileError && user) {
+      toast({
+        title: "Profile Loading Issue",
+        description: profileError,
+        variant: "destructive",
+      });
+    }
+  }, [profileError, user, toast]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,18 +112,16 @@ export default function AuthPage() {
       }
 
       // Check if email confirmation is required
-      // In Supabase, if the session is null after signup, it means email confirmation is required
-      // If Supabase auto-confirms emails (disabled email confirmation), session will be present
       const session = data?.session;
       const needsConfirmation = !session;
 
       if (!needsConfirmation) {
         // Auto-signed in (Supabase has email confirmation disabled)
-        // Will redirect via useEffect
         toast({
           title: "Account Created!",
           description: `Welcome! Setting up your ${signUpRole === "club_admin" ? "club" : "fan"} account...`
         });
+        // Navigation happens via useEffect
       } else {
         // Email confirmation is enabled in Supabase
         setRegisteredEmail(signUpEmail);
@@ -109,13 +136,17 @@ export default function AuthPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setIsRedirecting(false);
+    
     try {
       const validation = signInSchema.safeParse({ email: signInEmail, password: signInPassword });
       if (!validation.success) {
         toast({ title: "Validation Error", description: validation.error.errors[0].message, variant: "destructive" });
         return;
       }
+      
       const { error } = await signIn(signInEmail, signInPassword);
+      
       if (error) {
         // Provide more specific error messages
         if (error.message.includes("Invalid login credentials")) {
@@ -135,6 +166,7 @@ export default function AuthPage() {
         }
         return;
       }
+      
       toast({ title: "Welcome back!", description: "Signing you in..." });
       // Navigation happens via useEffect
     } finally {
@@ -142,10 +174,58 @@ export default function AuthPage() {
     }
   };
 
-  if (loading) {
+  // Show loading state while checking auth or redirecting
+  if (loading || isRedirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">
+          {isRedirecting ? "Redirecting..." : "Loading..."}
+        </p>
+      </div>
+    );
+  }
+
+  // Show profile error state
+  if (profileError && user && !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          <Card className="rounded-2xl border-border/40">
+            <CardContent className="pt-6 text-center">
+              <div className="mx-auto h-16 w-16 rounded-2xl bg-destructive/20 flex items-center justify-center mb-4">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              </div>
+              <h2 className="font-display text-xl font-bold text-foreground">Profile Loading Issue</h2>
+              <p className="text-muted-foreground mt-2 mb-4">
+                {profileError}
+              </p>
+              <div className="space-y-3">
+                <Button
+                  onClick={async () => {
+                    // Try to refresh the session
+                    const { data } = await signUp(signInEmail || "", "", "fan", "");
+                    window.location.reload();
+                  }}
+                  className="w-full rounded-xl"
+                >
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const { supabase } = await import("@/integrations/supabase/client");
+                    await supabase.auth.signOut();
+                    window.location.reload();
+                  }}
+                  className="w-full rounded-xl"
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

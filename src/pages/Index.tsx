@@ -6,28 +6,62 @@ import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileError } = useAuth();
   const navigate = useNavigate();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && profile) {
-      // Redirect authenticated users to their dashboard
-      if (profile.role === 'club_admin') {
-        navigate('/club/dashboard');
-      } else {
-        navigate('/fan/home');
-      }
-    }
-  }, [user, profile, loading, navigate]);
+    // Don't do anything while loading
+    if (loading) return;
 
-  // Show loading while checking auth
-  if (loading) {
+    // Only redirect if we have both user and profile with a role
+    if (user && profile?.role) {
+      setIsRedirecting(true);
+      
+      // Small delay to ensure smooth transition
+      const redirectTimer = setTimeout(() => {
+        // Redirect authenticated users to their dashboard
+        if (profile.role === 'club_admin') {
+          navigate('/club/onboarding', { replace: true });
+        } else {
+          navigate('/fan/home', { replace: true });
+        }
+      }, 100);
+
+      return () => clearTimeout(redirectTimer);
+    }
+    
+    // If there's a profile error but user exists, don't redirect
+    // Let the auth page handle the error
+    if (user && profileError && !profile) {
+      console.log('[Index] Profile error, redirecting to auth');
+      navigate('/auth', { replace: true });
+    }
+  }, [user, profile, loading, profileError, navigate]);
+
+  // Show loading while checking auth or redirecting
+  if (loading || isRedirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary font-display text-xl">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">
+          {isRedirecting ? "Redirecting to dashboard..." : "Loading..."}
+        </p>
+      </div>
+    );
+  }
+
+  // If user is authenticated but profile is missing, show loading
+  // (This shouldn't happen often, but handles edge cases)
+  if (user && !profile && !profileError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Loading your profile...</p>
       </div>
     );
   }

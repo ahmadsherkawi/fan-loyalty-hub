@@ -48,10 +48,18 @@ export default function ClubOnboarding() {
   const [programId, setProgramId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth?role=club_admin");
-    } else if (!loading && profile?.role !== "club_admin") {
-      navigate("/fan/home");
+    if (loading) return; // Wait for loading to complete
+    
+    if (!user) {
+      // No user, redirect to auth
+      navigate("/auth?role=club_admin", { replace: true });
+    } else if (!profile) {
+      // User exists but profile is missing - wait a bit for profile to load
+      // This shouldn't happen with our new AuthContext, but handle it gracefully
+      console.log("[ClubOnboarding] Waiting for profile to load...");
+    } else if (profile.role !== "club_admin") {
+      // User is not a club admin, redirect to fan home
+      navigate("/fan/home", { replace: true });
     }
   }, [user, profile, loading, navigate]);
 
@@ -290,10 +298,13 @@ export default function ClubOnboarding() {
     navigate("/");
   };
 
-  if (loading) {
+  if (loading || (user && !profile)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">
+          {loading ? "Loading..." : "Loading your profile..."}
+        </p>
       </div>
     );
   }

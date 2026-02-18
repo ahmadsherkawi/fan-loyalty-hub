@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, UserRole } from "@/types/database";
@@ -8,6 +8,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  profileError: string | null;
   signUp: (email: string, password: string, role: UserRole, fullName: string) => Promise<{ error: Error | null; data?: { session: Session | null } }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -21,90 +22,191 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
+  // Fetch profile by user_id
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching profile:", error);
+      if (error) {
+        console.error("[Auth] Error fetching profile:", error);
+        return null;
+      }
+
+      return data as Profile | null;
+    } catch (err) {
+      console.error("[Auth] Exception fetching profile:", err);
       return null;
     }
-
-    return data as Profile | null;
   };
 
-  const refreshProfile = async () => {
+  // Create profile if it doesn't exist (fallback for missing trigger)
+  const createProfileIfMissing = async (
+    userId: string,
+    email: string,
+    fullName: string | undefined,
+    role: UserRole
+  ): Promise<Profile | null> => {
+    try {
+      console.log("[Auth] Attempting to create missing profile for:", userId);
+
+      // Check if profile already exists
+      const existingProfile = await fetchProfile(userId);
+      if (existingProfile) {
+        console.log("[Auth] Profile already exists:", existingProfile);
+        return existingProfile;
+      }
+
+      // Try to get role from user metadata first
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const userRole = (authUser?.user_metadata?.role as UserRole) || role;
+      const userName = authUser?.user_metadata?.full_name || fullName || email;
+
+      // Create profile
+      const { data: newProfile, error: insertError } = await supabase
+        .from("profiles")
+        .insert({
+          user_id: userId,
+          email: email,
+          full_name: userName,
+          role: userRole,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("[Auth] Error creating profile:", insertError);
+        
+        // If insert fails due to RLS or other issues, try using the ensure_user_role function
+        if (insertError.code === "42501" || insertError.message.includes("policy")) {
+          console.log("[Auth] RLS policy blocked insert, trying ensure_user_role function");
+          await supabase.rpc("ensure_user_role", {
+            p_user_id: userId,
+            p_role: userRole
+          });
+          
+          // Fetch the profile again
+          return await fetchProfile(userId);
+        }
+        
+        return null;
+      }
+
+      console.log("[Auth] Profile created successfully:", newProfile);
+      return newProfile as Profile;
+    } catch (err) {
+      console.error("[Auth] Exception creating profile:", err);
+      return null;
+    }
+  };
+
+  const refreshProfile = useCallback(async () => {
     if (user) {
       const profileData = await fetchProfile(user.id);
       setProfile(profileData);
     }
-  };
-
-  useEffect(() => {
-    // TEMP DEBUG – remove later
-    supabase.auth.getSession().then(({ data, error }) => {
-      console.log("[Auth] getSession (startup) error:", error);
-      console.log("[Auth] getSession (startup) session:", data?.session);
-      console.log("[Auth] getSession (startup) session.user.id:", data?.session?.user?.id);
-    });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // TEMP DEBUG – remove later
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[Auth] onAuthStateChange event:", event);
-      console.log("[Auth] onAuthStateChange session:", session);
-      console.log("[Auth] onAuthStateChange session.user.id:", session?.user?.id);
+      console.log("[Auth] onAuthStateChange session?.user?.id:", session?.user?.id);
 
       setSession(session);
       setUser(session?.user ?? null);
+      setProfileError(null);
 
-      // Defer profile fetch with setTimeout to avoid deadlock
       if (session?.user) {
-        setTimeout(() => {
-          // TEMP DEBUG – remove later
-          console.log("[Auth] fetching profile by profiles.user_id:", session.user.id);
-          fetchProfile(session.user.id).then(setProfile);
+        // Defer profile fetch with setTimeout to avoid potential deadlock
+        setTimeout(async () => {
+          console.log("[Auth] Fetching profile for user:", session.user.id);
+          
+          let profileData = await fetchProfile(session.user.id);
+          
+          // If profile doesn't exist, try to create it
+          if (!profileData) {
+            console.log("[Auth] Profile not found, attempting to create...");
+            setProfileError("Profile not found. Creating profile...");
+            
+            profileData = await createProfileIfMissing(
+              session.user.id,
+              session.user.email || "",
+              session.user.user_metadata?.full_name,
+              session.user.user_metadata?.role || "fan"
+            );
+          }
+          
+          if (profileData) {
+            console.log("[Auth] Profile loaded successfully:", profileData);
+            setProfile(profileData);
+            setProfileError(null);
+          } else {
+            console.error("[Auth] Failed to load or create profile");
+            setProfile(null);
+            setProfileError("Unable to load user profile. Please try logging in again.");
+          }
+          
+          setLoading(false);
         }, 0);
       } else {
         setProfile(null);
+        setProfileError(null);
+        setLoading(false);
       }
 
       if (event === "SIGNED_OUT") {
         setProfile(null);
+        setProfileError(null);
       }
     });
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // TEMP DEBUG – remove later
-      console.log("[Auth] getSession (init) session:", session);
-      console.log("[Auth] getSession (init) session.user.id:", session?.user?.id);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log("[Auth] getSession session?.user?.id:", session?.user?.id);
 
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        fetchProfile(session.user.id).then((profileData) => {
-          // TEMP DEBUG – remove later
-          console.log("[Auth] profile loaded:", profileData);
+        let profileData = await fetchProfile(session.user.id);
+        
+        // If profile doesn't exist, try to create it
+        if (!profileData) {
+          console.log("[Auth] Profile not found on init, attempting to create...");
+          profileData = await createProfileIfMissing(
+            session.user.id,
+            session.user.email || "",
+            session.user.user_metadata?.full_name,
+            session.user.user_metadata?.role || "fan"
+          );
+        }
+        
+        if (profileData) {
+          console.log("[Auth] Profile loaded on init:", profileData);
           setProfile(profileData);
-          setLoading(false);
-        });
-      } else {
-        setLoading(false);
+        } else {
+          console.error("[Auth] Failed to load profile on init");
+          setProfileError("Unable to load user profile");
+        }
       }
+      
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, role: UserRole, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-
+    setProfileError(null);
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -117,24 +219,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
 
+    if (error) {
+      return { error: new Error(error.message), data: undefined };
+    }
+
     return { 
-      error: error ? new Error(error.message) : null, 
+      error: null, 
       data: { session: data.session } 
     };
   };
 
   const signIn = async (email: string, password: string) => {
+    setProfileError(null);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    return { error: error ? new Error(error.message) : null };
+    if (error) {
+      return { error: new Error(error.message) };
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setProfileError(null);
   };
 
   return (
@@ -144,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         profile,
         loading,
+        profileError,
         signUp,
         signIn,
         signOut,
