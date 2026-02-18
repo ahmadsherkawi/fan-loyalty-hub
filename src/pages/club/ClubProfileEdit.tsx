@@ -10,6 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -30,7 +41,9 @@ import {
   Facebook,
   Palette,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 
 import type { Club } from "@/types/database";
@@ -79,6 +92,8 @@ export default function ClubProfileEditPage() {
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [originalSlug, setOriginalSlug] = useState<string>("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [formData, setFormData] = useState<ClubFormData>({
     name: "",
@@ -359,6 +374,126 @@ export default function ClubProfileEditPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteClub = async () => {
+    if (!club || !profile || !user) return;
+    if (deleteConfirmText !== "DELETE") {
+      toast({
+        title: "Confirmation Required",
+        description: 'Please type "DELETE" to confirm club deletion',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Delete club's data from related tables
+      // 1. Get the loyalty program(s) for this club
+      const { data: programs } = await supabase
+        .from("loyalty_programs")
+        .select("id")
+        .eq("club_id", club.id);
+
+      const programIds = (programs ?? []).map(p => p.id);
+
+      if (programIds.length > 0) {
+        // 2. Delete activity completions for activities in these programs
+        for (const programId of programIds) {
+          const { data: activities } = await supabase
+            .from("activities")
+            .select("id")
+            .eq("program_id", programId);
+          
+          const activityIds = (activities ?? []).map(a => a.id);
+          
+          if (activityIds.length > 0) {
+            await supabase.from("activity_completions").delete().in("activity_id", activityIds);
+            await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+          }
+        }
+
+        // 3. Delete reward redemptions for rewards in these programs
+        for (const programId of programIds) {
+          const { data: rewards } = await supabase
+            .from("rewards")
+            .select("id")
+            .eq("program_id", programId);
+          
+          const rewardIds = (rewards ?? []).map(r => r.id);
+          
+          if (rewardIds.length > 0) {
+            await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+          }
+        }
+
+        // 4. Delete rewards
+        for (const programId of programIds) {
+          await supabase.from("rewards").delete().eq("program_id", programId);
+        }
+
+        // 5. Delete activities
+        for (const programId of programIds) {
+          await supabase.from("activities").delete().eq("program_id", programId);
+        }
+
+        // 6. Delete tiers
+        for (const programId of programIds) {
+          await supabase.from("tiers").delete().eq("program_id", programId);
+        }
+
+        // 7. Delete fan memberships
+        await supabase.from("fan_memberships").delete().eq("club_id", club.id);
+
+        // 8. Delete loyalty programs
+        await supabase.from("loyalty_programs").delete().eq("club_id", club.id);
+      }
+
+      // 9. Delete club verification
+      await supabase.from("club_verifications").delete().eq("club_id", club.id);
+
+      // 10. Delete club logos from storage
+      if (club.id) {
+        await supabase.storage.from("club-logos").remove([`${club.id}/logo.jpg`, `${club.id}/logo.png`]);
+        await supabase.storage.from("club-logos").remove([`${club.id}/banner.jpg`, `${club.id}/banner.png`]);
+      }
+
+      // 11. Delete club
+      await supabase.from("clubs").delete().eq("id", club.id);
+
+      // 12. Delete notifications
+      await supabase.from("notifications").delete().eq("user_id", user.id);
+
+      // 13. Delete profile
+      await supabase.from("profiles").delete().eq("id", profile.id);
+
+      // 14. Delete auth user using edge function
+      const { error: deleteError } = await supabase.functions.invoke("delete-user");
+      if (deleteError) {
+        console.error("Error deleting auth user:", deleteError);
+      }
+
+      toast({
+        title: "Club Deleted",
+        description: "Your club and all associated data have been permanently deleted. You can register again.",
+      });
+
+      // Sign out and redirect
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (error: unknown) {
+      console.error("Delete club error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete club";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmText("");
     }
   };
 
@@ -811,6 +946,86 @@ export default function ClubProfileEditPage() {
             Save Changes
           </Button>
         </div>
+
+        {/* Danger Zone */}
+        {!isPreviewMode && (
+          <Card className="rounded-2xl border-destructive/40 bg-destructive/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription>Irreversible actions that affect your club</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-destructive/20">
+                <div>
+                  <p className="font-semibold text-sm">Delete Club & Account</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Permanently delete your club, all associated data, and your admin account. This cannot be undone.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="rounded-full">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Club
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-2xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                        <AlertTriangle className="h-5 w-5" />
+                        Delete Club Permanently
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-3 pt-2">
+                        <p>
+                          This action <strong>cannot be undone</strong>. This will permanently delete:
+                        </p>
+                        <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                          <li>Your club profile and all settings</li>
+                          <li>All loyalty programs and rewards</li>
+                          <li>All fan memberships and points</li>
+                          <li>All activities and completions</li>
+                          <li>Your admin account</li>
+                        </ul>
+                        <div className="pt-3">
+                          <Label htmlFor="delete-confirm" className="text-sm font-medium">
+                            Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm:
+                          </Label>
+                          <Input
+                            id="delete-confirm"
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="Type DELETE"
+                            className="mt-2 rounded-xl"
+                          />
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setDeleteConfirmText("")} className="rounded-full">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteClub}
+                        disabled={isDeleting || deleteConfirmText !== "DELETE"}
+                        className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Delete Forever
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

@@ -83,7 +83,7 @@ export default function ClaimReview() {
       });
       setActivityClaims(formattedClaims);
       
-      // Fetch ALL redemptions for this program with fan profiles
+      // Fetch ALL redemptions for this program
       const { data: redemptionsData, error: redsErr } = await supabase
         .from("reward_redemptions")
         .select(`
@@ -96,11 +96,9 @@ export default function ClaimReview() {
           fulfilled_at,
           completed_at,
           redeemed_at,
-          rewards!inner(*),
-          fan:profiles!reward_redemptions_fan_id_fkey(id, full_name, email, user_id, phone)
+          rewards!inner(id, name, description, points_cost, redemption_method, program_id)
         `)
         .eq("rewards.program_id", p.id)
-        .in("rewards.redemption_method", ["manual_fulfillment", "voucher", "code_display"])
         .order("redeemed_at", { ascending: false });
       
       if (redsErr) {
@@ -108,17 +106,27 @@ export default function ClaimReview() {
         throw redsErr;
       }
       
+      // Fetch fan profiles separately to avoid join issues
+      const fanIds = [...new Set((redemptionsData ?? []).map(r => r.fan_id))];
+      const { data: fanProfiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, user_id, phone")
+        .in("id", fanIds);
+      
+      const fanProfileMap = new Map((fanProfiles ?? []).map(p => [p.id, p]));
+      
       const formattedRedemptions = (redemptionsData ?? []).map((row) => {
-        const r = row as RewardRedemption & { rewards: Reward; fan: { id: string; full_name: string | null; email: string; user_id: string; phone: string | null } | null };
+        const r = row as RewardRedemption & { rewards: Reward };
+        const fanProfile = fanProfileMap.get(r.fan_id);
         return { 
           ...r, 
           reward: r.rewards, 
-          fan_profile: r.fan ? { 
-            id: r.fan.id, 
-            full_name: r.fan.full_name, 
-            email: r.fan.email, 
-            user_id: r.fan.user_id,
-            phone: r.fan.phone
+          fan_profile: fanProfile ? { 
+            id: fanProfile.id, 
+            full_name: fanProfile.full_name, 
+            email: fanProfile.email, 
+            user_id: fanProfile.user_id,
+            phone: fanProfile.phone
           } : null 
         } as RedemptionWithDetails;
       });

@@ -12,6 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -30,7 +41,9 @@ import {
   XCircle,
   Shield,
   Trophy,
-  Sparkles
+  Sparkles,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 
 interface ProfileFormData {
@@ -74,6 +87,8 @@ export default function FanProfileEditPage() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [formData, setFormData] = useState<ProfileFormData>({
     username: "",
@@ -285,6 +300,72 @@ export default function FanProfileEditPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!profile || !user) return;
+    if (deleteConfirmText !== "DELETE") {
+      toast({
+        title: "Confirmation Required",
+        description: 'Please type "DELETE" to confirm account deletion',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Delete fan's data from related tables
+      // 1. Delete activity completions
+      await supabase.from("activity_completions").delete().eq("fan_id", profile.id);
+      
+      // 2. Delete manual claims
+      await supabase.from("manual_claims").delete().eq("fan_id", profile.id);
+      
+      // 3. Delete reward redemptions
+      await supabase.from("reward_redemptions").delete().eq("fan_id", profile.id);
+      
+      // 4. Delete fan memberships
+      await supabase.from("fan_memberships").delete().eq("fan_id", profile.id);
+      
+      // 5. Delete notifications
+      await supabase.from("notifications").delete().eq("user_id", user.id);
+      
+      // 6. Delete avatar from storage
+      if (profile.id) {
+        await supabase.storage.from("fan-avatars").remove([`${profile.id}/avatar.jpg`, `${profile.id}/avatar.png`, `${profile.id}/avatar.jpeg`]);
+      }
+      
+      // 7. Delete profile (clear username/email to allow reuse)
+      await supabase.from("profiles").delete().eq("id", profile.id);
+      
+      // 8. Delete auth user using admin API (requires edge function)
+      const { error: deleteError } = await supabase.functions.invoke("delete-user");
+      if (deleteError) {
+        console.error("Error deleting auth user:", deleteError);
+        // Continue anyway - profile is deleted
+      }
+
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been permanently deleted. You can register again with the same email.",
+      });
+
+      // Sign out and redirect
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (error: unknown) {
+      console.error("Delete account error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete account";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmText("");
     }
   };
 
@@ -612,6 +693,84 @@ export default function FanProfileEditPage() {
             Save Changes
           </Button>
         </div>
+
+        {/* Danger Zone */}
+        <Card className="rounded-2xl border-destructive/40 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription>Irreversible actions that affect your account</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-destructive/20">
+              <div>
+                <p className="font-semibold text-sm">Delete Account</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Permanently delete your account and all associated data. Your username and email will be available for reuse.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="rounded-full">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-2xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                      Delete Account Permanently
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-3 pt-2">
+                      <p>
+                        This action <strong>cannot be undone</strong>. This will permanently delete:
+                      </p>
+                      <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                        <li>Your profile and personal information</li>
+                        <li>All your points and memberships</li>
+                        <li>Activity history and claims</li>
+                        <li>Reward redemptions</li>
+                        <li>Notifications and preferences</li>
+                      </ul>
+                      <div className="pt-3">
+                        <Label htmlFor="delete-confirm" className="text-sm font-medium">
+                          Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm:
+                        </Label>
+                        <Input
+                          id="delete-confirm"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder="Type DELETE"
+                          className="mt-2 rounded-xl"
+                        />
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDeleteConfirmText("")} className="rounded-full">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting || deleteConfirmText !== "DELETE"}
+                      className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Delete Forever
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
