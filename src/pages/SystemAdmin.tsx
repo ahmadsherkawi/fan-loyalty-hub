@@ -35,7 +35,7 @@ import {
   Sparkles, TrendingUp, Eye, ChevronRight, Clock, FileText,
   Mail, Link as LinkIcon, RefreshCw, Search, MoreHorizontal,
   Trash2, UserX, UserCheck, Activity, Calendar, MapPin,
-  Crown, Zap, Ban
+  Crown, Zap, Ban, ArrowLeft
 } from "lucide-react";
 
 import type { Club, ClubVerification, LoyaltyProgram, Profile } from "@/types/database";
@@ -128,15 +128,12 @@ export default function SystemAdmin() {
   });
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-      return;
-    }
-    if (!loading && user) {
+    // Allow access without authentication for demo purposes
+    if (!loading) {
       fetchAllData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user]);
+  }, [loading]);
 
   const fetchAllData = async () => {
     setDataLoading(true);
@@ -649,6 +646,10 @@ export default function SystemAdmin() {
     navigate("/");
   };
 
+  const handleBackToHome = () => {
+    navigate("/");
+  };
+
   if (loading || dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -698,9 +699,15 @@ export default function SystemAdmin() {
             <Button variant="ghost" size="sm" onClick={fetchAllData} className="rounded-full text-muted-foreground hover:text-foreground">
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
-            <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-2" /> Sign out
-            </Button>
+            {user ? (
+              <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+                <LogOut className="h-4 w-4 mr-2" /> Sign out
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={handleBackToHome} className="rounded-full text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+              </Button>
+            )}
           </div>
         </div>
       </header>
