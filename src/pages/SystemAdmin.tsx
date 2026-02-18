@@ -561,93 +561,156 @@ export default function SystemAdmin() {
   };
 
   const handleDeleteUser = async (userId: string, role: string) => {
+    // Check if user is authenticated
+    if (!user) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "Please sign in to delete users. Click 'Sign In' on the landing page first.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
+      setActionLoading(true);
+      
       if (role === "fan") {
         // Delete fan data
-        await supabase.from("activity_completions").delete().eq("fan_id", userId);
-        await supabase.from("manual_claims").delete().eq("fan_id", userId);
-        await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
-        await supabase.from("fan_memberships").delete().eq("fan_id", userId);
+        const { error: completionsError } = await supabase.from("activity_completions").delete().eq("fan_id", userId);
+        if (completionsError) console.error("Error deleting completions:", completionsError);
+        
+        const { error: claimsError } = await supabase.from("manual_claims").delete().eq("fan_id", userId);
+        if (claimsError) console.error("Error deleting claims:", claimsError);
+        
+        const { error: redemptionsError } = await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
+        if (redemptionsError) console.error("Error deleting redemptions:", redemptionsError);
+        
+        const { error: membershipsError } = await supabase.from("fan_memberships").delete().eq("fan_id", userId);
+        if (membershipsError) console.error("Error deleting memberships:", membershipsError);
       }
       
-      // Delete notifications and profile
-      await supabase.from("notifications").delete().eq("user_id", userId);
-      await supabase.from("profiles").delete().eq("user_id", userId);
+      // Delete notifications
+      const { error: notifError } = await supabase.from("notifications").delete().eq("user_id", userId);
+      if (notifError) console.error("Error deleting notifications:", notifError);
+      
+      // Delete profile
+      const { error: profileError } = await supabase.from("profiles").delete().eq("user_id", userId);
+      if (profileError) {
+        console.error("Error deleting profile:", profileError);
+        toast({ title: "Error", description: `Failed to delete user: ${profileError.message}`, variant: "destructive" });
+        return;
+      }
 
       toast({ title: "User Deleted", description: "The user has been removed from the system." });
       await fetchAllData();
     } catch (error) {
+      console.error("Delete user error:", error);
       toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleDeleteClub = async (clubId: string, clubName: string) => {
+    // Check if user is authenticated
+    if (!user) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "Please sign in to delete clubs. Click 'Sign In' on the landing page first.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
       setActionLoading(true);
 
       // Get the club's program first
-      const { data: programs } = await supabase
+      const { data: programs, error: programsError } = await supabase
         .from("loyalty_programs")
         .select("id")
         .eq("club_id", clubId);
-
+      
+      if (programsError) console.error("Error fetching programs:", programsError);
       const programIds = programs?.map(p => p.id) || [];
 
       // Delete in correct order (child records first)
       if (programIds.length > 0) {
-        // Delete activity completions
-        const { data: activities } = await supabase
+        // Get activities
+        const { data: activities, error: activitiesError } = await supabase
           .from("activities")
           .select("id")
           .in("program_id", programIds);
         
+        if (activitiesError) console.error("Error fetching activities:", activitiesError);
         const activityIds = activities?.map(a => a.id) || [];
 
         if (activityIds.length > 0) {
-          await supabase.from("activity_completions").delete().in("activity_id", activityIds);
-          await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+          const { error: acError } = await supabase.from("activity_completions").delete().in("activity_id", activityIds);
+          if (acError) console.error("Error deleting activity completions:", acError);
+          
+          const { error: mcError } = await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+          if (mcError) console.error("Error deleting manual claims:", mcError);
         }
 
-        // Delete reward redemptions
-        const { data: rewards } = await supabase
+        // Get rewards
+        const { data: rewards, error: rewardsError } = await supabase
           .from("rewards")
           .select("id")
           .in("program_id", programIds);
         
+        if (rewardsError) console.error("Error fetching rewards:", rewardsError);
         const rewardIds = rewards?.map(r => r.id) || [];
 
         if (rewardIds.length > 0) {
-          await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+          const { error: rrError } = await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+          if (rrError) console.error("Error deleting reward redemptions:", rrError);
         }
 
         // Delete rewards, activities, tiers
-        await supabase.from("rewards").delete().in("program_id", programIds);
-        await supabase.from("activities").delete().in("program_id", programIds);
-        await supabase.from("tiers").delete().in("program_id", programIds);
+        const { error: delRewardsError } = await supabase.from("rewards").delete().in("program_id", programIds);
+        if (delRewardsError) console.error("Error deleting rewards:", delRewardsError);
+        
+        const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
+        if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
+        
+        const { error: delTiersError } = await supabase.from("tiers").delete().in("program_id", programIds);
+        if (delTiersError) console.error("Error deleting tiers:", delTiersError);
       }
 
       // Delete fan memberships
-      await supabase.from("fan_memberships").delete().eq("club_id", clubId);
+      const { error: fmError } = await supabase.from("fan_memberships").delete().eq("club_id", clubId);
+      if (fmError) console.error("Error deleting fan memberships:", fmError);
 
       // Delete club verification
-      await supabase.from("club_verifications").delete().eq("club_id", clubId);
+      const { error: cvError } = await supabase.from("club_verifications").delete().eq("club_id", clubId);
+      if (cvError) console.error("Error deleting club verifications:", cvError);
 
       // Delete loyalty programs
-      await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
+      const { error: lpError } = await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
+      if (lpError) console.error("Error deleting loyalty programs:", lpError);
 
       // Get club admin to delete their profile
-      const { data: clubData } = await supabase
+      const { data: clubData, error: clubDataError } = await supabase
         .from("clubs")
         .select("admin_id")
         .eq("id", clubId)
         .single();
+      
+      if (clubDataError) console.error("Error fetching club admin:", clubDataError);
 
       // Delete the club
-      await supabase.from("clubs").delete().eq("id", clubId);
+      const { error: clubDeleteError } = await supabase.from("clubs").delete().eq("id", clubId);
+      if (clubDeleteError) {
+        console.error("Error deleting club:", clubDeleteError);
+        toast({ title: "Error", description: `Failed to delete club: ${clubDeleteError.message}`, variant: "destructive" });
+        return;
+      }
 
-      // Delete the club admin's profile and auth user
+      // Delete the club admin's profile
       if (clubData?.admin_id) {
-        await supabase.from("profiles").delete().eq("id", clubData.admin_id);
+        const { error: adminProfileError } = await supabase.from("profiles").delete().eq("id", clubData.admin_id);
+        if (adminProfileError) console.error("Error deleting admin profile:", adminProfileError);
       }
 
       toast({ 
@@ -656,7 +719,7 @@ export default function SystemAdmin() {
       });
       await fetchAllData();
     } catch (error) {
-      console.error("Error deleting club:", error);
+      console.error("Delete club error:", error);
       toast({ title: "Error", description: "Failed to delete club", variant: "destructive" });
     } finally {
       setActionLoading(false);
