@@ -84,19 +84,22 @@ export default function AuthPage() {
 
       // Check if email confirmation is required
       // In Supabase, if the session is null after signup, it means email confirmation is required
+      // If Supabase auto-confirms emails (disabled email confirmation), session will be present
       const session = data?.session;
       const needsConfirmation = !session;
-      
-      setRegisteredEmail(signUpEmail);
-      setNeedsEmailConfirmation(needsConfirmation);
-      setShowConfirmationMessage(true);
-      
+
       if (!needsConfirmation) {
-        // Auto-signed in, will redirect via useEffect
-        toast({ 
-          title: "Account Created!", 
-          description: `Welcome! Setting up your ${signUpRole === "club_admin" ? "club" : "fan"} account...` 
+        // Auto-signed in (Supabase has email confirmation disabled)
+        // Will redirect via useEffect
+        toast({
+          title: "Account Created!",
+          description: `Welcome! Setting up your ${signUpRole === "club_admin" ? "club" : "fan"} account...`
         });
+      } else {
+        // Email confirmation is enabled in Supabase
+        setRegisteredEmail(signUpEmail);
+        setNeedsEmailConfirmation(true);
+        setShowConfirmationMessage(true);
       }
     } finally {
       setIsLoading(false);

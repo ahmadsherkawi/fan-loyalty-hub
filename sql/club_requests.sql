@@ -23,16 +23,17 @@ CREATE INDEX IF NOT EXISTS idx_club_requests_requester ON public.club_requests(r
 ALTER TABLE public.club_requests ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Fans can insert their own requests
+-- requester_id references profiles.id, so we need to match profiles.user_id with auth.uid()
 CREATE POLICY "Fans can insert club requests" ON public.club_requests
-    FOR INSERT WITH CHECK (auth.uid()::text = requester_id OR requester_id IN (SELECT user_id FROM profiles WHERE user_id = auth.uid()::text));
+    FOR INSERT WITH CHECK (requester_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
 -- Policy: Anyone can read (for admin purposes)
 CREATE POLICY "Anyone can read club requests" ON public.club_requests
     FOR SELECT USING (true);
 
--- Policy: Only service role can update
+-- Policy: Only service role or club_admin can update
 CREATE POLICY "Service role can update club requests" ON public.club_requests
-    FOR UPDATE USING (auth.role() = 'service_role' OR EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid()::text AND role = 'club_admin'));
+    FOR UPDATE USING (auth.jwt()->>'role' = 'service_role' OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'club_admin'));
 
 -- Grant permissions
 GRANT ALL ON public.club_requests TO authenticated;

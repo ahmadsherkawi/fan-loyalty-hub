@@ -11,14 +11,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Logo } from "@/components/ui/Logo";
 import { EnrollmentModal } from "@/components/ui/EnrollmentModal";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Loader2, AlertCircle, LogOut, Sparkles, Search, MapPin, Users, 
-  ShieldCheck, Building2, Clock, CheckCircle, Send
+import {
+  Loader2, AlertCircle, LogOut, Sparkles, Search, MapPin, Users,
+  ShieldCheck, Building2, Clock, CheckCircle, Send, Info,
+  Mail, ExternalLink, AlertTriangle
 } from "lucide-react";
 import { Club, LoyaltyProgram } from "@/types/database";
 
 interface ClubWithProgram extends Club {
   loyalty_programs: LoyaltyProgram[];
+}
+
+interface ClubRequest {
+  id: string;
+  club_name: string;
+  country: string | null;
+  status: "pending" | "contacted" | "resolved" | "rejected";
+  created_at: string;
 }
 
 export default function JoinClub() {
@@ -46,6 +55,9 @@ export default function JoinClub() {
   const [requestMessage, setRequestMessage] = useState("");
   const [requestSending, setRequestSending] = useState(false);
 
+  // User's previous requests
+  const [userRequests, setUserRequests] = useState<ClubRequest[]>([]);
+
   useEffect(() => {
     if (loading) return;
 
@@ -67,7 +79,7 @@ export default function JoinClub() {
   const initRealFlow = async () => {
     const alreadyMember = await checkMembership();
     if (alreadyMember) return;
-    await fetchClubs();
+    await Promise.all([fetchClubs(), fetchUserRequests()]);
   };
 
   const checkMembership = async (): Promise<boolean> => {
@@ -109,6 +121,24 @@ export default function JoinClub() {
       });
     } finally {
       setDataLoading(false);
+    }
+  };
+
+  const fetchUserRequests = async () => {
+    if (!profile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("club_requests")
+        .select("id, club_name, country, status, created_at")
+        .eq("requester_id", profile.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setUserRequests(data as ClubRequest[]);
+      }
+    } catch (err) {
+      console.error("Error fetching user requests:", err);
     }
   };
 
@@ -172,8 +202,8 @@ export default function JoinClub() {
       (c.city || "").toLowerCase().includes(search.toLowerCase());
 
     const matchCountry = countryFilter === "all" || c.country === countryFilter;
-    
-    const matchStatus = statusFilter === "all" || 
+
+    const matchStatus = statusFilter === "all" ||
       (statusFilter === "has_program" && c.loyalty_programs?.length) ||
       (statusFilter === "no_program" && !c.loyalty_programs?.length);
 
@@ -193,7 +223,6 @@ export default function JoinClub() {
     setRequestSending(true);
 
     try {
-      // Store the request in a table that admin can see
       const { error } = await supabase.from("club_requests").insert({
         requester_id: profile.id,
         requester_email: profile.email,
@@ -205,37 +234,37 @@ export default function JoinClub() {
       });
 
       if (error) {
-        // If table doesn't exist, create a notification for admin instead
+        // Check for specific error types
         if (error.message.includes("relation") || error.message.includes("does not exist")) {
-          // Fallback: Create a notification
-          await supabase.from("notifications").insert({
-            user_id: "system",
-            type: "club_request",
-            data: {
-              title: "New Club Request",
-              message: `Fan ${profile.full_name || profile.email} requested club: ${requestClubName}`,
-              requester_id: profile.id,
-              requester_email: profile.email,
-              club_name: requestClubName.trim(),
-              country: requestCountry.trim() || null,
-              club_contact: requestContact.trim() || null,
-              notes: requestMessage.trim() || null,
-            },
+          toast({
+            title: "Setup Required",
+            description: "The club request system is being set up. Please contact support.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes("policy") || error.message.includes("permission")) {
+          toast({
+            title: "Permission Denied",
+            description: "You don't have permission to submit requests. Please verify your account.",
+            variant: "destructive",
           });
         } else {
           throw error;
         }
+        return;
       }
 
       toast({
         title: "Request Sent!",
-        description: "We've received your request. Our team will reach out to the club.",
+        description: "We've received your request. Our admin team will review it and reach out to the club.",
       });
 
       setRequestClubName("");
       setRequestCountry("");
       setRequestContact("");
       setRequestMessage("");
+
+      // Refresh user requests
+      await fetchUserRequests();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to send request.";
       toast({
@@ -245,6 +274,21 @@ export default function JoinClub() {
       });
     } finally {
       setRequestSending(false);
+    }
+  };
+
+  const getStatusBadge = (status: ClubRequest["status"]) => {
+    switch (status) {
+      case "pending":
+        return <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">Pending Review</Badge>;
+      case "contacted":
+        return <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">Club Contacted</Badge>;
+      case "resolved":
+        return <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Resolved</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Not Available</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
@@ -287,6 +331,46 @@ export default function JoinClub() {
             <p className="text-white/50 mt-2">Join a verified club's loyalty program and start earning rewards</p>
           </div>
         </div>
+
+        {/* USER'S PREVIOUS REQUESTS */}
+        {userRequests.length > 0 && (
+          <Card className="rounded-2xl border-border/40">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Mail className="h-5 w-5 text-primary" />
+                Your Club Requests
+              </CardTitle>
+              <CardDescription>
+                Track the status of your club requests
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {userRequests.map((request) => (
+                <div key={request.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-accent" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{request.club_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {request.country && `${request.country} • `}
+                        Submitted {new Date(request.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  {getStatusBadge(request.status)}
+                </div>
+              ))}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2 p-3 rounded-xl bg-primary/5 border border-primary/10">
+                <Info className="h-4 w-4 text-primary flex-shrink-0" />
+                <span>
+                  Our admin team reviews all requests. Once a club is verified and has a loyalty program, it will appear in the list below.
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* SEARCH + FILTER */}
         <Card className="rounded-2xl border-border/40">
@@ -351,6 +435,21 @@ export default function JoinClub() {
           </Card>
         </div>
 
+        {/* INFO BANNER */}
+        <Card className="rounded-2xl border-primary/20 bg-primary/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Only Verified Clubs</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                All clubs listed here have been verified by our admin team. This ensures you're joining legitimate club loyalty programs.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* CLUB GRID */}
         {filteredClubs.length === 0 ? (
           <Card className="rounded-2xl border-border/40">
@@ -366,14 +465,14 @@ export default function JoinClub() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredClubs.map((club) => {
               const hasProgram = club.loyalty_programs?.length > 0;
-              
+
               return (
                 <Card key={club.id} className="relative overflow-hidden rounded-2xl border-border/40 card-hover group">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
                   <CardContent className="relative z-10 p-5">
                     <div className="flex items-start gap-4">
                       {/* Logo */}
-                      <div 
+                      <div
                         className="h-14 w-14 rounded-2xl flex items-center justify-center border border-border/30 flex-shrink-0 overflow-hidden"
                         style={{ backgroundColor: club.primary_color || "#16a34a" }}
                       >
@@ -383,7 +482,7 @@ export default function JoinClub() {
                           <span className="text-xl font-bold text-white">{club.name.charAt(0)}</span>
                         )}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="font-display font-semibold text-foreground truncate">{club.name}</h3>
@@ -395,7 +494,7 @@ export default function JoinClub() {
                           <MapPin className="h-3 w-3" />
                           {club.city}{club.city && club.country ? ", " : ""}{club.country}
                         </p>
-                        
+
                         {hasProgram ? (
                           <Badge className="mt-2 bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
                             <CheckCircle className="h-3 w-3 mr-1" />
@@ -435,10 +534,27 @@ export default function JoinClub() {
               Can't Find Your Club?
             </CardTitle>
             <CardDescription>
-              Let us know which club you'd like to join and we'll reach out to them
+              Request a club to be added and our team will reach out to them
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Process explanation */}
+            <div className="p-4 rounded-xl bg-muted/30 border border-border/30 space-y-3">
+              <p className="text-sm font-medium">How it works:</p>
+              <div className="flex items-start gap-3">
+                <div className="h-6 w-6 rounded-full bg-accent/10 text-accent text-xs flex items-center justify-center flex-shrink-0">1</div>
+                <p className="text-sm text-muted-foreground">Submit your club request with any details you have</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-6 w-6 rounded-full bg-accent/10 text-accent text-xs flex items-center justify-center flex-shrink-0">2</div>
+                <p className="text-sm text-muted-foreground">Our admin team reviews and contacts the club</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-6 w-6 rounded-full bg-accent/10 text-accent text-xs flex items-center justify-center flex-shrink-0">3</div>
+                <p className="text-sm text-muted-foreground">Once verified, the club appears here for you to join</p>
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Input
@@ -464,14 +580,14 @@ export default function JoinClub() {
               className="h-11 rounded-xl bg-muted/30 border-border/40"
             />
             <Textarea
-              placeholder="Additional notes (optional)"
+              placeholder="Additional notes (optional) - e.g., why you'd like this club added"
               value={requestMessage}
               onChange={(e) => setRequestMessage(e.target.value)}
               className="rounded-xl bg-muted/30 border-border/40 min-h-[80px]"
             />
-            <Button 
-              className="w-full rounded-xl gradient-golden font-semibold" 
-              onClick={handleSendClubRequest} 
+            <Button
+              className="w-full rounded-xl gradient-golden font-semibold"
+              onClick={handleSendClubRequest}
               disabled={requestSending || !requestClubName.trim()}
             >
               {requestSending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
