@@ -77,6 +77,20 @@ interface AdminStats {
   pendingVerifications: number;
   pendingClaims: number;
   recentRegistrations: number;
+  pendingClubRequests: number;
+}
+
+interface ClubRequest {
+  id: string;
+  requester_id: string;
+  requester_email: string;
+  club_name: string;
+  country: string | null;
+  club_contact: string | null;
+  message: string | null;
+  status: "pending" | "contacted" | "resolved" | "rejected";
+  created_at: string;
+  updated_at: string;
 }
 
 export default function SystemAdmin() {
@@ -89,6 +103,7 @@ export default function SystemAdmin() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [fanProfiles, setFanProfiles] = useState<Profile[]>([]);
   const [clubReports, setClubReports] = useState<ClubReport[]>([]);
+  const [clubRequests, setClubRequests] = useState<ClubRequest[]>([]);
   const [selectedVerification, setSelectedVerification] = useState<VerificationRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -109,6 +124,7 @@ export default function SystemAdmin() {
     pendingVerifications: 0,
     pendingClaims: 0,
     recentRegistrations: 0,
+    pendingClubRequests: 0,
   });
 
   useEffect(() => {
@@ -131,6 +147,7 @@ export default function SystemAdmin() {
         fetchAdminStats(),
         fetchFanProfiles(),
         fetchRecentActivity(),
+        fetchClubRequests(),
       ]);
     } finally {
       setDataLoading(false);
@@ -389,6 +406,55 @@ export default function SystemAdmin() {
     setRecentActivity(activities.slice(0, 15));
   };
 
+  const fetchClubRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("club_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        // Table might not exist yet
+        console.error("Error fetching club requests:", error);
+        setClubRequests([]);
+        return;
+      }
+
+      setClubRequests((data ?? []) as ClubRequest[]);
+      
+      // Update stats with pending count
+      const pendingCount = (data ?? []).filter((r: ClubRequest) => r.status === "pending").length;
+      setAdminStats((prev) => ({ ...prev, pendingClubRequests: pendingCount }));
+    } catch (err) {
+      console.error("Error fetching club requests:", err);
+      setClubRequests([]);
+    }
+  };
+
+  const handleUpdateClubRequest = async (requestId: string, newStatus: ClubRequest["status"]) => {
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("club_requests")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Request Updated", 
+        description: `Request marked as ${newStatus}.` 
+      });
+      
+      await fetchClubRequests();
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update request";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleApproveVerification = async (request: VerificationRequest) => {
     if (!request.club) return;
     setActionLoading(true);
@@ -560,6 +626,14 @@ export default function SystemAdmin() {
             </TabsTrigger>
             <TabsTrigger value="verifications" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ShieldCheck className="h-4 w-4 mr-2" /> Verifications
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Mail className="h-4 w-4 mr-2" /> Requests
+              {adminStats.pendingClubRequests > 0 && (
+                <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center bg-accent text-white text-xs rounded-full">
+                  {adminStats.pendingClubRequests}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="clubs" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" /> Clubs
@@ -810,6 +884,128 @@ export default function SystemAdmin() {
                   </Card>
                 );
               })
+            )}
+          </TabsContent>
+
+          {/* REQUESTS TAB */}
+          <TabsContent value="requests" className="mt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Mail className="h-4 w-4" /> Club Requests from Fans
+              </h2>
+              <Badge variant="secondary" className="rounded-full">{clubRequests.length} total</Badge>
+            </div>
+
+            {clubRequests.length === 0 ? (
+              <Card className="rounded-2xl border-border/40">
+                <CardContent className="pt-8 pb-8 text-center">
+                  <Mail className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">No club requests yet.</p>
+                  <p className="text-xs text-muted-foreground mt-1">When fans request new clubs, they'll appear here.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {clubRequests.map((request) => (
+                  <Card key={request.id} className="rounded-2xl border-border/40 overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-display font-semibold">{request.club_name}</h3>
+                            <Badge className={`rounded-full text-xs ${
+                              request.status === "pending" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                              request.status === "contacted" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                              request.status === "resolved" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                              "bg-red-500/10 text-red-400 border-red-500/20"
+                            }`}>
+                              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                            {request.country && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                {request.country}
+                              </div>
+                            )}
+                            {request.club_contact && (
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-3 w-3" />
+                                {request.club_contact}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3 w-3" />
+                              Requester: {request.requester_email}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(request.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          
+                          {request.message && (
+                            <div className="mt-3 p-3 rounded-xl bg-muted/30 text-sm">
+                              "{request.message}"
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          {request.status === "pending" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUpdateClubRequest(request.id, "contacted")}
+                                disabled={actionLoading}
+                                className="rounded-xl"
+                              >
+                                <Mail className="h-3 w-3 mr-1" />
+                                Contact
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateClubRequest(request.id, "resolved")}
+                                disabled={actionLoading}
+                                className="rounded-xl"
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Resolve
+                              </Button>
+                            </>
+                          )}
+                          {request.status === "contacted" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateClubRequest(request.id, "resolved")}
+                                disabled={actionLoading}
+                                className="rounded-xl"
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Resolve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleUpdateClubRequest(request.id, "rejected")}
+                                disabled={actionLoading}
+                                className="rounded-xl"
+                              >
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </TabsContent>
 

@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, role: UserRole, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, role: UserRole, fullName: string) => Promise<{ error: Error | null; data?: { session: Session | null } }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, role: UserRole, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -117,7 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
 
-    return { error: error ? new Error(error.message) : null };
+    return { 
+      error: error ? new Error(error.message) : null, 
+      data: { session: data.session } 
+    };
   };
 
   const signIn = async (email: string, password: string) => {
