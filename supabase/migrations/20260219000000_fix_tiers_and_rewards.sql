@@ -2,6 +2,12 @@
 -- FIX FOR: Points Multiplier, Fan Name, Mark Collected
 -- =====================================================
 
+-- Drop existing functions first (if they exist)
+DROP FUNCTION IF EXISTS public.redeem_reward(uuid, uuid);
+DROP FUNCTION IF EXISTS public.get_membership_multiplier(uuid);
+DROP FUNCTION IF EXISTS public.get_membership_discount(uuid);
+DROP FUNCTION IF EXISTS public.complete_activity(uuid, uuid);
+
 -- 1. Add completed_at column to reward_redemptions (for Mark Collected feature)
 ALTER TABLE public.reward_redemptions 
 ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ DEFAULT NULL;
@@ -216,7 +222,79 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 9. Update existing memberships to set their tier based on current points
+-- 9. Create complete_activity function (applies multiplier!)
+CREATE OR REPLACE FUNCTION public.complete_activity(
+  p_membership_id UUID,
+  p_activity_id UUID
+)
+RETURNS JSON AS $$
+DECLARE
+  v_fan_id UUID;
+  v_program_id UUID;
+  v_base_points INTEGER;
+  v_multiplier NUMERIC := 1.0;
+  v_final_points INTEGER;
+  v_activity_name TEXT;
+  v_completion_id UUID;
+BEGIN
+  -- Get membership info
+  SELECT fan_id, program_id INTO v_fan_id, v_program_id
+  FROM public.fan_memberships
+  WHERE id = p_membership_id;
+  
+  IF v_fan_id IS NULL THEN
+    RAISE EXCEPTION 'Membership not found';
+  END IF;
+  
+  -- Get activity info
+  SELECT name, points_awarded INTO v_activity_name, v_base_points
+  FROM public.activities
+  WHERE id = p_activity_id;
+  
+  IF v_activity_name IS NULL THEN
+    RAISE EXCEPTION 'Activity not found';
+  END IF;
+  
+  -- Get the multiplier for this member
+  v_multiplier := public.get_membership_multiplier(p_membership_id);
+  
+  -- Calculate final points
+  v_final_points := ROUND(v_base_points * v_multiplier);
+  
+  -- Create completion record
+  INSERT INTO public.activity_completions (
+    activity_id,
+    fan_id,
+    membership_id,
+    points_earned,
+    completed_at
+  ) VALUES (
+    p_activity_id,
+    v_fan_id,
+    p_membership_id,
+    v_final_points,
+    now()
+  ) RETURNING id INTO v_completion_id;
+  
+  -- Award points to the member
+  UPDATE public.fan_memberships
+  SET points_balance = points_balance + v_final_points,
+      updated_at = now()
+  WHERE id = p_membership_id;
+  
+  -- Return result
+  RETURN json_build_object(
+    'success', true,
+    'completion_id', v_completion_id,
+    'base_points', v_base_points,
+    'multiplier', v_multiplier,
+    'final_points', v_final_points,
+    'activity_name', v_activity_name
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 10. Update existing memberships to set their tier based on current points
 DO $$
 DECLARE
   mem RECORD;
@@ -226,11 +304,12 @@ BEGIN
   END LOOP;
 END $$;
 
--- 10. Grant execute permissions
+-- 11. Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.get_membership_multiplier(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_membership_discount(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.update_fan_tier(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.redeem_reward(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_activity(UUID, UUID) TO authenticated;
 
 -- 11. Create notifications table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.notifications (
