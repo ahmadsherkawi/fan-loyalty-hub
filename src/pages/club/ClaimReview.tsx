@@ -150,7 +150,7 @@ export default function ClaimReview() {
       setAllRedemptions(formattedRedemptions);
     } catch (error: unknown) {
       console.error("ClaimReview fetch error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to load claims.";
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setDataLoading(false);
@@ -257,33 +257,37 @@ export default function ClaimReview() {
     try {
       // Update redemption as completed (handed to fan)
       const now = new Date().toISOString();
-      const { error } = await supabase.from("reward_redemptions").update({ 
+      
+      console.log("Marking redemption as completed:", redemption.id);
+      
+      const { error: updateError } = await supabase.from("reward_redemptions").update({ 
         completed_at: now 
       }).eq("id", redemption.id);
       
-      if (error) {
-        // If completed_at column doesn't exist, show helpful message
-        if (error.message.includes('column') || error.message.includes('completed_at')) {
-          throw new Error("Database needs update: The 'completed_at' column is missing. Please run the SQL migration in Supabase.");
-        }
-        throw error;
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw new Error(`Database update failed: ${updateError.message}`);
       }
       
       // Use fan_profile from the redemption if available, otherwise fetch
       let fanUserId = redemption.fan_profile?.user_id;
       
       if (!fanUserId) {
-        const { data: fanProfile } = await supabase
+        const { data: fanProfile, error: profileError } = await supabase
           .from("profiles")
           .select("user_id")
           .eq("id", redemption.fan_id)
           .single();
+        
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+        }
         fanUserId = fanProfile?.user_id;
       }
       
-      // Create notification for the fan confirming completion
+      // Create notification for the fan confirming completion (non-blocking)
       if (fanUserId) {
-        await supabase.from("notifications").insert({
+        const { error: notifError } = await supabase.from("notifications").insert({
           user_id: fanUserId,
           type: "reward_completed",
           data: {
@@ -295,13 +299,25 @@ export default function ClaimReview() {
             priority: "normal"
           }
         });
+        
+        if (notifError) {
+          console.error("Notification error (non-blocking):", notifError);
+          // Don't throw - notification failure shouldn't block completion
+        }
       }
       
       toast({ title: "Reward Completed", description: "The reward has been handed to the fan. Record saved to audit log." });
       await fetchData();
     } catch (error: unknown) {
       console.error("Mark completed error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      // More detailed error logging
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      console.log("Full error details:", JSON.stringify(error, null, 2));
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setProcessingId(null);
