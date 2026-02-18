@@ -75,6 +75,9 @@ export interface LoyaltyProgram {
   description: string | null;
   points_currency_name: string;
   is_active: boolean | null;
+  chants_points_enabled: boolean | null;
+  chant_post_points: number | null;
+  chant_cheer_points: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -237,5 +240,26 @@ export interface Notification {
   title: string | null;
   data: Record<string, unknown>;
   is_read: boolean;
+  created_at: string;
+}
+
+// Chant types
+export interface Chant {
+  id: string;
+  fan_id: string;
+  membership_id: string;
+  club_id: string;
+  content: string;
+  image_url: string | null;
+  cheers_count: number;
+  is_edited: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChantCheer {
+  id: string;
+  chant_id: string;
+  fan_id: string;
   created_at: string;
 }

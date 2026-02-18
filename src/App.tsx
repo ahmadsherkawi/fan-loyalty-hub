@@ -35,6 +35,7 @@ import FanProfilePage from "./pages/fan/FanProfilePage";
 import FanProfileEdit from "./pages/fan/FanProfileEdit";
 import JoinClub from "./pages/fan/JoinClub";
 import FanNotifications from "./pages/fan/FanNotifications";
+import FanChants from "./pages/fan/FanChants";
 import SystemAdmin from "./pages/SystemAdmin";
 
 const queryClient = new QueryClient();
@@ -75,7 +76,8 @@ const App = () => {
                 <Route path="/fan/profile" element={<FanProfilePage />} />
                 <Route path="/fan/profile/edit" element={<FanProfileEdit />} />
                 <Route path="/fan/join" element={<JoinClub />} />
-                <Route path="/fan/notifications" element={<FanNotifications />} /> {/* ✅ CORRECT ROUTE */}
+                <Route path="/fan/notifications" element={<FanNotifications />} />
+                <Route path="/fan/chants" element={<FanChants />} />
                 {/* System Admin */}
                 <Route path="/admin" element={<SystemAdmin />} />
                 {/* Catch-all */}

@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Camera,
   BarChart3,
+  Megaphone,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -469,7 +470,7 @@ export default function FanHome() {
         </div>
 
         {/* QUICK NAV BENTO ROW */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
             onClick={() => navigate("/fan/activities")}
             className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
@@ -499,6 +500,16 @@ export default function FanHome() {
               <Users className="h-5 w-5 text-primary" />
             </div>
             <span className="text-xs font-semibold text-foreground relative z-10">Rankings</span>
+          </button>
+          <button
+            onClick={() => navigate("/fan/chants")}
+            className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent pointer-events-none rounded-3xl" />
+            <div className="h-11 w-11 rounded-2xl bg-red-500/15 flex items-center justify-center group-hover:bg-red-500/25 transition-colors">
+              <Megaphone className="h-5 w-5 text-red-500" />
+            </div>
+            <span className="text-xs font-semibold text-foreground relative z-10">Chants</span>
           </button>
         </div>
 

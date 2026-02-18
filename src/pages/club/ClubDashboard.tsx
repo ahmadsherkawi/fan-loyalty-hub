@@ -11,6 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { AlertCircle, CheckCircle2, Clock, Shield, ShieldAlert } from "lucide-react";
+import { Switch as SwitchUI } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 import {
   Loader2,
@@ -30,7 +40,10 @@ import {
   Camera,
   Settings,
   ArrowRight,
-  Lock } from "lucide-react";
+  Lock,
+  Megaphone,
+  Switch
+} from "lucide-react";
 
 import { toast } from "sonner";
 import type { Club, LoyaltyProgram } from "@/types/database";
@@ -64,6 +77,11 @@ export default function ClubDashboard() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [hasPendingVerification, setHasPendingVerification] = useState(false);
   const [verificationRejected, setVerificationRejected] = useState(false);
+  const [chantSettingsOpen, setChantSettingsOpen] = useState(false);
+  const [chantPointsEnabled, setChantPointsEnabled] = useState(true);
+  const [chantPostPoints, setChantPostPoints] = useState(5);
+  const [chantCheerPoints, setChantCheerPoints] = useState(2);
+  const [savingChantSettings, setSavingChantSettings] = useState(false);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,7 +175,13 @@ export default function ClubDashboard() {
         .limit(1);
 
       const programRecord = programs?.[0] as LoyaltyProgram | undefined;
-      if (programRecord) setProgram(programRecord);
+      if (programRecord) {
+        setProgram(programRecord);
+        // Load chant settings
+        setChantPointsEnabled(programRecord.chants_points_enabled ?? true);
+        setChantPostPoints(programRecord.chant_post_points ?? 5);
+        setChantCheerPoints(programRecord.chant_cheer_points ?? 2);
+      }
       const programId = programRecord?.id;
 
       const { count: fans } = await supabase
@@ -211,6 +235,29 @@ export default function ClubDashboard() {
     else {
       await signOut();
       navigate("/");
+    }
+  };
+
+  const handleSaveChantSettings = async () => {
+    if (!program) return;
+    setSavingChantSettings(true);
+    try {
+      const { error } = await supabase
+        .from("loyalty_programs")
+        .update({
+          chants_points_enabled: chantPointsEnabled,
+          chant_post_points: chantPostPoints,
+          chant_cheer_points: chantCheerPoints
+        })
+        .eq("id", program.id);
+
+      if (error) throw error;
+      toast.success("Chant settings saved!");
+      setChantSettingsOpen(false);
+    } catch (err: any) {
+      toast.error("Failed to save settings: " + err.message);
+    } finally {
+      setSavingChantSettings(false);
     }
   };
 
@@ -465,6 +512,48 @@ export default function ClubDashboard() {
           </div>
         </div>
 
+        {/* CHANT SETTINGS */}
+        {verified && program && (
+          <Card className="rounded-2xl border-border/40">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                    <Megaphone className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-display">Fan Chants</CardTitle>
+                    <p className="text-sm text-muted-foreground">Configure points for fan social posts</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setChantSettingsOpen(true)}
+                  className="rounded-full"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${chantPointsEnabled ? 'bg-green-500' : 'bg-muted-foreground/30'}`} />
+                  {chantPointsEnabled ? 'Points enabled' : 'Points disabled'}
+                </span>
+                {chantPointsEnabled && (
+                  <>
+                    <span>Post: +{chantPostPoints} pts</span>
+                    <span>Cheer received: +{chantCheerPoints} pts</span>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* MOBILE NAV LINKS */}
         <div className="md:hidden grid grid-cols-4 gap-3">
           {navLinks.map((link) =>
@@ -479,6 +568,91 @@ export default function ClubDashboard() {
           )}
         </div>
       </main>
+
+      {/* CHANT SETTINGS DIALOG */}
+      <Dialog open={chantSettingsOpen} onOpenChange={setChantSettingsOpen}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-red-500" />
+              Chant Points Settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Enable/Disable Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="font-medium">Enable Chant Points</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Award points when fans post chants or receive cheers
+                </p>
+              </div>
+              <SwitchUI
+                checked={chantPointsEnabled}
+                onCheckedChange={setChantPointsEnabled}
+              />
+            </div>
+
+            {chantPointsEnabled && (
+              <>
+                {/* Post Points */}
+                <div className="space-y-2">
+                  <Label htmlFor="post-points">Points for posting a chant</Label>
+                  <Input
+                    id="post-points"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={chantPostPoints}
+                    onChange={(e) => setChantPostPoints(parseInt(e.target.value) || 0)}
+                    className="rounded-xl border-border/40"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Points awarded when a fan posts a new chant
+                  </p>
+                </div>
+
+                {/* Cheer Points */}
+                <div className="space-y-2">
+                  <Label htmlFor="cheer-points">Points for receiving a cheer</Label>
+                  <Input
+                    id="cheer-points"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={chantCheerPoints}
+                    onChange={(e) => setChantCheerPoints(parseInt(e.target.value) || 0)}
+                    className="rounded-xl border-border/40"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Points awarded to chant author when another fan cheers their chant
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setChantSettingsOpen(false)}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveChantSettings}
+              disabled={savingChantSettings}
+              className="rounded-xl"
+            >
+              {savingChantSettings ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save Settings"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
