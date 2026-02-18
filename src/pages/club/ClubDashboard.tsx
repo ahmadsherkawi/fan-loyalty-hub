@@ -20,7 +20,6 @@ import {
   Trophy,
   LogOut,
   ShieldCheck,
-  Shield,
   Calendar,
   BarChart3,
   ChevronRight,
@@ -238,8 +237,7 @@ export default function ClubDashboard() {
   { label: "Seasons", icon: <Calendar className="h-4 w-4" />, path: "/club/seasons" },
   { label: "Analytics", icon: <BarChart3 className="h-4 w-4" />, path: "/club/analytics" },
   { label: "Tiers", icon: <Crown className="h-4 w-4" />, path: "/club/tiers" },
-  { label: "Settings", icon: <Settings className="h-4 w-4" />, path: "/club/profile" },
-  { label: "Admin", icon: <Shield className="h-4 w-4" />, path: "/admin", highlight: true }];
+  { label: "Settings", icon: <Settings className="h-4 w-4" />, path: "/club/profile" }];
 
 
   return (
@@ -276,11 +274,7 @@ export default function ClubDashboard() {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate(link.path)}
-                className={`rounded-full gap-1.5 text-xs ${
-                  (link as any).highlight 
-                    ? "text-accent hover:text-accent hover:bg-accent/10" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-card/60"
-                }`}>
+                className="rounded-full gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/60">
 
                   {link.icon}
                   {link.label}
@@ -388,17 +382,13 @@ export default function ClubDashboard() {
         </div>
 
         {/* MOBILE NAV LINKS */}
-        <div className="md:hidden grid grid-cols-3 gap-3">
+        <div className="md:hidden grid grid-cols-4 gap-3">
           {navLinks.map((link) =>
           <Button
             key={link.label}
             variant="outline"
             onClick={() => navigate(link.path)}
-            className={`rounded-2xl h-auto py-4 flex flex-col items-center gap-2 ${
-              (link as any).highlight 
-                ? "border-accent/40 text-accent hover:bg-accent/10" 
-                : "border-border/40 hover:border-primary/20 hover:bg-card/60"
-            }`}>
+            className="rounded-2xl h-auto py-4 flex flex-col items-center gap-2 border-border/40 hover:border-primary/20 hover:bg-card/60">
 
               {link.icon}
               <span className="text-xs">{link.label}</span>

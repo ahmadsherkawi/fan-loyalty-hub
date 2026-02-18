@@ -477,6 +477,47 @@ export default function SystemAdmin() {
     }
   };
 
+  const handleQuickVerify = async (clubId: string, clubName: string) => {
+    setActionLoading(true);
+    try {
+      // Update or create verification record
+      const { data: existingVerif } = await supabase
+        .from("club_verifications")
+        .select("id")
+        .eq("club_id", clubId)
+        .single();
+
+      if (existingVerif) {
+        await supabase
+          .from("club_verifications")
+          .update({ verified_at: new Date().toISOString() })
+          .eq("club_id", clubId);
+      } else {
+        await supabase
+          .from("club_verifications")
+          .insert({ 
+            club_id: clubId, 
+            verified_at: new Date().toISOString(),
+            authority_declaration: true 
+          });
+      }
+
+      // Update club status
+      await supabase
+        .from("clubs")
+        .update({ status: "verified" })
+        .eq("id", clubId);
+
+      await fetchAllData();
+      toast({ title: "Club Verified", description: `${clubName} has been verified.` });
+    } catch (error) {
+      console.error("Error verifying club:", error);
+      toast({ title: "Error", description: "Failed to verify club", variant: "destructive" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRejectVerification = async (request: VerificationRequest) => {
     if (!request.club) return;
     setActionLoading(true);
@@ -518,6 +559,88 @@ export default function SystemAdmin() {
       await fetchAllData();
     } catch (error) {
       toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteClub = async (clubId: string, clubName: string) => {
+    try {
+      setActionLoading(true);
+
+      // Get the club's program first
+      const { data: programs } = await supabase
+        .from("loyalty_programs")
+        .select("id")
+        .eq("club_id", clubId);
+
+      const programIds = programs?.map(p => p.id) || [];
+
+      // Delete in correct order (child records first)
+      if (programIds.length > 0) {
+        // Delete activity completions
+        const { data: activities } = await supabase
+          .from("activities")
+          .select("id")
+          .in("program_id", programIds);
+        
+        const activityIds = activities?.map(a => a.id) || [];
+
+        if (activityIds.length > 0) {
+          await supabase.from("activity_completions").delete().in("activity_id", activityIds);
+          await supabase.from("manual_claims").delete().in("activity_id", activityIds);
+        }
+
+        // Delete reward redemptions
+        const { data: rewards } = await supabase
+          .from("rewards")
+          .select("id")
+          .in("program_id", programIds);
+        
+        const rewardIds = rewards?.map(r => r.id) || [];
+
+        if (rewardIds.length > 0) {
+          await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
+        }
+
+        // Delete rewards, activities, tiers
+        await supabase.from("rewards").delete().in("program_id", programIds);
+        await supabase.from("activities").delete().in("program_id", programIds);
+        await supabase.from("tiers").delete().in("program_id", programIds);
+      }
+
+      // Delete fan memberships
+      await supabase.from("fan_memberships").delete().eq("club_id", clubId);
+
+      // Delete club verification
+      await supabase.from("club_verifications").delete().eq("club_id", clubId);
+
+      // Delete loyalty programs
+      await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
+
+      // Get club admin to delete their profile
+      const { data: clubData } = await supabase
+        .from("clubs")
+        .select("admin_id")
+        .eq("id", clubId)
+        .single();
+
+      // Delete the club
+      await supabase.from("clubs").delete().eq("id", clubId);
+
+      // Delete the club admin's profile and auth user
+      if (clubData?.admin_id) {
+        await supabase.from("profiles").delete().eq("id", clubData.admin_id);
+      }
+
+      toast({ 
+        title: "Club Deleted", 
+        description: `${clubName} and all associated data have been removed.` 
+      });
+      await fetchAllData();
+    } catch (error) {
+      console.error("Error deleting club:", error);
+      toast({ title: "Error", description: "Failed to delete club", variant: "destructive" });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1034,21 +1157,73 @@ export default function SystemAdmin() {
                   <Card key={club.id} className="rounded-2xl border-border/40 overflow-hidden card-hover">
                     <div className={`absolute inset-0 bg-gradient-to-br ${isVerified ? "from-primary/5" : "from-muted/30"} to-transparent pointer-events-none`} />
                     <CardContent className="relative z-10 pt-6">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div
-                          className="w-12 h-12 rounded-xl flex items-center justify-center border border-border/30"
-                          style={{ backgroundColor: club.primary_color || "#1a7a4c" }}
-                        >
-                          {club.logo_url ? (
-                            <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover rounded-xl" />
-                          ) : (
-                            <span className="text-lg font-bold text-white">{club.name.charAt(0)}</span>
-                          )}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div
+                            className="w-12 h-12 rounded-xl flex items-center justify-center border border-border/30"
+                            style={{ backgroundColor: club.primary_color || "#1a7a4c" }}
+                          >
+                            {club.logo_url ? (
+                              <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover rounded-xl" />
+                            ) : (
+                              <span className="text-lg font-bold text-white">{club.name.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-display font-bold text-foreground">{club.name}</h3>
+                            <p className="text-xs text-muted-foreground">{club.city}, {club.country}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-display font-bold text-foreground">{club.name}</h3>
-                          <p className="text-xs text-muted-foreground">{club.city}, {club.country}</p>
-                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {!isVerified && (
+                              <DropdownMenuItem onClick={() => handleQuickVerify(club.id, club.name)}>
+                                <ShieldCheck className="h-4 w-4 mr-2" /> Verify Club
+                              </DropdownMenuItem>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete Club
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Club?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete <strong>{club.name}</strong> and all associated data including:
+                                    <ul className="mt-2 ml-4 list-disc text-sm">
+                                      <li>All fan memberships</li>
+                                      <li>All activities and completions</li>
+                                      <li>All rewards and redemptions</li>
+                                      <li>Club admin account</li>
+                                    </ul>
+                                    <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteClub(club.id, club.name)}
+                                    disabled={actionLoading}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                    Delete Club
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
 
                       <div className="flex items-center justify-between">

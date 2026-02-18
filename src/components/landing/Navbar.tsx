@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, LayoutDashboard, Compass } from 'lucide-react';
+import { LogOut, LayoutDashboard, Compass, Shield } from 'lucide-react';
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -65,6 +65,14 @@ export function Navbar() {
                 onClick={() => navigate('/auth?role=club_admin')}
               >
                 Register Club
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/admin')}
+                className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
+                title="Admin Panel"
+              >
+                <Shield className="h-4 w-4" />
               </Button>
             </>
           )}
