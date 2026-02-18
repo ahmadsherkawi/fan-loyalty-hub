@@ -90,6 +90,7 @@ export default function ActivityBuilder() {
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [clubVerified, setClubVerified] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
@@ -146,9 +147,24 @@ export default function ActivityBuilder() {
     setDataLoading(true);
 
     try {
-      const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
+      const { data: clubs } = await supabase.from("clubs").select("id, status").eq("admin_id", profile.id).limit(1);
       if (!clubs || clubs.length === 0) {
         navigate("/club/onboarding");
+        return;
+      }
+
+      // Check if club is verified
+      const clubStatus = clubs[0].status;
+      const isVerified = clubStatus === "verified" || clubStatus === "official";
+      setClubVerified(isVerified);
+
+      if (!isVerified && !isPreviewMode) {
+        toast({
+          title: "Verification Required",
+          description: "Your club must be verified before you can create activities.",
+          variant: "destructive",
+        });
+        navigate("/club/dashboard?needs_verification=true");
         return;
       }
 

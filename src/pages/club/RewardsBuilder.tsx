@@ -32,6 +32,7 @@ export default function RewardsBuilder() {
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [clubVerified, setClubVerified] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
@@ -51,8 +52,24 @@ export default function RewardsBuilder() {
   const fetchData = async () => {
     if (!profile) return; setDataLoading(true);
     try {
-      const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
+      const { data: clubs } = await supabase.from("clubs").select("id, status").eq("admin_id", profile.id).limit(1);
       if (!clubs || clubs.length === 0) { navigate("/club/onboarding"); return; }
+
+      // Check if club is verified
+      const clubStatus = clubs[0].status;
+      const isVerified = clubStatus === "verified" || clubStatus === "official";
+      setClubVerified(isVerified);
+
+      if (!isVerified && !isPreviewMode) {
+        toast({
+          title: "Verification Required",
+          description: "Your club must be verified before you can create rewards.",
+          variant: "destructive",
+        });
+        navigate("/club/dashboard?needs_verification=true");
+        return;
+      }
+
       const { data: programs } = await supabase.from("loyalty_programs").select("*").eq("club_id", clubs[0].id).limit(1);
       if (!programs || programs.length === 0) { navigate("/club/dashboard"); return; }
       setProgram(programs[0] as LoyaltyProgram);

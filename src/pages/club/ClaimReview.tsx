@@ -38,6 +38,7 @@ export default function ClaimReview() {
   const [activityClaims, setActivityClaims] = useState<ClaimWithDetails[]>([]);
   const [allRedemptions, setAllRedemptions] = useState<RedemptionWithDetails[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [clubVerified, setClubVerified] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [activeTab, setActiveTab] = useState<RedemptionStatus>("pending");
@@ -60,10 +61,26 @@ export default function ClaimReview() {
     if (!profile) return;
     setDataLoading(true);
     try {
-      const { data: clubs, error: clubErr } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
+      const { data: clubs, error: clubErr } = await supabase.from("clubs").select("id, status").eq("admin_id", profile.id).limit(1);
       if (clubErr) throw clubErr;
       if (!clubs?.length) { navigate("/club/onboarding"); return; }
       const clubId = clubs[0].id;
+
+      // Check if club is verified
+      const clubStatus = clubs[0].status;
+      const isVerified = clubStatus === "verified" || clubStatus === "official";
+      setClubVerified(isVerified);
+
+      if (!isVerified && !isPreviewMode) {
+        toast({
+          title: "Verification Required",
+          description: "Your club must be verified before you can review claims.",
+          variant: "destructive",
+        });
+        navigate("/club/dashboard?needs_verification=true");
+        return;
+      }
+
       const { data: programs, error: progErr } = await supabase.from("loyalty_programs").select("*").eq("club_id", clubId).limit(1);
       if (progErr) throw progErr;
       if (!programs?.length) { navigate("/club/dashboard"); return; }
