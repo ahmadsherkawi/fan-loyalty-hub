@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { AlertCircle, CheckCircle2, Clock, Shield, ShieldAlert } from "lucide-react";
 
 import {
   Loader2,
@@ -27,7 +28,9 @@ import {
   Sparkles,
   Crown,
   Camera,
-  Settings } from "lucide-react";
+  Settings,
+  ArrowRight,
+  Lock } from "lucide-react";
 
 import { toast } from "sonner";
 import type { Club, LoyaltyProgram } from "@/types/database";
@@ -59,6 +62,8 @@ export default function ClubDashboard() {
   });
   const [dataLoading, setDataLoading] = useState(true);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [hasPendingVerification, setHasPendingVerification] = useState(false);
+  const [verificationRejected, setVerificationRejected] = useState(false);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,10 +106,18 @@ export default function ClubDashboard() {
       return;
     }
 
+    // Check URL params for verification status
+    const pendingVerification = searchParams.get("pending_verification") === "true";
+    const needsVerification = searchParams.get("needs_verification") === "true";
+    
+    if (pendingVerification || needsVerification) {
+      setHasPendingVerification(true);
+    }
+
     if (!loading && !user) navigate("/auth?role=club_admin");
     if (!loading && profile?.role !== "club_admin") navigate("/fan/home");
     if (!loading && profile) fetchData();
-  }, [loading, user, profile]);
+  }, [loading, user, profile, searchParams]);
 
   const fetchData = async () => {
     if (!profile) return;
@@ -121,47 +134,63 @@ export default function ClubDashboard() {
       const clubData = clubs[0] as Club;
       setClub(clubData);
 
-      const { data: programs } = await supabase.
-      from("loyalty_programs").
-      select("*").
-      eq("club_id", clubData.id).
-      limit(1);
+      // Check verification status
+      if (clubData.status === "unverified") {
+        const { data: verification } = await supabase
+          .from("club_verifications")
+          .select("id, verified_at")
+          .eq("club_id", clubData.id)
+          .maybeSingle();
+        
+        if (verification && !verification.verified_at) {
+          setHasPendingVerification(true);
+        } else if (!verification) {
+          // No verification submitted yet
+          setHasPendingVerification(false);
+        }
+      }
+
+      const { data: programs } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("club_id", clubData.id)
+        .limit(1);
 
       const programRecord = programs?.[0] as LoyaltyProgram | undefined;
       if (programRecord) setProgram(programRecord);
       const programId = programRecord?.id;
 
-      const { count: fans } = await supabase.
-      from("fan_memberships").
-      select("*", { count: "exact", head: true }).
-      eq("club_id", clubData.id);
+      const { count: fans } = await supabase
+        .from("fan_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("club_id", clubData.id);
 
-      const { count: activities } = await supabase.
-      from("activities").
-      select("*", { count: "exact", head: true }).
-      eq("program_id", programId);
+      const { count: activities } = await supabase
+        .from("activities")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", programId);
 
-      const { count: rewards } = await supabase.
-      from("rewards").
-      select("*", { count: "exact", head: true }).
-      eq("program_id", programId);
+      const { count: rewards } = await supabase
+        .from("rewards")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", programId);
 
-      const { count: pendingActivityClaims } = await supabase.
-      from("manual_claims").
-      select("id, activities!inner(program_id)", { count: "exact", head: true }).
-      eq("status", "pending").
-      eq("activities.program_id", programId);
+      const { count: pendingActivityClaims } = await supabase
+        .from("manual_claims")
+        .select("id, activities!inner(program_id)", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("activities.program_id", programId);
 
-      const { count: pendingRewardFulfillments } = await supabase.
-      from("reward_redemptions").
-      select("id, rewards!inner(program_id)", { count: "exact", head: true }).
-      is("fulfilled_at", null).
-      eq("rewards.program_id", programId);
+      const { count: pendingRewardFulfillments } = await supabase
+        .from("reward_redemptions")
+        .select("id, rewards!inner(program_id)", { count: "exact", head: true })
+        .is("fulfilled_at", null)
+        .eq("rewards.program_id", programId);
 
-      const { data: completions } = await supabase.
-      from("activity_completions").
-      select("points_earned, activities!inner(program_id)").
-      eq("activities.program_id", programId);
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned, activities!inner(program_id)")
+        .eq("activities.program_id", programId);
 
       const totalPoints = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
 
@@ -178,8 +207,8 @@ export default function ClubDashboard() {
   };
 
   const handleSignOut = async () => {
-    if (isPreview) navigate("/preview");else
-    {
+    if (isPreview) navigate("/preview");
+    else {
       await signOut();
       navigate("/");
     }
@@ -190,55 +219,52 @@ export default function ClubDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>);
-
   }
 
   const verified = club?.status === "verified" || club?.status === "official";
 
   const statItems = [
-  { icon: <Users className="h-5 w-5" />, label: "Fans", value: stats.fans, gradient: "from-primary/30 to-primary/5", iconColor: "text-primary" },
-  { icon: <Zap className="h-5 w-5" />, label: "Activities", value: stats.activities, gradient: "from-blue-500/30 to-blue-500/5", iconColor: "text-blue-400" },
-  { icon: <Gift className="h-5 w-5" />, label: "Rewards", value: stats.rewards, gradient: "from-accent/30 to-accent/5", iconColor: "text-accent" },
-  { icon: <FileCheck className="h-5 w-5" />, label: "Pending", value: stats.claims, gradient: "from-orange-500/30 to-orange-500/5", iconColor: "text-orange-400" },
-  { icon: <Trophy className="h-5 w-5" />, label: "Points", value: stats.points, gradient: "from-purple-500/30 to-purple-500/5", iconColor: "text-purple-400" }];
+    { icon: <Users className="h-5 w-5" />, label: "Fans", value: stats.fans, gradient: "from-primary/30 to-primary/5", iconColor: "text-primary" },
+    { icon: <Zap className="h-5 w-5" />, label: "Activities", value: stats.activities, gradient: "from-blue-500/30 to-blue-500/5", iconColor: "text-blue-400" },
+    { icon: <Gift className="h-5 w-5" />, label: "Rewards", value: stats.rewards, gradient: "from-accent/30 to-accent/5", iconColor: "text-accent" },
+    { icon: <FileCheck className="h-5 w-5" />, label: "Pending", value: stats.claims, gradient: "from-orange-500/30 to-orange-500/5", iconColor: "text-orange-400" },
+    { icon: <Trophy className="h-5 w-5" />, label: "Points", value: stats.points, gradient: "from-purple-500/30 to-purple-500/5", iconColor: "text-purple-400" ];
 
-
+  // Actions are disabled for unverified clubs
   const actions = [
-  {
-    title: "Manage Activities",
-    desc: "Create and edit fan activities",
-    disabled: !program,
-    onClick: () => navigate("/club/activities"),
-    icon: <Zap className="h-5 w-5" />,
-    iconColor: "text-primary",
-    gradient: "from-primary/15 to-transparent"
-  },
-  {
-    title: "Manage Rewards",
-    desc: "Configure redemption rewards",
-    disabled: !program,
-    onClick: () => navigate("/club/rewards"),
-    icon: <Gift className="h-5 w-5" />,
-    iconColor: "text-accent",
-    gradient: "from-accent/15 to-transparent"
-  },
-  {
-    title: "Review Claims",
-    desc: "Approve manual submissions",
-    disabled: !program,
-    onClick: () => navigate("/club/claims"),
-    icon: <FileCheck className="h-5 w-5" />,
-    iconColor: "text-orange-400",
-    gradient: "from-orange-500/15 to-transparent"
-  }];
-
+    {
+      title: "Manage Activities",
+      desc: verified ? "Create and edit fan activities" : "Requires verification",
+      disabled: !program || !verified,
+      onClick: () => navigate("/club/activities"),
+      icon: <Zap className="h-5 w-5" />,
+      iconColor: "text-primary",
+      gradient: "from-primary/15 to-transparent"
+    },
+    {
+      title: "Manage Rewards",
+      desc: verified ? "Configure redemption rewards" : "Requires verification",
+      disabled: !program || !verified,
+      onClick: () => navigate("/club/rewards"),
+      icon: <Gift className="h-5 w-5" />,
+      iconColor: "text-accent",
+      gradient: "from-accent/15 to-transparent"
+    },
+    {
+      title: "Review Claims",
+      desc: verified ? "Approve manual submissions" : "Requires verification",
+      disabled: !program || !verified,
+      onClick: () => navigate("/club/claims"),
+      icon: <FileCheck className="h-5 w-5" />,
+      iconColor: "text-orange-400",
+      gradient: "from-orange-500/15 to-transparent"
+    }];
 
   const navLinks = [
-  { label: "Seasons", icon: <Calendar className="h-4 w-4" />, path: "/club/seasons" },
-  { label: "Analytics", icon: <BarChart3 className="h-4 w-4" />, path: "/club/analytics" },
-  { label: "Tiers", icon: <Crown className="h-4 w-4" />, path: "/club/tiers" },
-  { label: "Settings", icon: <Settings className="h-4 w-4" />, path: "/club/profile" }];
-
+    { label: "Seasons", icon: <Calendar className="h-4 w-4" />, path: "/club/seasons" },
+    { label: "Analytics", icon: <BarChart3 className="h-4 w-4" />, path: "/club/analytics" },
+    { label: "Tiers", icon: <Crown className="h-4 w-4" />, path: "/club/tiers" },
+    { label: "Settings", icon: <Settings className="h-4 w-4" />, path: "/club/profile" }];
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,21 +287,26 @@ export default function ClubDashboard() {
             )}
             <span className="font-display font-bold text-foreground tracking-tight">{club?.name}</span>
 
-            {verified &&
-            <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs">
+            {verified && (
+              <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs">
                 <ShieldCheck className="h-3 w-3 mr-1" /> Verified
               </Badge>
-            }
+            )}
+            
+            {!verified && (
+              <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 rounded-full text-xs">
+                <Clock className="h-3 w-3 mr-1" /> Pending Verification
+              </Badge>
+            )}
 
             <div className="hidden md:flex items-center gap-1 ml-4">
               {navLinks.map((link) =>
-              <Button
-                key={link.label}
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate(link.path)}
-                className="rounded-full gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/60">
-
+                <Button
+                  key={link.label}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(link.path)}
+                  className="rounded-full gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/60">
                   {link.icon}
                   {link.label}
                 </Button>
@@ -288,6 +319,40 @@ export default function ClubDashboard() {
           </Button>
         </div>
       </header>
+
+      {/* VERIFICATION BANNER FOR UNVERIFIED CLUBS */}
+      {!verified && !isPreview && (
+        <div className="bg-gradient-to-r from-yellow-500/10 via-yellow-500/5 to-transparent border-b border-yellow-500/20">
+          <div className="container py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                  <ShieldAlert className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">
+                    {hasPendingVerification ? "Verification Pending" : "Verification Required"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {hasPendingVerification 
+                      ? "Your verification request is being reviewed by an admin. You'll be notified once approved."
+                      : "Submit verification to activate your club and start engaging with fans."}
+                  </p>
+                </div>
+              </div>
+              {!hasPendingVerification && (
+                <Button 
+                  onClick={() => navigate("/club/verification")}
+                  className="rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white"
+                >
+                  Submit Verification
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MAIN */}
       <main className="container py-10 space-y-10">
@@ -326,7 +391,9 @@ export default function ClubDashboard() {
                   Dashboard
                 </h1>
                 <p className="text-white/50 mt-2 max-w-lg">
-                  Monitor your fan loyalty ecosystem — track engagement, manage activities, and grow your community.
+                  {verified 
+                    ? "Monitor your fan loyalty ecosystem — track engagement, manage activities, and grow your community."
+                    : "Your dashboard is ready. Complete verification to unlock all features."}
                 </p>
               </div>
             </div>
@@ -336,7 +403,7 @@ export default function ClubDashboard() {
         {/* STATS BENTO GRID */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {statItems.map((s) =>
-          <Card key={s.label} className="relative overflow-hidden rounded-2xl border-border/40 group card-hover">
+            <Card key={s.label} className="relative overflow-hidden rounded-2xl border-border/40 group card-hover">
               <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient} opacity-50 pointer-events-none`} />
               <CardContent className="relative z-10 pt-5 pb-4 px-4">
                 <div className={`mb-2.5 h-9 w-9 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center ${s.iconColor}`}>
@@ -353,26 +420,42 @@ export default function ClubDashboard() {
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4" /> Quick Actions
+            {!verified && (
+              <Badge className="ml-2 bg-muted/50 text-muted-foreground text-xs">Requires Verification</Badge>
+            )}
           </h2>
           <div className="grid md:grid-cols-3 gap-4">
             {actions.map((a) =>
-            <Card
-              key={a.title}
-              onClick={!a.disabled ? a.onClick : undefined}
-              className={`relative overflow-hidden rounded-2xl border-border/40 transition-all duration-500 group ${
-              a.disabled ?
-              "opacity-40" :
-              "cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-primary/20"}`
-              }>
-
+              <Card
+                key={a.title}
+                onClick={!a.disabled ? a.onClick : undefined}
+                className={`relative overflow-hidden rounded-2xl border-border/40 transition-all duration-500 group ${
+                  a.disabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-primary/20"
+                }`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-br ${a.gradient} pointer-events-none`} />
-                <CardHeader className="relative z-10 pb-3">
+                
+                {/* Lock overlay for unverified */}
+                {!verified && (
+                  <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                    <div className="text-center">
+                      <Lock className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
+                      <span className="text-xs text-muted-foreground">Verify to unlock</span>
+                    </div>
+                  </div>
+                )}
+                
+                <CardHeader className="relative z-0 pb-3">
                   <div className={`mb-3 h-10 w-10 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center ${a.iconColor}`}>
                     {a.icon}
                   </div>
                   <CardTitle className="text-base font-display flex items-center justify-between">
                     {a.title}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+                    {verified && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+                    )}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">{a.desc}</p>
                 </CardHeader>
@@ -384,18 +467,17 @@ export default function ClubDashboard() {
         {/* MOBILE NAV LINKS */}
         <div className="md:hidden grid grid-cols-4 gap-3">
           {navLinks.map((link) =>
-          <Button
-            key={link.label}
-            variant="outline"
-            onClick={() => navigate(link.path)}
-            className="rounded-2xl h-auto py-4 flex flex-col items-center gap-2 border-border/40 hover:border-primary/20 hover:bg-card/60">
-
+            <Button
+              key={link.label}
+              variant="outline"
+              onClick={() => navigate(link.path)}
+              className="rounded-2xl h-auto py-4 flex flex-col items-center gap-2 border-border/40 hover:border-primary/20 hover:bg-card/60">
               {link.icon}
               <span className="text-xs">{link.label}</span>
             </Button>
           )}
         </div>
       </main>
-    </div>);
-
+    </div>
+  );
 }

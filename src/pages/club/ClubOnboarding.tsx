@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/ui/Logo";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X, LogOut, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload, X, LogOut, Sparkles, AlertCircle } from "lucide-react";
 
 type Step = "club" | "program" | "verification";
 
@@ -55,7 +55,6 @@ export default function ClubOnboarding() {
       navigate("/auth?role=club_admin", { replace: true });
     } else if (!profile) {
       // User exists but profile is missing - wait a bit for profile to load
-      // This shouldn't happen with our new AuthContext, but handle it gracefully
       console.log("[ClubOnboarding] Waiting for profile to load...");
     } else if (profile.role !== "club_admin") {
       // User is not a club admin, redirect to fan home
@@ -73,10 +72,11 @@ export default function ClubOnboarding() {
   const checkExistingClub = async () => {
     if (!profile) return;
 
-    const { data: clubs } = await supabase.from("clubs").select("id").eq("admin_id", profile.id).limit(1);
+    const { data: clubs } = await supabase.from("clubs").select("id, status").eq("admin_id", profile.id).limit(1);
 
     if (clubs && clubs.length > 0) {
-      navigate("/club/dashboard");
+      // If club exists, redirect to dashboard
+      navigate("/club/dashboard", { replace: true });
     }
   };
 
@@ -155,7 +155,7 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
 
     try {
-      // Create club first
+      // Create club with UNVERIFIED status - admin must approve
       const { data: club, error } = await supabase
         .from("clubs")
         .insert({
@@ -165,6 +165,7 @@ export default function ClubOnboarding() {
           city,
           stadium_name: stadiumName || null,
           primary_color: primaryColor,
+          status: "unverified", // Always start as unverified
         })
         .select()
         .single();
@@ -202,6 +203,7 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
 
     try {
+      // Create program but keep it INACTIVE until club is verified
       const { data: program, error } = await supabase
         .from("loyalty_programs")
         .insert({
@@ -209,6 +211,7 @@ export default function ClubOnboarding() {
           name: programName,
           description: programDescription || null,
           points_currency_name: pointsCurrencyName,
+          is_active: false, // Program starts inactive until verification
         })
         .select()
         .single();
@@ -219,7 +222,7 @@ export default function ClubOnboarding() {
       setStep("verification");
       toast({
         title: "Program Created",
-        description: "Now verify your club to publish.",
+        description: "Now submit verification to activate your club.",
       });
     } catch (error: unknown) {
       const err = error as Error;
@@ -259,20 +262,26 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
 
     try {
+      // Submit verification request (WITHOUT verified_at - admin must approve)
       const { error } = await supabase.from("club_verifications").insert({
         club_id: clubId,
         official_email_domain: officialEmailDomain || null,
         public_link: publicLink || null,
         authority_declaration: authorityDeclaration,
+        verified_at: null, // NOT verified until admin approves
       });
 
       if (error) throw error;
 
+      // Do NOT change club status - it stays "unverified" until admin approves
+      
       toast({
-        title: "Verification Submitted",
-        description: "Your club is now verified! You can start building activities.",
+        title: "Verification Submitted!",
+        description: "Your verification request has been submitted. An admin will review it shortly. You can view your dashboard while waiting.",
       });
-      navigate("/club/dashboard");
+      
+      // Redirect to dashboard with pending verification flag
+      navigate("/club/dashboard?pending_verification=true");
     } catch (error: unknown) {
       const err = error as Error;
       toast({
@@ -287,10 +296,11 @@ export default function ClubOnboarding() {
 
   const handleSkipVerification = () => {
     toast({
-      title: "Verification Skipped",
-      description: "You can verify later. Note: Only verified clubs can publish programs.",
+      title: "Verification Required",
+      description: "Your club needs verification before you can create activities and rewards. You can submit verification later from your dashboard.",
+      variant: "default",
     });
-    navigate("/club/dashboard");
+    navigate("/club/dashboard?needs_verification=true");
   };
 
   const handleSignOut = async () => {
@@ -499,6 +509,12 @@ export default function ClubOnboarding() {
                 <CardDescription>Set up your fan loyalty program</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <strong>Note:</strong> Your program will be inactive until an admin verifies your club.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="programName">Program Name *</Label>
                   <Input
@@ -555,13 +571,24 @@ export default function ClubOnboarding() {
                   <CheckCircle className="h-5 w-5 text-primary" />
                   Club Verification
                 </CardTitle>
-                <CardDescription>Provide at least 2 of 3 requirements to become verified</CardDescription>
+                <CardDescription>Submit verification for admin approval</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Admin Approval Required</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        After you submit, a system admin will review your verification. Your club will be active once approved.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20">
                   <p className="text-sm text-muted-foreground">
-                    <strong>Why verify?</strong> Only verified clubs can publish programs, appear in search, issue QR
-                    codes, and allow fans to earn points.
+                    <strong>Why verify?</strong> Only verified clubs can publish programs, appear in search, issue QR codes, and allow fans to earn points.
                   </p>
                 </div>
 
@@ -618,7 +645,7 @@ export default function ClubOnboarding() {
                     className="flex-1 rounded-xl"
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Submit Verification
+                    Submit for Approval
                   </Button>
                 </div>
               </CardContent>
