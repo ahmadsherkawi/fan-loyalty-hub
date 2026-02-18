@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, CheckCircle2, Circle, Loader2, Mail, Link as LinkIcon, ShieldCheck, AlertTriangle, LogOut, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Loader2, Mail, Link as LinkIcon, ShieldCheck, AlertTriangle, LogOut, Sparkles, Clock } from "lucide-react";
 import type { Club, ClubVerification as ClubVerificationType } from "@/types/database";
 
 const PUBLIC_EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "aol.com", "icloud.com", "mail.com", "protonmail.com", "live.com", "msn.com", "ymail.com"];
@@ -25,6 +25,7 @@ export default function ClubVerification() {
   const [searchParams] = useSearchParams();
   const { profile, signOut, loading } = useAuth();
   const { previewClubStatus, setPreviewClubVerified } = usePreviewMode();
+  const { toast } = useToast();
 
   const isPreviewMode = searchParams.get("preview") === "club_admin";
 
@@ -107,9 +108,11 @@ export default function ClubVerification() {
       };
       
       if (verification) { 
-        await supabase.from("club_verifications").update(verificationData).eq("id", verification.id); 
+        const { error } = await supabase.from("club_verifications").update(verificationData).eq("id", verification.id);
+        if (error) throw error;
       } else { 
-        await supabase.from("club_verifications").insert(verificationData); 
+        const { error } = await supabase.from("club_verifications").insert(verificationData);
+        if (error) throw error;
       }
       
       // Keep club status as "unverified" until admin approves
@@ -120,8 +123,8 @@ export default function ClubVerification() {
         description: "Your verification documents have been submitted. Our admin team will review and approve your club shortly." 
       });
       
-      // Refresh to show pending state
-      await fetchClubData();
+      // Navigate to dashboard with pending verification flag
+      navigate("/club/dashboard?pending_verification=true");
     } catch (error) { 
       console.error("Verification error:", error); 
       toast({ title: "Error", description: "Failed to submit verification. Please try again.", variant: "destructive" }); 

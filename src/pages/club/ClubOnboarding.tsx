@@ -237,7 +237,15 @@ export default function ClubOnboarding() {
   };
 
   const handleSubmitVerification = async () => {
-    if (!clubId) return;
+    if (!clubId) {
+      console.error("No clubId found");
+      toast({
+        title: "Error",
+        description: "Club not found. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Check if at least 2 of 3 requirements are met
     let count = 0;
@@ -249,6 +257,8 @@ export default function ClubOnboarding() {
     }
     if (publicLink) count++;
     if (authorityDeclaration) count++;
+
+    console.log("Verification criteria count:", count);
 
     if (count < 2) {
       toast({
@@ -262,16 +272,23 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
 
     try {
+      console.log("Submitting verification for club:", clubId);
+      
       // Submit verification request (WITHOUT verified_at - admin must approve)
-      const { error } = await supabase.from("club_verifications").insert({
+      const { data, error } = await supabase.from("club_verifications").insert({
         club_id: clubId,
         official_email_domain: officialEmailDomain || null,
         public_link: publicLink || null,
         authority_declaration: authorityDeclaration,
         verified_at: null, // NOT verified until admin approves
-      });
+      }).select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+
+      console.log("Verification submitted successfully:", data);
 
       // Do NOT change club status - it stays "unverified" until admin approves
       
@@ -283,6 +300,7 @@ export default function ClubOnboarding() {
       // Redirect to dashboard with pending verification flag
       navigate("/club/dashboard?pending_verification=true");
     } catch (error: unknown) {
+      console.error("Verification submission error:", error);
       const err = error as Error;
       toast({
         title: "Error",
