@@ -110,6 +110,8 @@ export default function SystemAdmin() {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [clubToDelete, setClubToDelete] = useState<Club | null>(null);
+  const [fanToDelete, setFanToDelete] = useState<Profile | null>(null);
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalClubs: 0,
@@ -156,15 +158,35 @@ export default function SystemAdmin() {
     const clubList = (allClubs ?? []) as Club[];
     setClubs(clubList);
 
+    // Fetch all verifications
     const { data: verifications } = await supabase.from("club_verifications").select("*");
     const vList = (verifications ?? []) as ClubVerification[];
 
-    const merged: VerificationRequest[] = vList.map((v) => ({
-      ...v,
-      club: clubList.find((c) => c.id === v.club_id),
-    }));
+    // Filter to show pending verifications:
+    // - Club is unverified
+    // - Has verification record with at least 2 criteria
+    // - Not yet approved (verified_at is null)
+    const pendingVerifications: VerificationRequest[] = vList
+      .filter((v) => {
+        const club = clubList.find((c) => c.id === v.club_id);
+        if (!club) return false;
+        
+        // Count criteria met
+        const criteriaCount = [
+          !!v.official_email_domain,
+          !!v.public_link,
+          !!v.authority_declaration,
+        ].filter(Boolean).length;
 
-    setVerificationRequests(merged);
+        // Show if: unverified club with 2+ criteria and not yet approved
+        return club.status === "unverified" && criteriaCount >= 2 && !v.verified_at;
+      })
+      .map((v) => ({
+        ...v,
+        club: clubList.find((c) => c.id === v.club_id),
+      }));
+
+    setVerificationRequests(pendingVerifications);
   };
 
   const fetchFanProfiles = async () => {
@@ -1196,39 +1218,15 @@ export default function SystemAdmin() {
                                 <ShieldCheck className="h-4 w-4 mr-2" /> Verify Club
                               </DropdownMenuItem>
                             )}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem className="text-destructive">
-                                  <Trash2 className="h-4 w-4 mr-2" /> Delete Club
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Club?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete <strong>{club.name}</strong> and all associated data including:
-                                    <ul className="mt-2 ml-4 list-disc text-sm">
-                                      <li>All fan memberships</li>
-                                      <li>All activities and completions</li>
-                                      <li>All rewards and redemptions</li>
-                                      <li>Club admin account</li>
-                                    </ul>
-                                    <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteClub(club.id, club.name)}
-                                    disabled={actionLoading}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                    Delete Club
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setClubToDelete(club);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete Club
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -1303,30 +1301,15 @@ export default function SystemAdmin() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem className="text-destructive">
-                                    <Trash2 className="h-4 w-4 mr-2" /> Delete User
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete User?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will permanently delete {fan.full_name || fan.email} and all their data.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteUser(fan.user_id, "fan")}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  setFanToDelete(fan);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete User
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -1407,6 +1390,76 @@ export default function SystemAdmin() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Delete Club Confirmation Dialog */}
+      <AlertDialog open={!!clubToDelete} onOpenChange={(open) => !open && setClubToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Club?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{clubToDelete?.name}</strong> and all associated data including:
+              <ul className="mt-2 ml-4 list-disc text-sm">
+                <li>All fan memberships</li>
+                <li>All activities and completions</li>
+                <li>All rewards and redemptions</li>
+                <li>Club admin account</li>
+              </ul>
+              <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClubToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (clubToDelete) {
+                  await handleDeleteClub(clubToDelete.id, clubToDelete.name);
+                  setClubToDelete(null);
+                }
+              }}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete Club
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Fan Confirmation Dialog */}
+      <AlertDialog open={!!fanToDelete} onOpenChange={(open) => !open && setFanToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{fanToDelete?.full_name || fanToDelete?.email}</strong> and all their data including:
+              <ul className="mt-2 ml-4 list-disc text-sm">
+                <li>Club membership</li>
+                <li>Activity completions</li>
+                <li>Reward redemptions</li>
+                <li>Notifications</li>
+              </ul>
+              <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setFanToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (fanToDelete) {
+                  await handleDeleteUser(fanToDelete.user_id, "fan");
+                  setFanToDelete(null);
+                }
+              }}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

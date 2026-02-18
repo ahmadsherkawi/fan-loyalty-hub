@@ -96,13 +96,36 @@ export default function ClubVerification() {
     if (isPreviewMode) { setPreviewClubVerified(); setClub({ ...club, status: "verified" }); toast({ title: "Club Verified!", description: "Your club is now verified and can publish loyalty programs." }); navigate("/club/dashboard?preview=club_admin"); return; }
     setSubmitting(true);
     try {
-      const verificationData = { club_id: club.id, official_email_domain: officialEmail.split("@")[1] || null, public_link: publicLink || null, authority_declaration: authorityDeclaration, verified_at: new Date().toISOString() };
-      if (verification) { await supabase.from("club_verifications").update(verificationData).eq("id", verification.id); }
-      else { await supabase.from("club_verifications").insert(verificationData); }
-      await supabase.from("clubs").update({ status: "verified" }).eq("id", club.id);
-      toast({ title: "Club Verified!", description: "Your club is now verified and can publish loyalty programs." });
-      navigate("/club/dashboard");
-    } catch (error) { console.error("Verification error:", error); toast({ title: "Error", description: "Failed to submit verification. Please try again.", variant: "destructive" }); }
+      // Submit verification docs WITHOUT auto-verifying
+      // Admin will review and approve
+      const verificationData = { 
+        club_id: club.id, 
+        official_email_domain: officialEmail.split("@")[1] || null, 
+        public_link: publicLink || null, 
+        authority_declaration: authorityDeclaration,
+        verified_at: null // NOT verified until admin approves
+      };
+      
+      if (verification) { 
+        await supabase.from("club_verifications").update(verificationData).eq("id", verification.id); 
+      } else { 
+        await supabase.from("club_verifications").insert(verificationData); 
+      }
+      
+      // Keep club status as "unverified" until admin approves
+      // The club_verifications record will show up in admin panel for review
+      
+      toast({ 
+        title: "Verification Submitted!", 
+        description: "Your verification documents have been submitted. Our admin team will review and approve your club shortly." 
+      });
+      
+      // Refresh to show pending state
+      await fetchClubData();
+    } catch (error) { 
+      console.error("Verification error:", error); 
+      toast({ title: "Error", description: "Failed to submit verification. Please try again.", variant: "destructive" }); 
+    }
     finally { setSubmitting(false); }
   };
 
@@ -115,6 +138,14 @@ export default function ClubVerification() {
   const criteriaCount = getCriteriaCount();
   const criteria = getCriteriaMet();
   const isAlreadyVerified = club?.status === "verified" || club?.status === "official";
+  
+  // Check if verification is pending (submitted but not approved)
+  const hasSubmittedVerification = verification && (
+    verification.official_email_domain || 
+    verification.public_link || 
+    verification.authority_declaration
+  );
+  const isPendingVerification = hasSubmittedVerification && !verification?.verified_at && !isAlreadyVerified;
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,15 +187,32 @@ export default function ClubVerification() {
           </Card>
         )}
 
-        {!isAlreadyVerified && (
+        {isPendingVerification && (
+          <Card className="rounded-2xl border-orange-500/20 bg-orange-500/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-orange-500/20 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold">Verification Pending</h3>
+                  <p className="text-sm text-muted-foreground">Your verification documents have been submitted. Our admin team will review and approve your club shortly.</p>
+                </div>
+                <Badge className="ml-auto rounded-full bg-orange-500/10 text-orange-400 border-orange-500/20">Pending Review</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isAlreadyVerified && !isPendingVerification && (
           <Card className={`rounded-2xl border-border/40 ${criteriaCount >= 2 ? "border-primary/20 bg-primary/5" : ""}`}>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between font-display"><span>Verification Progress</span><Badge variant={criteriaCount >= 2 ? "default" : "secondary"} className="rounded-full">{criteriaCount >= 2 ? "Ready to verify" : `${criteriaCount} of 3 completed`}</Badge></CardTitle>
-              <CardDescription>Complete any 2 of the 3 steps below to verify your club.</CardDescription>
+              <CardTitle className="flex items-center justify-between font-display"><span>Verification Progress</span><Badge variant={criteriaCount >= 2 ? "default" : "secondary"} className="rounded-full">{criteriaCount >= 2 ? "Ready to submit" : `${criteriaCount} of 3 completed`}</Badge></CardTitle>
+              <CardDescription>Complete any 2 of the 3 steps below to submit for verification.</CardDescription>
             </CardHeader>
             <CardContent>
               <Progress value={(criteriaCount / 3) * 100} className="mb-3 h-2" />
-              {criteriaCount >= 2 ? <p className="text-sm text-primary font-medium flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> You're ready! Click below to verify your club.</p> : <p className="text-sm text-muted-foreground">{`Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? "s" : ""} to unlock verification`}</p>}
+              {criteriaCount >= 2 ? <p className="text-sm text-primary font-medium flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> You're ready! Click below to submit for verification.</p> : <p className="text-sm text-muted-foreground">{`Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? "s" : ""} to unlock verification`}</p>}
             </CardContent>
           </Card>
         )}
@@ -173,27 +221,31 @@ export default function ClubVerification() {
           {/* 1. Email */}
           <Card className={`rounded-2xl border-border/40 ${criteria.officialEmail ? "border-primary/20" : ""}`}>
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg font-display">{criteria.officialEmail ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />} <Mail className="h-5 w-5" /> Official Email Domain</CardTitle><CardDescription>Provide your official club email address.</CardDescription></CardHeader>
-            <CardContent><div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" placeholder="admin@yourclub.com" value={officialEmail} onChange={(e) => { setOfficialEmail(e.target.value); validateEmail(e.target.value); }} disabled={isAlreadyVerified} className="rounded-xl border-border/40" />{emailError && <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> {emailError}</p>}<p className="text-xs text-muted-foreground">Public email domains (Gmail, Yahoo, Outlook, etc.) are not accepted.</p>{!isAlreadyVerified && isEmailValid(officialEmail) && (<div className="flex items-center gap-3 mt-2"><Button type="button" size="sm" onClick={handleSendVerificationEmail} disabled={isEmailVerified} className={`rounded-full ${isEmailVerified ? "bg-primary text-primary-foreground" : ""}`}>{isEmailVerified ? "Email Verified" : "Send Verification"}</Button>{isEmailVerified && <Badge className="rounded-full">Verified</Badge>}</div>)}</div></CardContent>
+            <CardContent><div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" placeholder="admin@yourclub.com" value={officialEmail} onChange={(e) => { setOfficialEmail(e.target.value); validateEmail(e.target.value); }} disabled={isAlreadyVerified || isPendingVerification} className="rounded-xl border-border/40" />{emailError && <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> {emailError}</p>}<p className="text-xs text-muted-foreground">Public email domains (Gmail, Yahoo, Outlook, etc.) are not accepted.</p>{!isAlreadyVerified && !isPendingVerification && isEmailValid(officialEmail) && (<div className="flex items-center gap-3 mt-2"><Button type="button" size="sm" onClick={handleSendVerificationEmail} disabled={isEmailVerified} className={`rounded-full ${isEmailVerified ? "bg-primary text-primary-foreground" : ""}`}>{isEmailVerified ? "Email Verified" : "Send Verification"}</Button>{isEmailVerified && <Badge className="rounded-full">Verified</Badge>}</div>)}</div></CardContent>
           </Card>
 
           {/* 2. Public Link */}
           <Card className={`rounded-2xl border-border/40 ${criteria.publicLink ? "border-primary/20" : ""}`}>
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg font-display">{criteria.publicLink ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />} <LinkIcon className="h-5 w-5" /> Public Club Presence</CardTitle><CardDescription>Link to your official website or social media profile.</CardDescription></CardHeader>
-            <CardContent><div className="space-y-2"><Label htmlFor="publicLink">Website or Social Media URL</Label><Input id="publicLink" type="url" placeholder="https://yourclub.com or social media link" value={publicLink} onChange={(e) => { setPublicLink(e.target.value); validateLink(e.target.value); }} disabled={isAlreadyVerified} className="rounded-xl border-border/40" />{linkError && <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> {linkError}</p>}<p className="text-xs text-muted-foreground">Official website, Twitter/X, Facebook, or Instagram profile.</p></div></CardContent>
+            <CardContent><div className="space-y-2"><Label htmlFor="publicLink">Website or Social Media URL</Label><Input id="publicLink" type="url" placeholder="https://yourclub.com or social media link" value={publicLink} onChange={(e) => { setPublicLink(e.target.value); validateLink(e.target.value); }} disabled={isAlreadyVerified || isPendingVerification} className="rounded-xl border-border/40" />{linkError && <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> {linkError}</p>}<p className="text-xs text-muted-foreground">Official website, Twitter/X, Facebook, or Instagram profile.</p></div></CardContent>
           </Card>
 
           {/* 3. Authority */}
           <Card className={`rounded-2xl border-border/40 ${criteria.authorityDeclaration ? "border-primary/20" : ""}`}>
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg font-display">{criteria.authorityDeclaration ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />} <ShieldCheck className="h-5 w-5" /> Authority Declaration</CardTitle><CardDescription>Confirm you're authorized to represent this club.</CardDescription></CardHeader>
-            <CardContent><div className="flex items-start space-x-3"><Checkbox id="authority" checked={authorityDeclaration} onCheckedChange={(checked) => setAuthorityDeclaration(checked as boolean)} disabled={isAlreadyVerified} /><div className="grid gap-1.5 leading-none"><Label htmlFor="authority" className="text-sm font-normal cursor-pointer">I confirm I am authorized to represent this club and manage its ClubPass loyalty program.</Label></div></div></CardContent>
+            <CardContent><div className="flex items-start space-x-3"><Checkbox id="authority" checked={authorityDeclaration} onCheckedChange={(checked) => setAuthorityDeclaration(checked as boolean)} disabled={isAlreadyVerified || isPendingVerification} /><div className="grid gap-1.5 leading-none"><Label htmlFor="authority" className="text-sm font-normal cursor-pointer">I confirm I am authorized to represent this club and manage its ClubPass loyalty program.</Label></div></div></CardContent>
           </Card>
         </div>
 
-        {!isAlreadyVerified && (
+        {!isAlreadyVerified && !isPendingVerification && (
           <Button onClick={handleSubmit} disabled={!canSubmit || submitting} className={`w-full rounded-xl ${canSubmit ? "" : ""}`} variant={canSubmit ? "default" : "secondary"} size="lg">
             {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {canSubmit ? <><ShieldCheck className="h-4 w-4 mr-2" /> Verify My Club</> : `Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? "s" : ""} to verify`}
+            {canSubmit ? <><ShieldCheck className="h-4 w-4 mr-2" /> Submit for Verification</> : `Complete ${2 - criteriaCount} more step${2 - criteriaCount > 1 ? "s" : ""} to verify`}
           </Button>
+        )}
+
+        {isPendingVerification && (
+          <Button onClick={() => navigate(isPreviewMode ? "/club/dashboard?preview=club_admin" : "/club/dashboard")} variant="outline" className="w-full rounded-xl border-border/40">Back to Dashboard</Button>
         )}
 
         {isAlreadyVerified && (
