@@ -173,33 +173,33 @@ export default function FanLeaderboardPage() {
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate(isPreviewMode ? "/fan/home?preview=fan" : "/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Logo size="sm" />
           </div>
-          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+            <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
           </Button>
         </div>
       </header>
 
-      <main className="container py-10 space-y-10">
+      <main className="container py-8 space-y-8">
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="relative z-10 p-8 md:p-10">
+          <div className="relative z-10 p-6 md:p-10">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-accent" />
-              <span className="text-xs font-semibold text-accent uppercase tracking-wider">Rankings</span>
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Rankings</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
               {club?.name || "Club"} Leaderboard
             </h1>
-            <p className="text-white/50 mt-1">See where you stand among fellow fans</p>
+            <p className="text-white/50 mt-1 text-sm">See where you stand among fellow fans</p>
           </div>
         </div>
 

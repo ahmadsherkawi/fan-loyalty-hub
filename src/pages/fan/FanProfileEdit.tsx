@@ -301,83 +301,72 @@ export default function FanProfileEditPage() {
       {/* Header */}
       <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/profile")} className="rounded-full">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/profile")} className="rounded-full h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Logo size="sm" />
           </div>
-          <Button onClick={handleSave} disabled={isSaving} className="rounded-full">
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          <Button onClick={handleSave} disabled={isSaving} size="sm" className="rounded-full gradient-stadium font-semibold">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
             Save Changes
           </Button>
         </div>
       </header>
 
-      <main className="container py-8 max-w-3xl space-y-8">
+      <main className="container py-8 max-w-3xl space-y-6">
         {/* Hero Section */}
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
-          <div className="relative z-10 p-8 flex items-center gap-6">
+          <div className="relative z-10 p-6 md:p-8 flex items-center gap-6">
             {/* Avatar Upload */}
-            <div className="relative group">
-              <div className="h-24 w-24 rounded-2xl border-4 border-white/20 shadow-lg overflow-hidden bg-card/30">
+            <div className="relative group flex-shrink-0">
+              <div className="h-22 w-22 rounded-3xl border-4 border-white/15 shadow-lg overflow-hidden bg-white/10" style={{height: 88, width: 88}}>
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary/20">
-                    <User className="h-10 w-10 text-primary" />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <User className="h-9 w-9 text-white/40" />
                   </div>
                 )}
               </div>
-              <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
-                {avatarUploading ? (
-                  <Loader2 className="h-6 w-6 text-white animate-spin" />
-                ) : (
-                  <Camera className="h-6 w-6 text-white" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                  disabled={avatarUploading}
-                />
+              <label className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-3xl">
+                {avatarUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
               </label>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="h-4 w-4 text-accent" />
-                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Edit Profile</span>
+                <Sparkles className="h-3.5 w-3.5 text-accent" />
+                <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Edit Profile</span>
               </div>
               <h1 className="text-2xl font-display font-bold text-white">Your Profile</h1>
-              <p className="text-white/60 text-sm">Complete your profile to get personalized experiences</p>
+              <p className="text-white/55 text-sm mt-0.5">Complete your profile for a better experience</p>
             </div>
           </div>
         </div>
 
         {/* Profile Completion Indicator */}
-        <Card className="rounded-2xl border-border/40">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-semibold">Profile Completion</p>
-                  <p className="text-xs text-muted-foreground">Complete your profile for better experience</p>
-                </div>
+        <div className="relative overflow-hidden rounded-3xl bg-card border border-border/50 px-5 py-4">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/6 to-transparent rounded-3xl pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-primary/15 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-primary" />
               </div>
-              <Badge className="bg-primary/10 text-primary border-primary/20">
-                <Trophy className="h-3 w-3 mr-1" />
-                {[formData.full_name, formData.username, formData.phone, formData.city, formData.country].filter(Boolean).length}/5
-              </Badge>
+              <div>
+                <p className="font-semibold text-sm">Profile Completion</p>
+                <p className="text-xs text-muted-foreground">Fill in your details for a better experience</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <Badge className="bg-primary/15 text-primary border-primary/25 rounded-full">
+              <Trophy className="h-3 w-3 mr-1" />
+              {[formData.full_name, formData.username, formData.phone, formData.city, formData.country].filter(Boolean).length}/5
+            </Badge>
+          </div>
+        </div>
 
         {/* Basic Information */}
         <Card className="rounded-2xl border-border/40">

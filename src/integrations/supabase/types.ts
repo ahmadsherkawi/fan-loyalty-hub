@@ -400,7 +400,6 @@ export type Database = {
       }
       profiles: {
         Row: {
-          avatar_url: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -410,7 +409,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -420,7 +418,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -431,129 +428,8 @@ export type Database = {
         }
         Relationships: []
       }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string
-          type: string
-          title: string | null
-          data: Json
-          is_read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          type: string
-          title?: string | null
-          data?: Json
-          is_read?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          type?: string
-          title?: string | null
-          data?: Json
-          is_read?: boolean
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tiers: {
-        Row: {
-          id: string
-          program_id: string
-          name: string
-          rank: number
-          points_threshold: number
-          multiplier: number
-          discount_percent: number
-          perks: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          program_id: string
-          name: string
-          rank?: number
-          points_threshold?: number
-          multiplier?: number
-          discount_percent?: number
-          perks?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          program_id?: string
-          name?: string
-          rank?: number
-          points_threshold?: number
-          multiplier?: number
-          discount_percent?: number
-          perks?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tiers_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "loyalty_programs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tier_benefits: {
-        Row: {
-          id: string
-          tier_id: string
-          benefit_type: string
-          benefit_value: string
-          benefit_label: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          tier_id: string
-          benefit_type: string
-          benefit_value: string
-          benefit_label: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          tier_id?: string
-          benefit_type?: string
-          benefit_value?: string
-          benefit_label?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tier_benefits_tier_id_fkey"
-            columns: ["tier_id"]
-            isOneToOne: false
-            referencedRelation: "tiers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       reward_redemptions: {
         Row: {
-          completed_at: string | null
           fan_id: string
           fulfilled_at: string | null
           id: string
@@ -564,7 +440,6 @@ export type Database = {
           reward_id: string
         }
         Insert: {
-          completed_at?: string | null
           fan_id: string
           fulfilled_at?: string | null
           id?: string
@@ -575,7 +450,6 @@ export type Database = {
           reward_id: string
         }
         Update: {
-          completed_at?: string | null
           fan_id?: string
           fulfilled_at?: string | null
           id?: string
