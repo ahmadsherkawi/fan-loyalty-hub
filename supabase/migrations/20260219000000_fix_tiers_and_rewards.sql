@@ -35,8 +35,9 @@ CREATE TABLE IF NOT EXISTS public.tier_benefits (
 ALTER TABLE public.tiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tier_benefits ENABLE ROW LEVEL SECURITY;
 
--- Create policies for tiers
-CREATE POLICY IF NOT EXISTS "Anyone can view tiers"
+-- Create policies for tiers (drop first to avoid errors)
+DROP POLICY IF EXISTS "Anyone can view tiers" ON public.tiers;
+CREATE POLICY "Anyone can view tiers"
   ON public.tiers FOR SELECT
   USING (program_id IN (
     SELECT lp.id FROM public.loyalty_programs lp
@@ -44,7 +45,8 @@ CREATE POLICY IF NOT EXISTS "Anyone can view tiers"
     WHERE c.status IN ('verified', 'official')
   ));
 
-CREATE POLICY IF NOT EXISTS "Club admins can manage tiers"
+DROP POLICY IF EXISTS "Club admins can manage tiers" ON public.tiers;
+CREATE POLICY "Club admins can manage tiers"
   ON public.tiers FOR ALL
   USING (program_id IN (
     SELECT lp.id FROM public.loyalty_programs lp
@@ -53,11 +55,13 @@ CREATE POLICY IF NOT EXISTS "Club admins can manage tiers"
   ));
 
 -- Create policies for tier_benefits
-CREATE POLICY IF NOT EXISTS "Anyone can view tier benefits"
+DROP POLICY IF EXISTS "Anyone can view tier benefits" ON public.tier_benefits;
+CREATE POLICY "Anyone can view tier benefits"
   ON public.tier_benefits FOR SELECT
   USING (tier_id IN (SELECT id FROM public.tiers));
 
-CREATE POLICY IF NOT EXISTS "Club admins can manage tier benefits"
+DROP POLICY IF EXISTS "Club admins can manage tier benefits" ON public.tier_benefits;
+CREATE POLICY "Club admins can manage tier benefits"
   ON public.tier_benefits FOR ALL
   USING (tier_id IN (
     SELECT t.id FROM public.tiers t
@@ -388,19 +392,23 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- Create notification policies
-CREATE POLICY IF NOT EXISTS "Users can view their own notifications"
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+CREATE POLICY "Users can view their own notifications"
   ON public.notifications FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can insert their own notifications"
+DROP POLICY IF EXISTS "Users can insert their own notifications" ON public.notifications;
+CREATE POLICY "Users can insert their own notifications"
   ON public.notifications FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can update their own notifications"
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+CREATE POLICY "Users can update their own notifications"
   ON public.notifications FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can delete their own notifications"
+DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
+CREATE POLICY "Users can delete their own notifications"
   ON public.notifications FOR DELETE
   USING (auth.uid() = user_id);
 
