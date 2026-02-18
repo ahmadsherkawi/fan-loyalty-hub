@@ -20,6 +20,7 @@ import {
   Trophy,
   LogOut,
   ShieldCheck,
+  Shield,
   Calendar,
   BarChart3,
   ChevronRight,
