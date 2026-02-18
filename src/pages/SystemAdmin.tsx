@@ -706,12 +706,18 @@ export default function SystemAdmin() {
     if (!request.club) return;
     setActionLoading(true);
     try {
+      // Update verification record
       await supabase.from("club_verifications").update({ verified_at: new Date().toISOString() }).eq("id", request.id);
+      
+      // Update club status to verified
       await supabase.from("clubs").update({ status: "verified" }).eq("id", request.club_id);
+      
+      // Activate the loyalty program if it exists
+      await supabase.from("loyalty_programs").update({ is_active: true }).eq("club_id", request.club_id);
 
       await fetchAllData();
       setSelectedVerification(null);
-      toast({ title: "Club Verified", description: `${request.club.name} has been verified.` });
+      toast({ title: "Club Verified", description: `${request.club.name} has been verified and their loyalty program is now active.` });
     } finally {
       setActionLoading(false);
     }
@@ -736,10 +742,14 @@ export default function SystemAdmin() {
         });
       }
 
+      // Update club status to verified
       await supabase.from("clubs").update({ status: "verified" }).eq("id", clubId);
+      
+      // Activate the loyalty program
+      await supabase.from("loyalty_programs").update({ is_active: true }).eq("club_id", clubId);
 
       await fetchAllData();
-      toast({ title: "Club Verified", description: `${clubName} has been verified.` });
+      toast({ title: "Club Verified", description: `${clubName} has been verified and their loyalty program is now active.` });
     } catch (error) {
       console.error("Error verifying club:", error);
       toast({ title: "Error", description: "Failed to verify club", variant: "destructive" });

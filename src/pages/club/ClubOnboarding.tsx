@@ -222,7 +222,7 @@ export default function ClubOnboarding() {
       setStep("verification");
       toast({
         title: "Program Created",
-        description: "Now submit verification to activate your club.",
+        description: "Now submit verification to activate your club and program.",
       });
     } catch (error: unknown) {
       const err = error as Error;
