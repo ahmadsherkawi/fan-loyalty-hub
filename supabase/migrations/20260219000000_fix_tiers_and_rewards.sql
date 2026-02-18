@@ -8,6 +8,68 @@ DROP FUNCTION IF EXISTS public.get_membership_multiplier(uuid);
 DROP FUNCTION IF EXISTS public.get_membership_discount(uuid);
 DROP FUNCTION IF EXISTS public.complete_activity(uuid, uuid);
 
+-- 0. Create tiers table if it doesn't exist (CRITICAL - was missing!)
+CREATE TABLE IF NOT EXISTS public.tiers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID NOT NULL REFERENCES public.loyalty_programs(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  rank INTEGER NOT NULL DEFAULT 1,
+  points_threshold INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(program_id, rank)
+);
+
+-- Create tier_benefits table if it doesn't exist (CRITICAL - was missing!)
+CREATE TABLE IF NOT EXISTS public.tier_benefits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tier_id UUID NOT NULL REFERENCES public.tiers(id) ON DELETE CASCADE,
+  benefit_type TEXT NOT NULL,
+  benefit_value NUMERIC,
+  benefit_label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(tier_id, benefit_type)
+);
+
+-- Enable RLS on tiers and tier_benefits
+ALTER TABLE public.tiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tier_benefits ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for tiers
+CREATE POLICY IF NOT EXISTS "Anyone can view tiers"
+  ON public.tiers FOR SELECT
+  USING (program_id IN (
+    SELECT lp.id FROM public.loyalty_programs lp
+    JOIN public.clubs c ON c.id = lp.club_id
+    WHERE c.status IN ('verified', 'official')
+  ));
+
+CREATE POLICY IF NOT EXISTS "Club admins can manage tiers"
+  ON public.tiers FOR ALL
+  USING (program_id IN (
+    SELECT lp.id FROM public.loyalty_programs lp
+    JOIN public.clubs c ON c.id = lp.club_id
+    WHERE c.admin_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
+  ));
+
+-- Create policies for tier_benefits
+CREATE POLICY IF NOT EXISTS "Anyone can view tier benefits"
+  ON public.tier_benefits FOR SELECT
+  USING (tier_id IN (SELECT id FROM public.tiers));
+
+CREATE POLICY IF NOT EXISTS "Club admins can manage tier benefits"
+  ON public.tier_benefits FOR ALL
+  USING (tier_id IN (
+    SELECT t.id FROM public.tiers t
+    JOIN public.loyalty_programs lp ON lp.id = t.program_id
+    JOIN public.clubs c ON c.id = lp.club_id
+    WHERE c.admin_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
+  ));
+
+-- Create indexes for tiers
+CREATE INDEX IF NOT EXISTS idx_tiers_program ON public.tiers(program_id);
+CREATE INDEX IF NOT EXISTS idx_tier_benefits_tier ON public.tier_benefits(tier_id);
+
 -- 1. Add completed_at column to reward_redemptions (for Mark Collected feature)
 ALTER TABLE public.reward_redemptions 
 ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ DEFAULT NULL;
