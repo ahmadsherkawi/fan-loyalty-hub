@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/Logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,27 +18,139 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, LogOut, ShieldCheck, Shield, Users, Trophy, Gift,
-  CheckCircle2, XCircle, AlertTriangle, Building2, BarChart3,
-  Sparkles, TrendingUp, Eye, ChevronRight, Clock, FileText,
-  Mail, Link as LinkIcon, RefreshCw, Search, MoreHorizontal,
-  Trash2, UserX, UserCheck, Activity, Calendar, MapPin,
-  Crown, Zap, Ban, ArrowLeft
+  CheckCircle2, AlertTriangle, Building2, BarChart3,
+  Sparkles, TrendingUp, Clock, FileText,
+  Mail, RefreshCw, Search, MoreHorizontal,
+  Trash2, Activity, Zap, ArrowLeft, Lock
 } from "lucide-react";
 
-import type { Club, ClubVerification, LoyaltyProgram, Profile } from "@/types/database";
+import type { Club, ClubVerification, Profile } from "@/types/database";
+
+// ============================================
+// ADMIN AUTHENTICATION
+// ============================================
+
+interface AdminSession {
+  id: string;
+  username: string;
+  expiresAt: number;
+}
+
+// Version 4 - Force complete reset
+const ADMIN_SESSION_KEY = "clubpass_admin_auth_session_v4";
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// IMMEDIATELY clear OLD admin session keys when this module loads
+// This runs before any component code - but NOT V4 (the current version)
+if (typeof window !== 'undefined') {
+  const keysToClear = [
+    'clubpass_admin_session',
+    'clubpass_admin_auth_session',
+    'clubpass_admin_auth_session_v1',
+    'clubpass_admin_auth_session_v2',
+    'clubpass_admin_auth_session_v3'
+    // NOT clearing V4 - that's the current version for session persistence
+  ];
+  keysToClear.forEach(key => localStorage.removeItem(key));
+  console.log('[SystemAdmin Module V4] Cleared old admin session keys');
+}
+
+// Simple hash function for password verification
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Pre-computed hash for "admin" password
+const ADMIN_PASSWORD_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
+
+function getStoredAdminSession(): AdminSession | null {
+  console.log('[getStoredAdminSession] Checking localStorage for key:', ADMIN_SESSION_KEY);
+  
+  try {
+    const stored = localStorage.getItem(ADMIN_SESSION_KEY);
+    console.log('[getStoredAdminSession] Stored value:', stored);
+    
+    if (!stored) {
+      console.log('[getStoredAdminSession] No stored session found');
+      return null;
+    }
+    
+    const session = JSON.parse(stored) as unknown;
+    
+    // Validate session object has all required properties
+    if (
+      !session ||
+      typeof session !== 'object' ||
+      !('id' in session) ||
+      !('username' in session) ||
+      !('expiresAt' in session) ||
+      typeof (session as AdminSession).id !== 'string' ||
+      typeof (session as AdminSession).username !== 'string' ||
+      typeof (session as AdminSession).expiresAt !== 'number'
+    ) {
+      // Invalid session data, clear it
+      console.log('[getStoredAdminSession] Invalid session structure, clearing');
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    
+    const validSession = session as AdminSession;
+    
+    // Check if session has expired
+    if (Date.now() > validSession.expiresAt) {
+      console.log('[getStoredAdminSession] Session expired, clearing');
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    
+    // Validate username is 'admin' (only allowed admin)
+    if (validSession.username !== 'admin') {
+      console.log('[getStoredAdminSession] Invalid username, clearing');
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    
+    console.log('[getStoredAdminSession] Valid session found:', validSession.username);
+    return validSession;
+  } catch (error) {
+    console.log('[getStoredAdminSession] Error parsing session:', error);
+    // Any error, clear the storage
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    return null;
+  }
+}
+
+function storeAdminSession(username: string): AdminSession {
+  const session: AdminSession = {
+    id: crypto.randomUUID(),
+    username,
+    expiresAt: Date.now() + SESSION_DURATION
+  };
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+  return session;
+}
+
+function clearAdminSession(): void {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
+}
+
+// ============================================
+// INTERFACES
+// ============================================
 
 interface VerificationRequest extends ClubVerification {
   club?: Club;
@@ -93,12 +205,165 @@ interface ClubRequest {
   updated_at: string;
 }
 
+// ============================================
+// ADMIN LOGIN COMPONENT
+// ============================================
+
+function AdminLoginScreen({ onLogin }: { onLogin: (session: AdminSession) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      // Verify credentials
+      if (username !== "admin") {
+        setError("Invalid username or password");
+        setLoading(false);
+        return;
+      }
+
+      const passwordHash = await hashPassword(password);
+      if (passwordHash !== ADMIN_PASSWORD_HASH) {
+        setError("Invalid username or password");
+        setLoading(false);
+        return;
+      }
+
+      // Create session
+      const session = storeAdminSession(username);
+      onLogin(session);
+    } catch {
+      setError("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header with Back Button */}
+      <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
+        <div className="container py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Logo className="h-6" />
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => window.location.href = "/"}
+            className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Home
+          </Button>
+        </div>
+      </header>
+
+      {/* Login Content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          {/* Hero Card */}
+          <div className="relative overflow-hidden rounded-3xl border border-border/40">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
+            
+            <div className="relative z-10 p-8 text-center">
+              <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/20 flex items-center justify-center mb-6 shadow-stadium">
+                <Shield className="h-8 w-8 text-primary" />
+              </div>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Lock className="h-4 w-4 text-accent" />
+                <span className="text-xs font-semibold text-accent uppercase tracking-wider">Admin Portal</span>
+              </div>
+              <h1 className="font-display text-2xl font-bold text-white tracking-tight">
+                ClubPass Admin
+              </h1>
+              <p className="text-white/50 mt-1">
+                Sign in to access the admin panel
+              </p>
+            </div>
+          </div>
+
+          {/* Login Form */}
+          <Card className="rounded-2xl border-border/40">
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Enter username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="h-12 rounded-xl bg-muted/10 border-border/40"
+                    required
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 rounded-xl bg-muted/10 border-border/40"
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                {error && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 rounded-xl gradient-stadium font-semibold text-base shadow-stadium"
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Sign In
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Default credentials hint */}
+          <p className="text-center text-xs text-muted-foreground">
+            Default credentials: <span className="font-mono bg-muted px-1.5 py-0.5 rounded">admin</span> / <span className="font-mono bg-muted px-1.5 py-0.5 rounded">admin</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// SYSTEM ADMIN COMPONENT
+// ============================================
+
 export default function SystemAdmin() {
+  console.log('[SystemAdmin] Component mounted - checking authentication...');
+  
   const navigate = useNavigate();
-  const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
-  const [dataLoading, setDataLoading] = useState(true);
+  // Admin auth state
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Data state
+  const [dataLoading, setDataLoading] = useState(false);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [fanProfiles, setFanProfiles] = useState<Profile[]>([]);
@@ -129,15 +394,78 @@ export default function SystemAdmin() {
     pendingClubRequests: 0,
   });
 
+  // Check for existing session on mount
   useEffect(() => {
-    // Allow access without authentication for demo purposes
-    if (!loading) {
+    console.log('[SystemAdmin V4] useEffect - checking for existing session...');
+    
+    // Clear only OLD version keys (not current V4)
+    const oldKeys = [
+      'clubpass_admin_session',
+      'clubpass_admin_auth_session',
+      'clubpass_admin_auth_session_v1',
+      'clubpass_admin_auth_session_v2',
+      'clubpass_admin_auth_session_v3'
+    ];
+    oldKeys.forEach(key => localStorage.removeItem(key));
+    
+    // Check if we have a valid V4 session
+    const session = getStoredAdminSession();
+    console.log('[SystemAdmin V4] Session check result:', session);
+    
+    setAdminSession(session);
+    setCheckingSession(false);
+  }, []);
+
+  // Load data when admin is authenticated
+  useEffect(() => {
+    if (adminSession) {
       fetchAllData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [adminSession]);
 
-  const fetchAllData = async () => {
+  const handleAdminLogin = (session: AdminSession) => {
+    setAdminSession(session);
+    toast({
+      title: "Welcome, Admin!",
+      description: "You have successfully logged in."
+    });
+  };
+
+  const handleAdminLogout = () => {
+    console.log('[SystemAdmin V4] handleAdminLogout called - clearing all sessions');
+    
+    // Clear ALL possible admin session keys including V4
+    const allKeys = [
+      'clubpass_admin_session',
+      'clubpass_admin_auth_session',
+      'clubpass_admin_auth_session_v1',
+      'clubpass_admin_auth_session_v2',
+      'clubpass_admin_auth_session_v3',
+      'clubpass_admin_auth_session_v4'  // Explicitly include V4
+    ];
+    allKeys.forEach(key => localStorage.removeItem(key));
+    
+    setAdminSession(null);
+    setCheckingSession(false);
+    
+    toast({
+      title: "Logged out",
+      description: "You have been signed out."
+    });
+    
+    // Force page reload to clear any cached state
+    window.location.reload();
+  };
+
+  const fetchAllData = useCallback(async () => {
+    // Double-check that we have a valid session before fetching
+    const currentSession = getStoredAdminSession();
+    if (!currentSession) {
+      console.log('[Admin] No valid session, skipping data fetch');
+      return;
+    }
+    
     setDataLoading(true);
     try {
       await Promise.all([
@@ -151,34 +479,27 @@ export default function SystemAdmin() {
     } finally {
       setDataLoading(false);
     }
-  };
+  }, []);
 
   const fetchVerificationRequests = async () => {
     const { data: allClubs } = await supabase.from("clubs").select("*");
     const clubList = (allClubs ?? []) as Club[];
     setClubs(clubList);
 
-    // Fetch all verifications
     const { data: verifications } = await supabase.from("club_verifications").select("*");
     const vList = (verifications ?? []) as ClubVerification[];
 
-    // Filter to show pending verifications:
-    // - Club is unverified
-    // - Has verification record with at least 2 criteria
-    // - Not yet approved (verified_at is null)
     const pendingVerifications: VerificationRequest[] = vList
       .filter((v) => {
         const club = clubList.find((c) => c.id === v.club_id);
         if (!club) return false;
         
-        // Count criteria met
         const criteriaCount = [
           !!v.official_email_domain,
           !!v.public_link,
           !!v.authority_declaration,
         ].filter(Boolean).length;
 
-        // Show if: unverified club with 2+ criteria and not yet approved
         return club.status === "unverified" && criteriaCount >= 2 && !v.verified_at;
       })
       .map((v) => ({
@@ -280,69 +601,54 @@ export default function SystemAdmin() {
   };
 
   const fetchAdminStats = async () => {
-    // Total clubs
     const { count: totalClubs } = await supabase
       .from("clubs")
       .select("*", { count: "exact", head: true });
 
-    // Verified clubs
     const { count: verifiedClubs } = await supabase
       .from("clubs")
       .select("*", { count: "exact", head: true })
       .in("status", ["verified", "official"]);
 
-    // Unverified clubs
     const { count: unverifiedClubs } = await supabase
       .from("clubs")
       .select("*", { count: "exact", head: true })
       .eq("status", "unverified");
 
-    // Total fans
     const { count: totalFans } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("role", "fan");
 
-    // Total points issued
     const { data: allCompletions } = await supabase
       .from("activity_completions")
       .select("points_earned");
-    const totalPointsIssued = allCompletions?.reduce((s: number, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+    const totalPointsIssued = allCompletions?.reduce((s: number, c: { points_earned: number }) => s + (c.points_earned || 0), 0) ?? 0;
 
-    // Total points spent
     const { data: allRedemptions } = await supabase
       .from("reward_redemptions")
       .select("points_spent");
-    const totalPointsSpent = allRedemptions?.reduce((s: number, r: any) => s + (r.points_spent || 0), 0) ?? 0;
+    const totalPointsSpent = allRedemptions?.reduce((s: number, r: { points_spent: number }) => s + (r.points_spent || 0), 0) ?? 0;
 
-    // Total redemptions
     const { count: totalRedemptions } = await supabase
       .from("reward_redemptions")
       .select("*", { count: "exact", head: true });
 
-    // Total activities
     const { count: totalActivities } = await supabase
       .from("activities")
       .select("*", { count: "exact", head: true });
 
-    // Total rewards
     const { count: totalRewards } = await supabase
       .from("rewards")
       .select("*", { count: "exact", head: true });
 
-    // Pending verifications
-    const pendingVerifications = (await supabase
-      .from("clubs")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "unverified")).count ?? 0;
+    const pendingVerifications = unverifiedClubs ?? 0;
 
-    // Pending claims
     const { count: pendingClaims } = await supabase
       .from("manual_claims")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending");
 
-    // Recent registrations (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const { count: recentRegistrations } = await supabase
@@ -369,14 +675,13 @@ export default function SystemAdmin() {
   const fetchRecentActivity = async () => {
     const activities: RecentActivity[] = [];
 
-    // Recent redemptions
     const { data: recentRedemptions } = await supabase
       .from("reward_redemptions")
       .select("id, created_at, points_spent, fan_id, profiles(full_name), rewards(name)")
       .order("created_at", { ascending: false })
       .limit(5);
 
-    (recentRedemptions ?? []).forEach((r: any) => {
+    (recentRedemptions ?? []).forEach((r: { id: string; created_at: string; points_spent: number; profiles?: { full_name: string | null }; rewards?: { name: string } }) => {
       activities.push({
         id: r.id,
         type: "redemption",
@@ -386,14 +691,13 @@ export default function SystemAdmin() {
       });
     });
 
-    // Recent completions
     const { data: recentCompletions } = await supabase
       .from("activity_completions")
       .select("id, completed_at, points_earned, fan_id, profiles(full_name), activities(name)")
       .order("completed_at", { ascending: false })
       .limit(5);
 
-    (recentCompletions ?? []).forEach((c: any) => {
+    (recentCompletions ?? []).forEach((c: { id: string; completed_at: string; points_earned: number; profiles?: { full_name: string | null }; activities?: { name: string } }) => {
       activities.push({
         id: c.id,
         type: "completion",
@@ -403,14 +707,13 @@ export default function SystemAdmin() {
       });
     });
 
-    // Recent registrations
     const { data: recentUsers } = await supabase
       .from("profiles")
       .select("id, created_at, full_name, role")
       .order("created_at", { ascending: false })
       .limit(5);
 
-    (recentUsers ?? []).forEach((u: any) => {
+    (recentUsers ?? []).forEach((u: { id: string; created_at: string; full_name: string | null; role: string }) => {
       activities.push({
         id: u.id,
         type: "registration",
@@ -420,7 +723,6 @@ export default function SystemAdmin() {
       });
     });
 
-    // Sort by date
     activities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setRecentActivity(activities.slice(0, 15));
   };
@@ -433,7 +735,6 @@ export default function SystemAdmin() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        // Table might not exist yet
         console.error("Error fetching club requests:", error);
         setClubRequests([]);
         return;
@@ -441,7 +742,6 @@ export default function SystemAdmin() {
 
       setClubRequests((data ?? []) as ClubRequest[]);
       
-      // Update stats with pending count
       const pendingCount = (data ?? []).filter((r: ClubRequest) => r.status === "pending").length;
       setAdminStats((prev) => ({ ...prev, pendingClubRequests: pendingCount }));
     } catch (err) {
@@ -460,13 +760,9 @@ export default function SystemAdmin() {
 
       if (error) throw error;
 
-      toast({ 
-        title: "Request Updated", 
-        description: `Request marked as ${newStatus}.` 
-      });
-      
+      toast({ title: "Request Updated", description: `Request marked as ${newStatus}.` });
       await fetchClubRequests();
-    } catch (err: unknown) {
+    } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update request";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
@@ -478,15 +774,8 @@ export default function SystemAdmin() {
     if (!request.club) return;
     setActionLoading(true);
     try {
-      await supabase
-        .from("club_verifications")
-        .update({ verified_at: new Date().toISOString() })
-        .eq("id", request.id);
-
-      await supabase
-        .from("clubs")
-        .update({ status: "verified" })
-        .eq("id", request.club_id);
+      await supabase.from("club_verifications").update({ verified_at: new Date().toISOString() }).eq("id", request.id);
+      await supabase.from("clubs").update({ status: "verified" }).eq("id", request.club_id);
 
       await fetchAllData();
       setSelectedVerification(null);
@@ -499,7 +788,6 @@ export default function SystemAdmin() {
   const handleQuickVerify = async (clubId: string, clubName: string) => {
     setActionLoading(true);
     try {
-      // Update or create verification record
       const { data: existingVerif } = await supabase
         .from("club_verifications")
         .select("id")
@@ -507,25 +795,16 @@ export default function SystemAdmin() {
         .single();
 
       if (existingVerif) {
-        await supabase
-          .from("club_verifications")
-          .update({ verified_at: new Date().toISOString() })
-          .eq("club_id", clubId);
+        await supabase.from("club_verifications").update({ verified_at: new Date().toISOString() }).eq("club_id", clubId);
       } else {
-        await supabase
-          .from("club_verifications")
-          .insert({ 
-            club_id: clubId, 
-            verified_at: new Date().toISOString(),
-            authority_declaration: true 
-          });
+        await supabase.from("club_verifications").insert({
+          club_id: clubId,
+          verified_at: new Date().toISOString(),
+          authority_declaration: true
+        });
       }
 
-      // Update club status
-      await supabase
-        .from("clubs")
-        .update({ status: "verified" })
-        .eq("id", clubId);
+      await supabase.from("clubs").update({ status: "verified" }).eq("id", clubId);
 
       await fetchAllData();
       toast({ title: "Club Verified", description: `${clubName} has been verified.` });
@@ -537,66 +816,20 @@ export default function SystemAdmin() {
     }
   };
 
-  const handleRejectVerification = async (request: VerificationRequest) => {
-    if (!request.club) return;
-    setActionLoading(true);
-    try {
-      await supabase
-        .from("club_verifications")
-        .update({ verified_at: null })
-        .eq("id", request.id);
-
-      await supabase
-        .from("clubs")
-        .update({ status: "unverified" })
-        .eq("id", request.club_id);
-
-      await fetchAllData();
-      setSelectedVerification(null);
-      setRejectionReason("");
-      toast({ title: "Verification Rejected", variant: "destructive" });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteUser = async (userId: string, role: string) => {
-    // Check if user is authenticated
-    if (!user) {
-      toast({ 
-        title: "Authentication Required", 
-        description: "Please sign in to delete users. Click 'Sign In' on the landing page first.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
+  const handleDeleteUser = async (userId: string) => {
     try {
       setActionLoading(true);
-      
-      if (role === "fan") {
-        // Delete fan data
-        const { error: completionsError } = await supabase.from("activity_completions").delete().eq("fan_id", userId);
-        if (completionsError) console.error("Error deleting completions:", completionsError);
-        
-        const { error: claimsError } = await supabase.from("manual_claims").delete().eq("fan_id", userId);
-        if (claimsError) console.error("Error deleting claims:", claimsError);
-        
-        const { error: redemptionsError } = await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
-        if (redemptionsError) console.error("Error deleting redemptions:", redemptionsError);
-        
-        const { error: membershipsError } = await supabase.from("fan_memberships").delete().eq("fan_id", userId);
-        if (membershipsError) console.error("Error deleting memberships:", membershipsError);
-      }
-      
-      // Delete notifications
-      const { error: notifError } = await supabase.from("notifications").delete().eq("user_id", userId);
-      if (notifError) console.error("Error deleting notifications:", notifError);
-      
+
+      // Delete fan data
+      await supabase.from("activity_completions").delete().eq("fan_id", userId);
+      await supabase.from("manual_claims").delete().eq("fan_id", userId);
+      await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
+      await supabase.from("fan_memberships").delete().eq("fan_id", userId);
+      await supabase.from("notifications").delete().eq("user_id", userId);
+
       // Delete profile
       const { error: profileError } = await supabase.from("profiles").delete().eq("user_id", userId);
       if (profileError) {
-        console.error("Error deleting profile:", profileError);
         toast({ title: "Error", description: `Failed to delete user: ${profileError.message}`, variant: "destructive" });
         return;
       }
@@ -612,111 +845,50 @@ export default function SystemAdmin() {
   };
 
   const handleDeleteClub = async (clubId: string, clubName: string) => {
-    // Check if user is authenticated
-    if (!user) {
-      toast({ 
-        title: "Authentication Required", 
-        description: "Please sign in to delete clubs. Click 'Sign In' on the landing page first.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
     try {
       setActionLoading(true);
 
-      // Get the club's program first
-      const { data: programs, error: programsError } = await supabase
-        .from("loyalty_programs")
-        .select("id")
-        .eq("club_id", clubId);
-      
-      if (programsError) console.error("Error fetching programs:", programsError);
+      const { data: programs } = await supabase.from("loyalty_programs").select("id").eq("club_id", clubId);
       const programIds = programs?.map(p => p.id) || [];
 
-      // Delete in correct order (child records first)
       if (programIds.length > 0) {
-        // Get activities
-        const { data: activities, error: activitiesError } = await supabase
-          .from("activities")
-          .select("id")
-          .in("program_id", programIds);
-        
-        if (activitiesError) console.error("Error fetching activities:", activitiesError);
+        const { data: activities } = await supabase.from("activities").select("id").in("program_id", programIds);
         const activityIds = activities?.map(a => a.id) || [];
 
         if (activityIds.length > 0) {
-          const { error: acError } = await supabase.from("activity_completions").delete().in("activity_id", activityIds);
-          if (acError) console.error("Error deleting activity completions:", acError);
-          
-          const { error: mcError } = await supabase.from("manual_claims").delete().in("activity_id", activityIds);
-          if (mcError) console.error("Error deleting manual claims:", mcError);
+          await supabase.from("activity_completions").delete().in("activity_id", activityIds);
+          await supabase.from("manual_claims").delete().in("activity_id", activityIds);
         }
 
-        // Get rewards
-        const { data: rewards, error: rewardsError } = await supabase
-          .from("rewards")
-          .select("id")
-          .in("program_id", programIds);
-        
-        if (rewardsError) console.error("Error fetching rewards:", rewardsError);
+        const { data: rewards } = await supabase.from("rewards").select("id").in("program_id", programIds);
         const rewardIds = rewards?.map(r => r.id) || [];
 
         if (rewardIds.length > 0) {
-          const { error: rrError } = await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
-          if (rrError) console.error("Error deleting reward redemptions:", rrError);
+          await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
         }
 
-        // Delete rewards, activities, tiers
-        const { error: delRewardsError } = await supabase.from("rewards").delete().in("program_id", programIds);
-        if (delRewardsError) console.error("Error deleting rewards:", delRewardsError);
-        
-        const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
-        if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
-        
-        const { error: delTiersError } = await supabase.from("tiers").delete().in("program_id", programIds);
-        if (delTiersError) console.error("Error deleting tiers:", delTiersError);
+        await supabase.from("rewards").delete().in("program_id", programIds);
+        await supabase.from("activities").delete().in("program_id", programIds);
+        await supabase.from("tiers").delete().in("program_id", programIds);
       }
 
-      // Delete fan memberships
-      const { error: fmError } = await supabase.from("fan_memberships").delete().eq("club_id", clubId);
-      if (fmError) console.error("Error deleting fan memberships:", fmError);
+      await supabase.from("fan_memberships").delete().eq("club_id", clubId);
+      await supabase.from("club_verifications").delete().eq("club_id", clubId);
+      await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
 
-      // Delete club verification
-      const { error: cvError } = await supabase.from("club_verifications").delete().eq("club_id", clubId);
-      if (cvError) console.error("Error deleting club verifications:", cvError);
+      const { data: clubData } = await supabase.from("clubs").select("admin_id").eq("id", clubId).single();
 
-      // Delete loyalty programs
-      const { error: lpError } = await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
-      if (lpError) console.error("Error deleting loyalty programs:", lpError);
-
-      // Get club admin to delete their profile
-      const { data: clubData, error: clubDataError } = await supabase
-        .from("clubs")
-        .select("admin_id")
-        .eq("id", clubId)
-        .single();
-      
-      if (clubDataError) console.error("Error fetching club admin:", clubDataError);
-
-      // Delete the club
       const { error: clubDeleteError } = await supabase.from("clubs").delete().eq("id", clubId);
       if (clubDeleteError) {
-        console.error("Error deleting club:", clubDeleteError);
         toast({ title: "Error", description: `Failed to delete club: ${clubDeleteError.message}`, variant: "destructive" });
         return;
       }
 
-      // Delete the club admin's profile
       if (clubData?.admin_id) {
-        const { error: adminProfileError } = await supabase.from("profiles").delete().eq("id", clubData.admin_id);
-        if (adminProfileError) console.error("Error deleting admin profile:", adminProfileError);
+        await supabase.from("profiles").delete().eq("id", clubData.admin_id);
       }
 
-      toast({ 
-        title: "Club Deleted", 
-        description: `${clubName} and all associated data have been removed.` 
-      });
+      toast({ title: "Club Deleted", description: `${clubName} and all associated data have been removed.` });
       await fetchAllData();
     } catch (error) {
       console.error("Delete club error:", error);
@@ -726,23 +898,44 @@ export default function SystemAdmin() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
-  const handleBackToHome = () => {
-    navigate("/");
-  };
-
-  if (loading || dataLoading) {
+  // Loading state - always show spinner while checking session
+  console.log('[SystemAdmin] Render - checkingSession:', checkingSession, 'adminSession:', adminSession?.username || 'null');
+  
+  if (checkingSession) {
+    console.log('[SystemAdmin] Showing loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Verifying authentication...</p>
+        </div>
       </div>
     );
   }
 
+  // Show login if not authenticated - this is ALWAYS the case now
+  if (!adminSession) {
+    console.log('[SystemAdmin V4] Showing LOGIN SCREEN (no session)');
+    return (
+      <>
+        {/* Fixed Banner at top of login screen */}
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-green-400 to-teal-500 text-black px-4 py-3 text-center shadow-xl">
+          <span className="font-bold text-lg">🔐 LOGIN SCREEN V4 - Session Cleared</span>
+          <span className="ml-4 bg-black/20 px-3 py-1 rounded text-sm font-mono">admin / admin</span>
+        </div>
+        <div className="bg-blue-600 text-white px-4 py-2 text-center text-xs fixed top-[52px] left-0 right-0 z-[9998]">
+          💡 If you see dashboard instead, press <strong>Ctrl+Shift+R</strong> (or Cmd+Shift+R on Mac) to hard refresh
+        </div>
+        <div className="pt-20">
+          <AdminLoginScreen onLogin={handleAdminLogin} />
+        </div>
+      </>
+    );
+  }
+
+  console.log('[SystemAdmin] Showing DASHBOARD for user:', adminSession.username);
+
+  // Dashboard
   const filteredClubs = clubs.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -768,6 +961,22 @@ export default function SystemAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* PROMINENT DEBUG BANNER - VISIBLE ON DASHBOARD */}
+      <div className="sticky top-0 z-[9999] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 text-black px-4 py-3 flex items-center justify-center gap-4 shadow-xl">
+        <span className="font-bold text-lg">🔐 DASHBOARD V4 LOADED</span>
+        <span className="text-sm">| Session: {adminSession?.username || 'unknown'}</span>
+        <Button 
+          size="sm" 
+          onClick={handleAdminLogout}
+          className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg shadow-lg"
+        >
+          <LogOut className="h-4 w-4 mr-2" /> SIGN OUT
+        </Button>
+      </div>
+      <div className="bg-blue-600 text-white px-4 py-2 text-center text-xs">
+        💡 If you don't see this banner, press <strong>Ctrl+Shift+R</strong> (or Cmd+Shift+R on Mac) to hard refresh
+      </div>
+      
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
@@ -781,18 +990,17 @@ export default function SystemAdmin() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {adminSession?.username || 'Unknown'}</span>
             <Button variant="ghost" size="sm" onClick={fetchAllData} className="rounded-full text-muted-foreground hover:text-foreground">
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
-            {user ? (
-              <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-                <LogOut className="h-4 w-4 mr-2" /> Sign out
-              </Button>
-            ) : (
-              <Button variant="ghost" onClick={handleBackToHome} className="rounded-full text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
-              </Button>
-            )}
+            <Button 
+              variant="destructive" 
+              onClick={handleAdminLogout}
+              className="rounded-full"
+            >
+              <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            </Button>
           </div>
         </div>
       </header>
@@ -864,7 +1072,6 @@ export default function SystemAdmin() {
           {/* OVERVIEW TAB */}
           <TabsContent value="overview" className="mt-6 space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Recent Activity */}
               <Card className="rounded-2xl border-border/40">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -902,7 +1109,6 @@ export default function SystemAdmin() {
                 </CardContent>
               </Card>
 
-              {/* Platform Health */}
               <Card className="rounded-2xl border-border/40">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -922,8 +1128,8 @@ export default function SystemAdmin() {
                     <div className="p-4 rounded-xl bg-muted/30">
                       <p className="text-xs text-muted-foreground">Redemption Rate</p>
                       <p className="text-2xl font-display font-bold">
-                        {adminStats.totalPointsIssued > 0 
-                          ? Math.round((adminStats.totalPointsSpent / adminStats.totalPointsIssued) * 100) 
+                        {adminStats.totalPointsIssued > 0
+                          ? Math.round((adminStats.totalPointsSpent / adminStats.totalPointsIssued) * 100)
                           : 0}%
                       </p>
                     </div>
@@ -934,14 +1140,13 @@ export default function SystemAdmin() {
                     <div className="p-4 rounded-xl bg-muted/30">
                       <p className="text-xs text-muted-foreground">Verification Rate</p>
                       <p className="text-2xl font-display font-bold">
-                        {adminStats.totalClubs > 0 
-                          ? Math.round((adminStats.verifiedClubs / adminStats.totalClubs) * 100) 
+                        {adminStats.totalClubs > 0
+                          ? Math.round((adminStats.verifiedClubs / adminStats.totalClubs) * 100)
                           : 0}%
                       </p>
                     </div>
                   </div>
 
-                  {/* Quick Stats */}
                   <div className="space-y-2 pt-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total Rewards Created</span>
@@ -984,7 +1189,6 @@ export default function SystemAdmin() {
             ) : (
               verificationRequests.map((request) => {
                 const club = request.club;
-                const isVerified = club?.status === "verified" || club?.status === "official";
                 const criteriaCount = [
                   !!request.official_email_domain,
                   !!request.public_link,
@@ -992,109 +1196,37 @@ export default function SystemAdmin() {
                 ].filter(Boolean).length;
 
                 return (
-                  <Card key={request.id} className={`rounded-2xl border-border/40 overflow-hidden ${isVerified ? "border-primary/20" : ""}`}>
-                    <div className={`absolute inset-0 bg-gradient-to-br ${isVerified ? "from-primary/5" : "from-orange-500/5"} to-transparent pointer-events-none`} />
-                    <CardHeader className="relative z-10 pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center border border-border/30"
-                            style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}
-                          >
-                            {club?.logo_url ? (
-                              <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover rounded-xl" />
-                            ) : (
-                              <span className="text-sm font-bold text-white">{club?.name?.charAt(0) ?? "?"}</span>
+                  <Card key={request.id} className="rounded-2xl border-border/40 overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-lg">{club?.name}</h3>
+                            <Badge variant="secondary" className="rounded-full">{club?.city}, {club?.country}</Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            {request.official_email_domain && (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" /> Email Domain
+                              </span>
+                            )}
+                            {request.public_link && (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" /> Public Link
+                              </span>
+                            )}
+                            {request.authority_declaration && (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" /> Authority Declaration
+                              </span>
                             )}
                           </div>
-                          <div>
-                            <CardTitle className="text-base font-display">{club?.name ?? "Unknown Club"}</CardTitle>
-                            <CardDescription>{club?.city}, {club?.country}</CardDescription>
-                          </div>
+                          <p className="text-xs text-muted-foreground">{criteriaCount}/3 verification criteria met</p>
                         </div>
-                        <Badge className={`rounded-full ${isVerified ? "bg-primary/10 text-primary border-primary/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"}`}>
-                          {isVerified ? "Verified" : "Pending"}
-                        </Badge>
+                        <Button onClick={() => handleApproveVerification(request)} disabled={actionLoading}>
+                          <CheckCircle2 className="h-4 w-4 mr-2" /> Verify
+                        </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent className="relative z-10 space-y-3">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className={`flex items-center gap-2 text-xs p-2 rounded-xl ${request.official_email_domain ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                          <Mail className="h-3 w-3" />
-                          <span>{request.official_email_domain ? `@${request.official_email_domain}` : "No email"}</span>
-                        </div>
-                        <div className={`flex items-center gap-2 text-xs p-2 rounded-xl ${request.public_link ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                          <LinkIcon className="h-3 w-3" />
-                          <span>{request.public_link ? "Provided" : "No link"}</span>
-                        </div>
-                        <div className={`flex items-center gap-2 text-xs p-2 rounded-xl ${request.authority_declaration ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                          <ShieldCheck className="h-3 w-3" />
-                          <span>{request.authority_declaration ? "Declared" : "Not declared"}</span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground">
-                        {criteriaCount}/3 criteria met · Submitted {new Date(request.created_at).toLocaleDateString()}
-                      </p>
-
-                      {request.public_link && (
-                        <a
-                          href={request.public_link.startsWith("http") ? request.public_link : `https://${request.public_link}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                        >
-                          <Eye className="h-3 w-3" /> View public link
-                        </a>
-                      )}
-
-                      {!isVerified && (
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApproveVerification(request)}
-                            disabled={actionLoading}
-                            className="rounded-xl gradient-stadium font-semibold shadow-stadium flex-1"
-                          >
-                            {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              if (selectedVerification?.id === request.id) {
-                                handleRejectVerification(request);
-                              } else {
-                                setSelectedVerification(request);
-                              }
-                            }}
-                            disabled={actionLoading}
-                            className="rounded-xl flex-1"
-                          >
-                            <XCircle className="h-4 w-4 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      )}
-
-                      {selectedVerification?.id === request.id && (
-                        <div className="space-y-2 pt-2">
-                          <Input
-                            placeholder="Optional: reason for rejection..."
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            className="rounded-xl border-border/40 text-sm"
-                          />
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="destructive" onClick={() => handleRejectVerification(request)} className="rounded-xl">
-                              Confirm Reject
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setSelectedVerification(null)} className="rounded-xl">
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
                 );
@@ -1106,116 +1238,129 @@ export default function SystemAdmin() {
           <TabsContent value="requests" className="mt-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Mail className="h-4 w-4" /> Club Requests from Fans
+                <Mail className="h-4 w-4" /> Club Requests
               </h2>
-              <Badge variant="secondary" className="rounded-full">{clubRequests.length} total</Badge>
             </div>
 
             {clubRequests.length === 0 ? (
               <Card className="rounded-2xl border-border/40">
                 <CardContent className="pt-8 pb-8 text-center">
                   <Mail className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground">No club requests yet.</p>
-                  <p className="text-xs text-muted-foreground mt-1">When fans request new clubs, they'll appear here.</p>
+                  <p className="text-muted-foreground">No club requests found.</p>
                 </CardContent>
               </Card>
             ) : (
+              clubRequests.map((request) => (
+                <Card key={request.id} className="rounded-2xl border-border/40">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-lg">{request.club_name}</h3>
+                          <Badge className={`rounded-full ${
+                            request.status === "pending" ? "bg-yellow-500/20 text-yellow-700" :
+                            request.status === "contacted" ? "bg-blue-500/20 text-blue-700" :
+                            request.status === "resolved" ? "bg-green-500/20 text-green-700" :
+                            "bg-red-500/20 text-red-700"
+                          }`}>
+                            {request.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          From: {request.requester_email} • {request.country}
+                        </p>
+                        {request.message && (
+                          <p className="text-sm bg-muted/30 p-3 rounded-lg">{request.message}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {request.status === "pending" && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handleUpdateClubRequest(request.id, "contacted")} disabled={actionLoading}>
+                              Contacted
+                            </Button>
+                            <Button size="sm" onClick={() => handleUpdateClubRequest(request.id, "resolved")} disabled={actionLoading}>
+                              Resolved
+                            </Button>
+                          </>
+                        )}
+                        {request.status === "contacted" && (
+                          <Button size="sm" onClick={() => handleUpdateClubRequest(request.id, "resolved")} disabled={actionLoading}>
+                            Resolved
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* CLUBS TAB */}
+          <TabsContent value="clubs" className="mt-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search clubs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 rounded-xl"
+                />
+              </div>
+              <Badge variant="secondary" className="rounded-full">{filteredClubs.length} clubs</Badge>
+            </div>
+
+            {dataLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
               <div className="space-y-3">
-                {clubRequests.map((request) => (
-                  <Card key={request.id} className="rounded-2xl border-border/40 overflow-hidden">
-                    <CardContent className="p-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-display font-semibold">{request.club_name}</h3>
+                {filteredClubs.map((club) => (
+                  <Card key={club.id} className="rounded-2xl border-border/40">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
+                          {club.logo_url ? (
+                            <img src={club.logo_url} alt={club.name} className="h-10 w-10 rounded-lg object-cover" />
+                          ) : (
+                            <Building2 className="h-6 w-6 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{club.name}</h3>
                             <Badge className={`rounded-full text-xs ${
-                              request.status === "pending" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                              request.status === "contacted" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                              request.status === "resolved" ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                              "bg-red-500/10 text-red-400 border-red-500/20"
+                              club.status === "verified" ? "bg-green-500/20 text-green-700" :
+                              club.status === "official" ? "bg-blue-500/20 text-blue-700" :
+                              "bg-yellow-500/20 text-yellow-700"
                             }`}>
-                              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                              {club.status}
                             </Badge>
                           </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                            {request.country && (
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-3 w-3" />
-                                {request.country}
-                              </div>
-                            )}
-                            {request.club_contact && (
-                              <div className="flex items-center gap-2">
-                                <Mail className="h-3 w-3" />
-                                {request.club_contact}
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                              <Users className="h-3 w-3" />
-                              Requester: {request.requester_email}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(request.created_at).toLocaleDateString()}
-                            </div>
-                          </div>
-                          
-                          {request.message && (
-                            <div className="mt-3 p-3 rounded-xl bg-muted/30 text-sm">
-                              "{request.message}"
-                            </div>
-                          )}
+                          <p className="text-sm text-muted-foreground">{club.city}, {club.country}</p>
                         </div>
-                        
-                        <div className="flex gap-2">
-                          {request.status === "pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleUpdateClubRequest(request.id, "contacted")}
-                                disabled={actionLoading}
-                                className="rounded-xl"
-                              >
-                                <Mail className="h-3 w-3 mr-1" />
-                                Contact
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateClubRequest(request.id, "resolved")}
-                                disabled={actionLoading}
-                                className="rounded-xl"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Resolve
-                              </Button>
-                            </>
-                          )}
-                          {request.status === "contacted" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateClubRequest(request.id, "resolved")}
-                                disabled={actionLoading}
-                                className="rounded-xl"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Resolve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleUpdateClubRequest(request.id, "rejected")}
-                                disabled={actionLoading}
-                                className="rounded-xl"
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {club.status === "unverified" && (
+                          <Button size="sm" variant="outline" onClick={() => handleQuickVerify(club.id, club.name)} disabled={actionLoading}>
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="text-destructive" onClick={() => setClubToDelete(club)}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete Club
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </CardContent>
                   </Card>
@@ -1224,301 +1369,145 @@ export default function SystemAdmin() {
             )}
           </TabsContent>
 
-          {/* CLUBS TAB */}
-          <TabsContent value="clubs" className="mt-6 space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="h-4 w-4" /> All Clubs
-              </h2>
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search clubs..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 rounded-full"
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredClubs.map((club) => {
-                const isVerified = club.status === "verified" || club.status === "official";
-
-                return (
-                  <Card key={club.id} className="rounded-2xl border-border/40 overflow-hidden card-hover">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${isVerified ? "from-primary/5" : "from-muted/30"} to-transparent pointer-events-none`} />
-                    <CardContent className="relative z-10 pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center border border-border/30"
-                            style={{ backgroundColor: club.primary_color || "#1a7a4c" }}
-                          >
-                            {club.logo_url ? (
-                              <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover rounded-xl" />
-                            ) : (
-                              <span className="text-lg font-bold text-white">{club.name.charAt(0)}</span>
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-display font-bold text-foreground">{club.name}</h3>
-                            <p className="text-xs text-muted-foreground">{club.city}, {club.country}</p>
-                          </div>
-                        </div>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {!isVerified && (
-                              <DropdownMenuItem onClick={() => handleQuickVerify(club.id, club.name)}>
-                                <ShieldCheck className="h-4 w-4 mr-2" /> Verify Club
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                                setClubToDelete(club);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete Club
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <Badge className={`rounded-full ${isVerified ? "bg-primary/10 text-primary border-primary/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"}`}>
-                          {isVerified ? <><ShieldCheck className="h-3 w-3 mr-1" /> Verified</> : <><AlertTriangle className="h-3 w-3 mr-1" /> Unverified</>}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground">
-                          Joined {new Date(club.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      {club.stadium_name && (
-                        <p className="text-xs text-muted-foreground mt-2">🏟️ {club.stadium_name}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-
           {/* FANS TAB */}
           <TabsContent value="fans" className="mt-6 space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Users className="h-4 w-4" /> All Fans
-              </h2>
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search fans..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 rounded-full"
+                  className="pl-10 rounded-xl"
                 />
               </div>
+              <Badge variant="secondary" className="rounded-full">{filteredFans.length} fans</Badge>
             </div>
 
-            <Card className="rounded-2xl border-border/40 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="divide-y divide-border/40">
-                  {filteredFans.length === 0 ? (
-                    <div className="py-8 text-center text-muted-foreground">No fans found</div>
-                  ) : (
-                    filteredFans.slice(0, 50).map((fan) => (
-                      <div key={fan.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
-                            {fan.avatar_url ? (
-                              <img src={fan.avatar_url} alt={fan.full_name || "Fan"} className="w-full h-full object-cover rounded-xl" />
-                            ) : (
-                              <Users className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium">{fan.full_name || "Unknown"}</p>
-                            <p className="text-xs text-muted-foreground">{fan.email} {fan.username && `· @${fan.username}`}</p>
-                          </div>
+            {dataLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredFans.map((fan) => (
+                  <Card key={fan.id} className="rounded-2xl border-border/40">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
+                          <Users className="h-6 w-6 text-muted-foreground" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            Joined {new Date(fan.created_at).toLocaleDateString()}
-                          </span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onSelect={(e) => {
-                                  e.preventDefault();
-                                  setFanToDelete(fan);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete User
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div>
+                          <h3 className="font-semibold">{fan.full_name || "Unknown"}</h3>
+                          <p className="text-sm text-muted-foreground">{fan.email}</p>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="text-destructive" onClick={() => setFanToDelete(fan)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete Fan
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* REPORTS TAB */}
           <TabsContent value="reports" className="mt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Club Reports
-              </h2>
-            </div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Club Reports
+            </h2>
 
-            <Card className="rounded-2xl border-border/40 overflow-hidden">
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase">Club</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Fans</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Points Issued</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Redemptions</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Activities</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Rewards</th>
-                      <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Pending</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {clubReports.map((report) => {
-                      const club = clubs.find((c) => c.id === report.club_id);
-                      return (
-                        <tr key={report.club_id} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center border border-border/30"
-                                style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}
-                              >
-                                {club?.logo_url ? (
-                                  <img src={club.logo_url} alt={report.club_name} className="w-full h-full object-cover rounded-lg" />
-                                ) : (
-                                  <span className="text-xs font-bold text-white">{report.club_name.charAt(0)}</span>
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-medium">{report.club_name}</p>
-                                <p className="text-xs text-muted-foreground">{club?.city}, {club?.country}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4 text-center font-medium">{report.total_fans}</td>
-                          <td className="p-4 text-center font-medium">{report.total_points_claimed.toLocaleString()}</td>
-                          <td className="p-4 text-center font-medium">{report.total_rewards_redeemed}</td>
-                          <td className="p-4 text-center font-medium">{report.total_activities}</td>
-                          <td className="p-4 text-center font-medium">{report.total_rewards}</td>
-                          <td className="p-4 text-center">
-                            {report.pending_claims > 0 ? (
-                              <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 rounded-full">
-                                {report.pending_claims}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">0</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+            {clubReports.length === 0 ? (
+              <Card className="rounded-2xl border-border/40">
+                <CardContent className="pt-8 pb-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">No club reports available.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {clubReports.map((report) => (
+                  <Card key={report.club_id} className="rounded-2xl border-border/40">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{report.club_name}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-xs text-muted-foreground">Total Fans</p>
+                          <p className="text-xl font-bold">{report.total_fans}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-xs text-muted-foreground">Points Claimed</p>
+                          <p className="text-xl font-bold">{report.total_points_claimed.toLocaleString()}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-xs text-muted-foreground">Redemptions</p>
+                          <p className="text-xl font-bold">{report.total_rewards_redeemed}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-xs text-muted-foreground">Pending Claims</p>
+                          <p className="text-xl font-bold text-yellow-500">{report.pending_claims}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>
 
-      {/* Delete Club Confirmation Dialog */}
-      <AlertDialog open={!!clubToDelete} onOpenChange={(open) => !open && setClubToDelete(null)}>
+      {/* Delete Club Dialog */}
+      <AlertDialog open={!!clubToDelete} onOpenChange={() => setClubToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Club?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Club</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{clubToDelete?.name}</strong> and all associated data including:
-              <ul className="mt-2 ml-4 list-disc text-sm">
-                <li>All fan memberships</li>
-                <li>All activities and completions</li>
-                <li>All rewards and redemptions</li>
-                <li>Club admin account</li>
-              </ul>
-              <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
+              Are you sure you want to delete &quot;{clubToDelete?.name}&quot;? This will also delete all associated data including activities, rewards, and member data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setClubToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
-                if (clubToDelete) {
-                  await handleDeleteClub(clubToDelete.id, clubToDelete.name);
-                  setClubToDelete(null);
-                }
-              }}
-              disabled={actionLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => clubToDelete && handleDeleteClub(clubToDelete.id, clubToDelete.name)}
             >
-              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Delete Club
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Fan Confirmation Dialog */}
-      <AlertDialog open={!!fanToDelete} onOpenChange={(open) => !open && setFanToDelete(null)}>
+      {/* Delete Fan Dialog */}
+      <AlertDialog open={!!fanToDelete} onOpenChange={() => setFanToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Fan</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{fanToDelete?.full_name || fanToDelete?.email}</strong> and all their data including:
-              <ul className="mt-2 ml-4 list-disc text-sm">
-                <li>Club membership</li>
-                <li>Activity completions</li>
-                <li>Reward redemptions</li>
-                <li>Notifications</li>
-              </ul>
-              <p className="mt-2 font-medium text-destructive">This action cannot be undone.</p>
+              Are you sure you want to delete &quot;{fanToDelete?.full_name || fanToDelete?.email}&quot;? This will also delete all their data including points, memberships, and activity history. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setFanToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
-                if (fanToDelete) {
-                  await handleDeleteUser(fanToDelete.user_id, "fan");
-                  setFanToDelete(null);
-                }
-              }}
-              disabled={actionLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => fanToDelete && handleDeleteUser(fanToDelete.user_id)}
             >
-              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Delete User
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
