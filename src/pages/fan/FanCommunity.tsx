@@ -23,6 +23,10 @@ import {
   UserMinus,
   MapPin,
   Trophy,
+  Zap,
+  Gift,
+  Star,
+  ChevronRight,
 } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 
@@ -64,6 +68,18 @@ interface CommunityEvent {
   participant_count: number;
 }
 
+interface LoyaltyProgram {
+  id: string;
+  name: string;
+  points_currency_name: string;
+}
+
+interface FanMembership {
+  id: string;
+  points_balance: number;
+  program_id: string;
+}
+
 export default function FanCommunity() {
   const navigate = useNavigate();
   const { clubId } = useParams<{ clubId: string }>();
@@ -78,6 +94,11 @@ export default function FanCommunity() {
   const [joining, setJoining] = useState(false);
   const [posting, setPosting] = useState(false);
   const [cheeringId, setCheeringId] = useState<string | null>(null);
+
+  // Loyalty program state
+  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null);
+  const [fanMembership, setFanMembership] = useState<FanMembership | null>(null);
+  const [joiningProgram, setJoiningProgram] = useState(false);
 
   // Compose state
   const [content, setContent] = useState("");
@@ -165,6 +186,31 @@ export default function FanCommunity() {
       );
 
       setEvents(eventsWithCounts);
+
+      // Check if this is an official club with a loyalty program
+      if (clubData.is_official) {
+        const { data: programData } = await supabase
+          .from("loyalty_programs")
+          .select("id, name, points_currency_name")
+          .eq("club_id", clubId)
+          .maybeSingle();
+
+        if (programData) {
+          setLoyaltyProgram(programData as LoyaltyProgram);
+
+          // Check if fan is already a member of this loyalty program
+          const { data: membershipData } = await supabase
+            .from("fan_memberships")
+            .select("id, points_balance, program_id")
+            .eq("fan_id", profile.id)
+            .eq("club_id", clubId)
+            .maybeSingle();
+
+          if (membershipData) {
+            setFanMembership(membershipData as FanMembership);
+          }
+        }
+      }
     } catch (err) {
       console.error("Fetch error:", err);
       toast({
@@ -425,6 +471,41 @@ export default function FanCommunity() {
     navigate("/");
   };
 
+  const handleJoinLoyaltyProgram = async () => {
+    if (!profile || !clubId || !loyaltyProgram) return;
+
+    setJoiningProgram(true);
+    try {
+      const { data, error } = await supabase
+        .from("fan_memberships")
+        .insert({
+          fan_id: profile.id,
+          club_id: clubId,
+          program_id: loyaltyProgram.id,
+        })
+        .select("id, points_balance, program_id")
+        .single();
+
+      if (error) throw error;
+
+      setFanMembership(data as FanMembership);
+
+      toast({
+        title: "Welcome to the Loyalty Program!",
+        description: `You've joined ${community?.name}'s loyalty program.`,
+      });
+    } catch (err) {
+      const error = err as Error;
+      toast({
+        title: "Error",
+        description: error.message || "Could not join loyalty program.",
+        variant: "destructive",
+      });
+    } finally {
+      setJoiningProgram(false);
+    }
+  };
+
   if (loading || dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -544,6 +625,79 @@ export default function FanCommunity() {
             </Button>
           </div>
         </div>
+
+        {/* Loyalty Program Section for Official Clubs */}
+        {community.is_official && loyaltyProgram && (
+          <Card className="rounded-2xl border-accent/30 bg-gradient-to-br from-accent/5 to-transparent">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-accent/15 flex items-center justify-center">
+                    <Trophy className="h-5 w-5 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{loyaltyProgram.name}</h3>
+                    <p className="text-xs text-muted-foreground">Loyalty Program</p>
+                  </div>
+                </div>
+
+                {fanMembership ? (
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-accent/10 text-accent border-accent/20">
+                      <Star className="h-3 w-3 mr-1" />
+                      {fanMembership.points_balance} {loyaltyProgram.points_currency_name || "pts"}
+                    </Badge>
+                  </div>
+                ) : null}
+              </div>
+
+              {fanMembership ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/fan/activities")}
+                    className="rounded-xl justify-start"
+                  >
+                    <Zap className="h-4 w-4 mr-2 text-primary" />
+                    Activities
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/fan/rewards")}
+                    className="rounded-xl justify-start"
+                  >
+                    <Gift className="h-4 w-4 mr-2 text-accent" />
+                    Rewards
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Join the loyalty program to earn points, unlock rewards, and get exclusive perks!
+                  </p>
+                  <Button
+                    onClick={handleJoinLoyaltyProgram}
+                    disabled={joiningProgram}
+                    className="w-full rounded-xl gradient-golden"
+                  >
+                    {joiningProgram ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Star className="h-4 w-4 mr-2" />
+                        Join Loyalty Program
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Events Preview */}
         {events.length > 0 && (

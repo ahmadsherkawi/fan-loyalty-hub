@@ -307,6 +307,7 @@ export default function FanDiscover() {
           </div>
           <Button
             onClick={() => setShowCreateDialog(true)}
+            disabled={communityLimit && !communityLimit.can_join_more}
             className="rounded-xl gradient-stadium"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -575,62 +576,81 @@ export default function FanDiscover() {
           <DialogHeader>
             <DialogTitle>Add a New Club</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Can't find your club? Add it as a fan community. Once the official club joins,
-            they can claim it!
-          </p>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Club Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., FC Barcelona"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="rounded-xl border-border/40"
-              />
+          {communityLimit && !communityLimit.can_join_more ? (
+            <div className="py-6 text-center">
+              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+              <p className="font-semibold">Community Limit Reached</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                You've joined the maximum of {MAX_COMMUNITIES} communities. Leave a community to create a new one.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+                className="mt-4 rounded-xl"
+              >
+                Close
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="country">Country *</Label>
-              <Input
-                id="country"
-                placeholder="e.g., Spain"
-                value={newCountry}
-                onChange={(e) => setNewCountry(e.target.value)}
-                className="rounded-xl border-border/40"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                placeholder="e.g., Barcelona"
-                value={newCity}
-                onChange={(e) => setNewCity(e.target.value)}
-                className="rounded-xl border-border/40"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateDialog(false)}
-              className="rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateCommunity}
-              disabled={creating || !newName.trim() || !newCountry.trim()}
-              className="rounded-xl gradient-stadium"
-            >
-              {creating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Create Community"
-              )}
-            </Button>
-          </DialogFooter>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Can't find your club? Add it as a fan community. Once the official club joins,
+                they can claim it!
+              </p>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Club Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g., FC Barcelona"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="rounded-xl border-border/40"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country *</Label>
+                  <Input
+                    id="country"
+                    placeholder="e.g., Spain"
+                    value={newCountry}
+                    onChange={(e) => setNewCountry(e.target.value)}
+                    className="rounded-xl border-border/40"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    placeholder="e.g., Barcelona"
+                    value={newCity}
+                    onChange={(e) => setNewCity(e.target.value)}
+                    className="rounded-xl border-border/40"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateDialog(false)}
+                  className="rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateCommunity}
+                  disabled={creating || !newName.trim() || !newCountry.trim()}
+                  className="rounded-xl gradient-stadium"
+                >
+                  {creating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Create Community"
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
