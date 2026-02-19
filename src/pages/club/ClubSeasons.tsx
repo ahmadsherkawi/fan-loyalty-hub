@@ -127,8 +127,8 @@ export default function ClubSeasons() {
       if (error) throw error;
 
       setSeasons((seasonRows ?? []) as Season[]);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     } finally {
       setDataLoading(false);
     }
@@ -160,8 +160,8 @@ export default function ClubSeasons() {
       setStartDate("");
       setEndDate("");
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -180,8 +180,8 @@ export default function ClubSeasons() {
 
       toast({ title: "Season activated" });
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     }
   };
 

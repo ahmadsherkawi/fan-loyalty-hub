@@ -182,7 +182,7 @@ export default function TierManagement() {
         if (bErr) throw bErr;
 
         const grouped: Record<string, TierBenefit[]> = {};
-        (benefitsData || []).forEach((b: any) => {
+        (benefitsData || []).forEach((b: { tier_id: string }) => {
           if (!grouped[b.tier_id]) grouped[b.tier_id] = [];
           grouped[b.tier_id].push(b);
         });
@@ -199,8 +199,8 @@ export default function TierManagement() {
       } else {
         setBenefitsByTier({});
       }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     } finally {
       setDataLoading(false);
     }
@@ -256,8 +256,8 @@ export default function TierManagement() {
 
       resetTierForm();
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     }
   };
 
@@ -274,8 +274,8 @@ export default function TierManagement() {
 
       toast({ title: "Tier deleted" });
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     }
   };
 
@@ -337,8 +337,8 @@ export default function TierManagement() {
       updateDraft(tierId, { type: "", value: "" });
 
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     }
   };
 
@@ -351,8 +351,8 @@ export default function TierManagement() {
 
       toast({ title: "Benefit deleted" });
       fetchData();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
     }
   };
 

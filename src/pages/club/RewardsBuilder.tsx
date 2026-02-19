@@ -74,7 +74,7 @@ export default function RewardsBuilder() {
       if (!programs || programs.length === 0) { navigate("/club/dashboard"); return; }
       setProgram(programs[0] as LoyaltyProgram);
       const { data: rewardsData } = await supabase.from("rewards").select(`*, reward_redemptions(count)`).eq("program_id", programs[0].id).order("created_at", { ascending: false });
-      setRewards((rewardsData || []).map((r: any) => ({ ...r, quantity_redeemed: r.reward_redemptions?.[0]?.count || 0 })) as Reward[]);
+      setRewards((rewardsData || []).map((r: { reward_redemptions?: { count: number }[] }) => ({ ...r, quantity_redeemed: r.reward_redemptions?.[0]?.count || 0 })) as Reward[]);
     } catch (error) { console.error("Error fetching data:", error); } finally { setDataLoading(false); }
   };
 

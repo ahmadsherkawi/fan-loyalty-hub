@@ -41,8 +41,7 @@ import {
   Settings,
   ArrowRight,
   Lock,
-  Megaphone,
-  Switch
+  Megaphone
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -216,7 +215,7 @@ export default function ClubDashboard() {
         .select("points_earned, activities!inner(program_id)")
         .eq("activities.program_id", programId);
 
-      const totalPoints = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+      const totalPoints = completions?.reduce((s, c: { points_earned: number }) => s + (c.points_earned || 0), 0) ?? 0;
 
       setStats({
         fans: fans ?? 0,
@@ -254,8 +253,9 @@ export default function ClubDashboard() {
       if (error) throw error;
       toast.success("Chant settings saved!");
       setChantSettingsOpen(false);
-    } catch (err: any) {
-      toast.error("Failed to save settings: " + err.message);
+    } catch (err) {
+      const error = err as Error;
+      toast.error("Failed to save settings: " + error.message);
     } finally {
       setSavingChantSettings(false);
     }
