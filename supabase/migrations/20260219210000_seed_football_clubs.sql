@@ -100,6 +100,3 @@ INSERT INTO public.clubs (id, name, country, city, primary_color, is_official, s
 ('00000010-0000-0000-0000-000000000004', 'Al-Ahli FC', 'Saudi Arabia', 'Jeddah', '#007A33', false, 'unverified', now())
 
 ON CONFLICT (id) DO NOTHING;
-
--- Update sequences to avoid conflicts
-SELECT setval('clubs_id_seq', (SELECT MAX(id) FROM clubs));
