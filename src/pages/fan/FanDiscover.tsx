@@ -272,11 +272,17 @@ export default function FanDiscover() {
           <div className="flex items-center gap-1.5">
             <Users className="h-4 w-4" />
             <span>
-              <strong>{communities.length}</strong> communities
+              <strong>{communities.filter(c => !c.is_official).length}</strong> fan communities
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle className="h-4 w-4 text-primary" />
+            <span>
+              <strong>{communities.filter(c => c.is_official).length}</strong> official clubs
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle className="h-4 w-4 text-accent" />
             <span>
               <strong>{joinedIds.size}</strong> joined
             </span>
