@@ -303,7 +303,7 @@ RETURNS TABLE (
   logo_url TEXT,
   city TEXT,
   country TEXT,
-  primary_color,
+  primary_color TEXT,
   is_official BOOLEAN,
   member_count BIGINT,
   joined_at TIMESTAMPTZ
