@@ -26,7 +26,7 @@ const Index = () => {
       const redirectTimer = setTimeout(() => {
         // Redirect authenticated users to their dashboard
         if (profile.role === 'club_admin') {
-          navigate('/club/onboarding', { replace: true });
+          navigate('/club/claim', { replace: true });
         } else if (profile.role === 'system_admin' || profile.role === 'admin') {
           navigate('/admin', { replace: true });
         } else if (profile.role === 'fan') {

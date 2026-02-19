@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 
 // Club pages
 import ClubOnboarding from "./pages/club/ClubOnboarding";
+import ClubClaim from "./pages/club/ClubClaim";
 import ClubDashboard from "./pages/club/ClubDashboard";
 import ClubVerification from "./pages/club/ClubVerification";
 import ActivityBuilder from "./pages/club/ActivityBuilder";
@@ -63,6 +64,7 @@ const App = () => {
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/preview" element={<PreviewHub />} />
                 {/* ================= CLUB ADMIN ================= */}
+                <Route path="/club/claim" element={<ClubClaim />} />
                 <Route path="/club/onboarding" element={<ClubOnboarding />} />
                 <Route path="/club/dashboard" element={<ClubDashboard />} />
                 <Route path="/club/verification" element={<ClubVerification />} />

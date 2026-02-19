@@ -31,6 +31,12 @@ export default function AuthPage() {
 
   const defaultRole = (searchParams.get("role") as UserRole) || "fan";
 
+  // Claim parameters for clubs claiming communities
+  const claimAction = searchParams.get("action");
+  const claimCommunityId = searchParams.get("community_id");
+  const claimCommunityName = searchParams.get("name");
+  const redirectPath = searchParams.get("redirect");
+
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signup");
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
@@ -55,22 +61,30 @@ export default function AuthPage() {
       setIsRedirecting(true);
       
       // Navigate to appropriate page based on role
-      let redirectPath: string;
+      let destination: string;
       if (profile.role === "club_admin") {
-        redirectPath = "/club/onboarding";
+        // Check if this is a claim action
+        if (claimAction === "claim" && claimCommunityId) {
+          destination = `/club/claim?community_id=${claimCommunityId}&name=${encodeURIComponent(claimCommunityName || "")}`;
+        } else {
+          destination = "/club/claim";
+        }
       } else if (profile.role === "system_admin" || profile.role === "admin") {
-        redirectPath = "/admin";
+        destination = "/admin";
       } else {
-        // Fan - check if onboarding completed
-        // Note: onboarding_completed may not exist if migration not run
-        // Default to onboarding if undefined/false
-        const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
-        redirectPath = onboardingDone ? "/fan/home" : "/fan/onboarding";
+        // Fan - check if there's a redirect path from explore
+        if (redirectPath) {
+          destination = redirectPath;
+        } else {
+          // Check if onboarding completed
+          const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
+          destination = onboardingDone ? "/fan/home" : "/fan/onboarding";
+        }
       }
       
       // Small delay to ensure state updates are processed
       setTimeout(() => {
-        navigate(redirectPath, { replace: true });
+        navigate(destination, { replace: true });
       }, 100);
     } else if (user && !profile && !profileError) {
       // User exists but profile is being loaded
@@ -80,7 +94,7 @@ export default function AuthPage() {
       console.error("[AuthPage] Profile error:", profileError);
       setIsRedirecting(false);
     }
-  }, [loading, user, profile, profileError, navigate]);
+  }, [loading, user, profile, profileError, navigate, claimAction, claimCommunityId, claimCommunityName, redirectPath]);
 
   // Show error toast if profile loading fails
   useEffect(() => {
