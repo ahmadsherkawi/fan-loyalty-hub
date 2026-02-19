@@ -29,6 +29,7 @@ import {
   Megaphone,
   Globe,
   CheckCircle,
+  MessageCircle,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -173,10 +174,10 @@ export default function FanHome() {
         const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
         setProgram(programData as LoyaltyProgram);
 
-        const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
+        const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
         setActivities((acts ?? []) as Activity[]);
 
-        const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
+        const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
         setRewards((rews ?? []) as Reward[]);
 
         const { data: tiersData } = await supabase
@@ -209,26 +210,6 @@ export default function FanHome() {
 
         setCurrentTier(current);
         setNextTier(next);
-
-        if (current?.id) {
-          const { data: benefits } = await supabase
-            .from("tier_benefits")
-            .select("*")
-            .eq("tier_id", current.id);
-          
-          if (benefits && benefits.length > 0) {
-            setTierBenefits(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              benefits.map((b: any) => ({
-                id: b.id,
-                name: b.benefit_label || b.benefit_type,
-                description: `${b.benefit_type === 'points_multiplier' ? 'Earn ' + b.benefit_value + 'x points' : b.benefit_value + '% off rewards'}`,
-                benefit_type: b.benefit_type,
-                benefit_value: b.benefit_value,
-              }))
-            );
-          }
-        }
       }
 
       const { count } = await supabase
@@ -304,6 +285,10 @@ export default function FanHome() {
   const officialCommunities = communities.filter((c) => c.is_official);
   const fanCommunities = communities.filter((c) => !c.is_official);
 
+  // Find the official club that the fan is a loyalty member of
+  const loyaltyClubId = membership?.club_id;
+  const loyaltyCommunity = communities.find((c) => c.id === loyaltyClubId);
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
@@ -373,93 +358,7 @@ export default function FanHome() {
       </header>
 
       <main className="container py-8 space-y-8">
-        {/* MY COMMUNITIES SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              My Communities
-              <Badge variant="outline" className="text-xs">
-                {communities.length}/{MAX_COMMUNITIES}
-              </Badge>
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/fan/discover")}
-              className="rounded-full"
-            >
-              <Globe className="h-4 w-4 mr-1.5" />
-              Discover More
-            </Button>
-          </div>
-
-          {communities.length === 0 ? (
-            <Card className="rounded-2xl border-dashed border-2 border-border/40">
-              <CardContent className="py-8 text-center">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No communities joined yet.</p>
-                <Button
-                  onClick={() => navigate("/fan/discover")}
-                  className="mt-4 rounded-xl gradient-stadium"
-                >
-                  Discover Communities
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {communities.map((community) => (
-                <Card
-                  key={community.id}
-                  className="rounded-2xl border-border/40 hover:border-primary/30 transition-all cursor-pointer"
-                  onClick={() => navigate(`/fan/community/${community.id}`)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
-                        style={{
-                          backgroundColor: community.primary_color || "#16a34a",
-                        }}
-                      >
-                        {community.logo_url ? (
-                          <img
-                            src={community.logo_url}
-                            alt={community.name}
-                            className="h-full w-full rounded-xl object-cover"
-                          />
-                        ) : (
-                          community.name.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-semibold truncate">{community.name}</h3>
-                          {community.is_official && (
-                            <CheckCircle className="h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {community.city ? `${community.city}, ` : ""}
-                          {community.country}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {community.member_count} members
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* OFFICIAL CLUB LOYALTY PROGRAM (if member) */}
+        {/* LOYALTY PROGRAM SECTION (if member) */}
         {membership && club && (
           <>
             {/* HERO CARD */}
@@ -473,7 +372,9 @@ export default function FanHome() {
                   <div className="flex items-center gap-5">
                     <div className="relative group flex-shrink-0">
                       <div className="w-20 h-20 rounded-2xl border-2 border-white/20 shadow-lg overflow-hidden bg-white/10">
-                        {avatarUrl ? (
+                        {club.logo_url ? (
+                          <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+                        ) : avatarUrl ? (
                           <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -655,6 +556,108 @@ export default function FanHome() {
             )}
           </>
         )}
+
+        {/* MY COMMUNITIES SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              My Communities
+              <Badge variant="outline" className="text-xs">
+                {communities.length}/{MAX_COMMUNITIES}
+              </Badge>
+            </h2>
+            {communities.length < MAX_COMMUNITIES && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/fan/discover")}
+                className="rounded-full"
+              >
+                <Globe className="h-4 w-4 mr-1.5" />
+                Discover More
+              </Button>
+            )}
+          </div>
+
+          {communities.length === 0 ? (
+            <Card className="rounded-2xl border-dashed border-2 border-border/40">
+              <CardContent className="py-8 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No communities joined yet.</p>
+                <Button
+                  onClick={() => navigate("/fan/discover")}
+                  className="mt-4 rounded-xl gradient-stadium"
+                >
+                  Discover Communities
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {communities.map((community) => {
+                const isLoyaltyClub = community.id === loyaltyClubId;
+                
+                return (
+                  <Card
+                    key={community.id}
+                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all cursor-pointer"
+                    onClick={() => navigate(`/fan/community/${community.id}`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+                          style={{
+                            backgroundColor: community.primary_color || "#16a34a",
+                          }}
+                        >
+                          {community.logo_url ? (
+                            <img
+                              src={community.logo_url}
+                              alt={community.name}
+                              className="h-full w-full rounded-xl object-cover"
+                            />
+                          ) : (
+                            community.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="font-semibold truncate">{community.name}</h3>
+                            {community.is_official && (
+                              <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {community.city ? `${community.city}, ` : ""}
+                            {community.country}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {community.member_count} members
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3 w-3" />
+                              Chants
+                            </span>
+                          </div>
+                          {isLoyaltyClub && (
+                            <Badge className="mt-2 text-[10px] bg-accent/10 text-accent border-accent/20">
+                              <Star className="h-3 w-3 mr-1" />
+                              Loyalty Member
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

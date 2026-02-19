@@ -241,22 +241,30 @@ export default function FanCommunity() {
       const fileExt = file.name.split(".").pop();
       const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
 
+      console.log("[FanCommunity] Uploading image to chant-images bucket:", fileName);
+      
       const { error: uploadErr } = await supabase.storage
         .from("chant-images")
         .upload(fileName, file);
 
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) {
+        console.error("[FanCommunity] Upload error:", uploadErr);
+        throw uploadErr;
+      }
 
       const { data: urlData } = supabase.storage
         .from("chant-images")
         .getPublicUrl(fileName);
 
+      console.log("[FanCommunity] Image uploaded successfully:", urlData.publicUrl);
       setImageUrl(urlData.publicUrl);
       sonnerToast.success("Image uploaded!");
     } catch (err) {
+      const error = err as Error;
+      console.error("[FanCommunity] Upload failed:", error);
       toast({
         title: "Upload failed",
-        description: "Could not upload image.",
+        description: error.message || "Could not upload image. Please try again.",
         variant: "destructive",
       });
     } finally {
