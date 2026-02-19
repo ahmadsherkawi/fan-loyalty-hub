@@ -582,6 +582,51 @@ export type Database = {
         Args: { p_membership_id: string; p_points: number }
         Returns: boolean
       }
+      // Community functions
+      get_communities: {
+        Args: { p_search: string | null; p_limit: number; p_offset: number }
+        Returns: {
+          id: string
+          name: string
+          logo_url: string | null
+          city: string | null
+          country: string | null
+          primary_color: string | null
+          is_official: boolean
+          member_count: number
+          chant_count: number
+        }[]
+      }
+      get_my_communities: {
+        Args: { p_fan_id: string }
+        Returns: {
+          id: string
+          name: string
+          logo_url: string | null
+          city: string | null
+          country: string | null
+          primary_color: string | null
+          is_official: boolean
+          member_count: number
+          joined_at: string
+        }[]
+      }
+      join_community: {
+        Args: { p_club_id: string; p_fan_id: string }
+        Returns: { id: string; club_id: string; joined: boolean }
+      }
+      leave_community: {
+        Args: { p_club_id: string; p_fan_id: string }
+        Returns: boolean
+      }
+      get_community_stats: {
+        Args: { p_club_id: string }
+        Returns: { member_count: number; chant_count: number; event_count: number }
+      }
+      create_fan_community: {
+        Args: { p_name: string; p_country: string; p_city: string | null; p_fan_id: string; p_logo_url: string | null }
+        Returns: { id: string; name: string; is_official: boolean }
+      }
     }
     Enums: {
       activity_frequency:
