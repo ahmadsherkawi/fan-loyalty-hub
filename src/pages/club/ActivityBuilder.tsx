@@ -468,8 +468,9 @@ export default function ActivityBuilder() {
       });
       
       let totalResponses = 0;
-      completions?.forEach((c: { metadata?: { selectedOption?: string } }) => {
-        const selectedOption = c.metadata?.selectedOption;
+      completions?.forEach((c: { metadata?: unknown }) => {
+        const meta = c.metadata as { selectedOption?: string } | null;
+        const selectedOption = meta?.selectedOption;
         if (selectedOption && Object.prototype.hasOwnProperty.call(optionCounts, selectedOption)) {
           optionCounts[selectedOption]++;
           totalResponses++;
@@ -692,7 +693,7 @@ export default function ActivityBuilder() {
           <Dialog open={!!qrActivity} onOpenChange={() => setQrActivity(null)}>
             <DialogContent className="rounded-2xl border-border/40">
               <DialogHeader><DialogTitle className="font-display">QR Code: {qrActivity.name}</DialogTitle></DialogHeader>
-              <QRCodeDisplay data={qrActivity.qr_code_data || ""} activityName={qrActivity.name} />
+              <QRCodeDisplay isOpen={true} onClose={() => setQrActivity(null)} activityName={qrActivity.name} qrCodeData={qrActivity.qr_code_data || ""} pointsAwarded={qrActivity.points_awarded} pointsCurrency={program?.points_currency_name || "Points"} />
             </DialogContent>
           </Dialog>
         )}

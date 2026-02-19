@@ -65,7 +65,7 @@ async function checkAdminRole(): Promise<boolean> {
     .eq('user_id', user.id)
     .single();
   
-  return profile?.role === 'system_admin';
+  return (profile?.role as string) === 'system_admin';
 }
 
 // ============================================
@@ -166,7 +166,7 @@ function AdminLoginScreen({ onLogin }: { onLogin: () => void }) {
         .eq('user_id', data.user.id)
         .single();
 
-      if (!profile || profile.role !== 'system_admin') {
+      if (!profile || (profile.role as string) !== 'system_admin') {
         // Sign out if not admin
         await supabase.auth.signOut();
         setError("Access denied. Admin privileges required.");
@@ -373,8 +373,9 @@ export default function SystemAdmin() {
 
   const handleAdminLogin = () => {
     setIsAdmin(true);
-    const { data: { session } } = supabase.auth.getSession();
-    setAdminEmail(session?.user?.email || null);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAdminEmail(session?.user?.email || null);
+    });
     toast({
       title: "Welcome, Admin!",
       description: "You have successfully logged in."
@@ -601,35 +602,37 @@ export default function SystemAdmin() {
       pendingVerifications,
       pendingClaims: pendingClaims ?? 0,
       recentRegistrations: recentRegistrations ?? 0,
+      pendingClubRequests: 0,
     });
   };
 
   const fetchRecentActivity = async () => {
     const activities: RecentActivity[] = [];
 
-    const { data: recentRedemptions } = await supabase
+    // Use any-cast for reward_redemptions since the select columns cause type mismatch
+    const { data: recentRedemptions } = await (supabase as any)
       .from("reward_redemptions")
-      .select("id, created_at, points_spent, fan_id, profiles(full_name), rewards(name)")
-      .order("created_at", { ascending: false })
+      .select("id, redeemed_at, points_spent, fan_id, profiles(full_name), rewards(name)")
+      .order("redeemed_at", { ascending: false })
       .limit(5);
 
-    (recentRedemptions ?? []).forEach((r: { id: string; created_at: string; points_spent: number; profiles?: { full_name: string | null }; rewards?: { name: string } }) => {
+    ((recentRedemptions ?? []) as Array<{ id: string; redeemed_at: string; points_spent: number; profiles?: { full_name: string | null }; rewards?: { name: string } }>).forEach((r) => {
       activities.push({
         id: r.id,
         type: "redemption",
-        created_at: r.created_at,
+        created_at: r.redeemed_at,
         details: `Redeemed "${r.rewards?.name}" for ${r.points_spent} points`,
         user_name: r.profiles?.full_name || "Unknown Fan",
       });
     });
 
-    const { data: recentCompletions } = await supabase
+    const { data: recentCompletions } = await (supabase as any)
       .from("activity_completions")
       .select("id, completed_at, points_earned, fan_id, profiles(full_name), activities(name)")
       .order("completed_at", { ascending: false })
       .limit(5);
 
-    (recentCompletions ?? []).forEach((c: { id: string; completed_at: string; points_earned: number; profiles?: { full_name: string | null }; activities?: { name: string } }) => {
+    ((recentCompletions ?? []) as Array<{ id: string; completed_at: string; points_earned: number; profiles?: { full_name: string | null }; activities?: { name: string } }>).forEach((c) => {
       activities.push({
         id: c.id,
         type: "completion",
@@ -645,7 +648,7 @@ export default function SystemAdmin() {
       .order("created_at", { ascending: false })
       .limit(5);
 
-    (recentUsers ?? []).forEach((u: { id: string; created_at: string; full_name: string | null; role: string }) => {
+    ((recentUsers ?? []) as Array<{ id: string; created_at: string; full_name: string | null; role: string }>).forEach((u) => {
       activities.push({
         id: u.id,
         type: "registration",
@@ -661,7 +664,7 @@ export default function SystemAdmin() {
 
   const fetchClubRequests = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("club_requests")
         .select("*")
         .order("created_at", { ascending: false });
@@ -672,9 +675,9 @@ export default function SystemAdmin() {
         return;
       }
 
-      setClubRequests((data ?? []) as ClubRequest[]);
+      setClubRequests((data ?? []) as unknown as ClubRequest[]);
       
-      const pendingCount = (data ?? []).filter((r: ClubRequest) => r.status === "pending").length;
+      const pendingCount = ((data ?? []) as unknown as ClubRequest[]).filter((r) => r.status === "pending").length;
       setAdminStats((prev) => ({ ...prev, pendingClubRequests: pendingCount }));
     } catch (err) {
       console.error("Error fetching club requests:", err);
@@ -685,7 +688,7 @@ export default function SystemAdmin() {
   const handleUpdateClubRequest = async (requestId: string, newStatus: ClubRequest["status"]) => {
     setActionLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("club_requests")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", requestId);
@@ -767,7 +770,7 @@ export default function SystemAdmin() {
       await supabase.from("manual_claims").delete().eq("fan_id", userId);
       await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
       await supabase.from("fan_memberships").delete().eq("fan_id", userId);
-      await supabase.from("notifications").delete().eq("user_id", userId);
+      await (supabase as any).from("notifications").delete().eq("user_id", userId);
 
       // Delete profile
       const { error: profileError } = await supabase.from("profiles").delete().eq("user_id", userId);
@@ -844,7 +847,7 @@ export default function SystemAdmin() {
         const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
         if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
         
-        const { error: delTiersError } = await supabase.from("tiers").delete().in("program_id", programIds);
+        const { error: delTiersError } = await (supabase as any).from("tiers").delete().in("program_id", programIds);
         if (delTiersError) console.error("Error deleting tiers:", delTiersError);
       }
 

@@ -45,7 +45,7 @@ export default function ClaimReview() {
 
   useEffect(() => {
     if (isPreviewMode) {
-      setProgram({ id: "preview-program", club_id: "preview-club", name: "Demo Rewards", description: null, points_currency_name: "Points", is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      setProgram({ id: "preview-program", club_id: "preview-club", name: "Demo Rewards", description: null, points_currency_name: "Points", is_active: true, chants_points_enabled: null, chant_post_points: null, chant_cheer_points: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
       setActivityClaims([]);
       setAllRedemptions([]);
       setDataLoading(false);
@@ -94,27 +94,16 @@ export default function ClaimReview() {
         .eq("activities.program_id", p.id)
         .order("created_at", { ascending: false });
       if (claimsErr) throw claimsErr;
-      const formattedClaims = (claimsData ?? []).map((row: { activities: Activity; profiles: Profile }) => {
+      const formattedClaims = ((claimsData ?? []) as any[]).map((row: any) => {
         const c = row as ManualClaim & { activities: Activity; profiles: Profile };
         return { ...c, activity: c.activities, fan_profile: c.profiles } as ClaimWithDetails;
       });
       setActivityClaims(formattedClaims);
       
       // Fetch ALL redemptions for this program
-      const { data: redemptionsData, error: redsErr } = await supabase
+      const { data: redemptionsData, error: redsErr } = await (supabase as any)
         .from("reward_redemptions")
-        .select(`
-          id,
-          reward_id,
-          fan_id,
-          membership_id,
-          points_spent,
-          redemption_code,
-          fulfilled_at,
-          completed_at,
-          redeemed_at,
-          rewards!inner(id, name, description, points_cost, redemption_method, program_id)
-        `)
+        .select(`id, reward_id, fan_id, membership_id, points_spent, redemption_code, fulfilled_at, completed_at, redeemed_at, rewards!inner(id, name, description, points_cost, redemption_method, program_id)`)
         .eq("rewards.program_id", p.id)
         .order("redeemed_at", { ascending: false });
       
@@ -124,15 +113,15 @@ export default function ClaimReview() {
       }
       
       // Fetch fan profiles separately to avoid join issues
-      const fanIds = [...new Set((redemptionsData ?? []).map(r => r.fan_id))];
-      const { data: fanProfiles } = await supabase
+      const fanIds = [...new Set(((redemptionsData ?? []) as any[]).map((r: any) => r.fan_id))];
+      const { data: fanProfiles } = await (supabase as any)
         .from("profiles")
         .select("id, full_name, email, user_id, phone")
         .in("id", fanIds);
       
-      const fanProfileMap = new Map((fanProfiles ?? []).map(p => [p.id, p]));
+      const fanProfileMap = new Map(((fanProfiles ?? []) as any[]).map((p: any) => [p.id, p]));
       
-      const formattedRedemptions = (redemptionsData ?? []).map((row) => {
+      const formattedRedemptions = ((redemptionsData ?? []) as any[]).map((row: any) => {
         const r = row as RewardRedemption & { rewards: Reward };
         const fanProfile = fanProfileMap.get(r.fan_id);
         return { 
@@ -145,7 +134,7 @@ export default function ClaimReview() {
             user_id: fanProfile.user_id,
             phone: fanProfile.phone
           } : null 
-        } as RedemptionWithDetails;
+        } as unknown as RedemptionWithDetails;
       });
       setAllRedemptions(formattedRedemptions);
     } catch (error: unknown) {
@@ -178,7 +167,7 @@ export default function ClaimReview() {
     try {
       const { error: claimError } = await supabase.from("manual_claims").update({ status: "approved", reviewed_by: profile?.id, reviewed_at: new Date().toISOString() }).eq("id", claim.id);
       if (claimError) throw claimError;
-      const { error: completeError } = await supabase.rpc("complete_activity", { p_membership_id: claim.membership_id, p_activity_id: claim.activity_id });
+      const { error: completeError } = await (supabase as any).rpc("complete_activity", { p_membership_id: claim.membership_id, p_activity_id: claim.activity_id });
       if (completeError) throw completeError;
       toast({ title: "Claim Approved", description: `Awarded ${claim.activity.points_awarded} ${program?.points_currency_name || "Points"}.` });
       await fetchData();
@@ -223,7 +212,7 @@ export default function ClaimReview() {
       
       // Create notification for the fan
       if (fanProfile?.user_id) {
-        const { error: notifError } = await supabase.from("notifications").insert({
+        const { error: notifError } = await (supabase as any).from("notifications").insert({
           user_id: fanProfile.user_id,
           type: "reward_fulfilled",
           data: {
@@ -260,7 +249,7 @@ export default function ClaimReview() {
       
       console.log("Marking redemption as completed:", redemption.id);
       
-      const { error: updateError } = await supabase.from("reward_redemptions").update({ 
+      const { error: updateError } = await (supabase as any).from("reward_redemptions").update({ 
         completed_at: now 
       }).eq("id", redemption.id);
       
@@ -287,7 +276,7 @@ export default function ClaimReview() {
       
       // Create notification for the fan confirming completion (non-blocking)
       if (fanUserId) {
-        const { error: notifError } = await supabase.from("notifications").insert({
+        const { error: notifError } = await (supabase as any).from("notifications").insert({
           user_id: fanUserId,
           type: "reward_completed",
           data: {
