@@ -130,11 +130,11 @@ export default function FanChants() {
 
       // Fetch chants
       await fetchChants(m.club_id, profile.id);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fetch error:", err);
       toast({
         title: "Error",
-        description: err?.message || "Failed to load data.",
+        description: (err as Error)?.message || "Failed to load data.",
         variant: "destructive",
       });
     } finally {
@@ -154,7 +154,7 @@ export default function FanChants() {
 
       if (error) throw error;
       setChants((data || []) as Chant[]);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Chants fetch error:", err);
     }
   };
@@ -203,10 +203,10 @@ export default function FanChants() {
 
       setImageUrl(urlData.publicUrl);
       sonnerToast.success("Image uploaded!");
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Upload failed",
-        description: err?.message || "Could not upload image.",
+        description: (err as Error)?.message || "Could not upload image.",
         variant: "destructive",
       });
     } finally {
@@ -268,10 +268,10 @@ export default function FanChants() {
 
       setContent("");
       setImageUrl(null);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.message || "Failed to post chant.",
+        description: (err as Error)?.message || "Failed to post chant.",
         variant: "destructive",
       });
     } finally {
@@ -303,10 +303,10 @@ export default function FanChants() {
             : c
         )
       );
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.message || "Could not cheer.",
+        description: (err as Error)?.message || "Could not cheer.",
         variant: "destructive",
       });
     } finally {
@@ -337,10 +337,10 @@ export default function FanChants() {
       );
 
       toast({ title: "Chant updated!" });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.message || "Could not update chant.",
+        description: (err as Error)?.message || "Could not update chant.",
         variant: "destructive",
       });
     }
@@ -361,10 +361,10 @@ export default function FanChants() {
       setChants((prev) => prev.filter((c) => c.id !== chantId));
 
       toast({ title: "Chant deleted" });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.message || "Could not delete chant.",
+        description: (err as Error)?.message || "Could not delete chant.",
         variant: "destructive",
       });
     }
@@ -384,10 +384,10 @@ export default function FanChants() {
       if (error) throw error;
 
       toast({ title: "Report submitted", description: "Thank you for helping keep our community safe." });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.message || "Could not submit report.",
+        description: (err as Error)?.message || "Could not submit report.",
         variant: "destructive",
       });
     } finally {

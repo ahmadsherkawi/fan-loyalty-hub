@@ -78,11 +78,12 @@ export default function ClubChants() {
 
       // Fetch chants
       await fetchChants(clubData.id);
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as Error;
       console.error("Fetch error:", err);
       toast({
         title: "Error",
-        description: err?.message || "Failed to load data.",
+        description: error?.message || "Failed to load data.",
         variant: "destructive",
       });
     } finally {
@@ -101,7 +102,7 @@ export default function ClubChants() {
 
       if (error) throw error;
       setChants((data || []) as ClubChant[]);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Chants fetch error:", err);
     }
   };

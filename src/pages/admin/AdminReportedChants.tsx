@@ -100,11 +100,12 @@ export default function AdminReportedChants() {
 
       if (error) throw error;
       setChants((data || []) as ReportedChant[]);
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as Error;
       console.error("Fetch error:", err);
       toast({
         title: "Error",
-        description: err?.message || "Failed to load data.",
+        description: error?.message || "Failed to load data.",
         variant: "destructive",
       });
     } finally {
@@ -132,7 +133,7 @@ export default function AdminReportedChants() {
 
       if (error) throw error;
       setReports((data || []) as ChantReport[]);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Reports fetch error:", err);
     } finally {
       setLoadingReports(false);
@@ -165,10 +166,11 @@ export default function AdminReportedChants() {
       setChants((prev) => prev.filter((c) => c.id !== actionChant.id));
       setShowDeleteDialog(false);
       setActionChant(null);
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as Error;
       toast({
         title: "Error",
-        description: err?.message || "Failed to delete chant.",
+        description: error?.message || "Failed to delete chant.",
         variant: "destructive",
       });
     } finally {
@@ -192,10 +194,11 @@ export default function AdminReportedChants() {
       setChants((prev) => prev.filter((c) => c.id !== actionChant.id));
       setShowDismissDialog(false);
       setActionChant(null);
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as Error;
       toast({
         title: "Error",
-        description: err?.message || "Failed to dismiss reports.",
+        description: error?.message || "Failed to dismiss reports.",
         variant: "destructive",
       });
     } finally {
