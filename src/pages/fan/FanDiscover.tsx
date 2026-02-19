@@ -65,27 +65,39 @@ export default function FanDiscover() {
 
     try {
       // Fetch all communities
+      console.log("[Discover] Fetching communities...");
       const { data, error } = await supabase.rpc("get_communities", {
         p_search: searchQuery || null,
         p_limit: 100,
         p_offset: 0,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[Discover] Error fetching communities:", error);
+        throw error;
+      }
+      
+      console.log("[Discover] Communities fetched:", data?.length, data);
       setCommunities((data || []) as Community[]);
 
       // Fetch user's joined communities
+      console.log("[Discover] Fetching user's communities...");
       const { data: myCommunities, error: myError } = await supabase.rpc(
         "get_my_communities",
         { p_fan_id: profile.id }
       );
 
-      if (myError) throw myError;
+      if (myError) {
+        console.error("[Discover] Error fetching my communities:", myError);
+        throw myError;
+      }
+      
+      console.log("[Discover] My communities:", myCommunities);
 
       const joined = new Set((myCommunities || []).map((c: { id: string }) => c.id));
       setJoinedIds(joined);
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("[Discover] Fetch error:", err);
       toast({
         title: "Error",
         description: "Failed to load communities.",
