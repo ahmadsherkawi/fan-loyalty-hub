@@ -14,6 +14,16 @@ import { ArrowLeft, ArrowRight, Building2, CheckCircle, Shield, Loader2, Upload,
 
 type Step = "club" | "program" | "verification";
 
+interface ExistingClub {
+  id: string;
+  status: string;
+  name: string;
+  country: string | null;
+  city: string | null;
+  primary_color: string | null;
+  logo_url: string | null;
+}
+
 export default function ClubOnboarding() {
   const navigate = useNavigate();
   const { user, profile, signOut, loading } = useAuth();
@@ -72,11 +82,43 @@ export default function ClubOnboarding() {
   const checkExistingClub = async () => {
     if (!profile) return;
 
-    const { data: clubs } = await supabase.from("clubs").select("id, status").eq("admin_id", profile.id).limit(1);
+    const { data: clubs } = await supabase
+      .from("clubs")
+      .select("id, status, name, country, city, primary_color, logo_url")
+      .eq("admin_id", profile.id)
+      .limit(1);
 
     if (clubs && clubs.length > 0) {
-      // If club exists, redirect to dashboard
-      navigate("/club/dashboard", { replace: true });
+      const club = clubs[0];
+
+      // Check if loyalty program exists
+      const { data: programs } = await supabase
+        .from("loyalty_programs")
+        .select("id")
+        .eq("club_id", club.id)
+        .limit(1);
+
+      if (programs && programs.length > 0) {
+        // Both club and program exist, redirect to dashboard
+        navigate("/club/dashboard", { replace: true });
+      } else {
+        // Club exists but no program - start from program step
+        // This happens when a club claimed a community
+        setClubId(club.id);
+        setClubName(club.name);
+        setCountry(club.country || "");
+        setCity(club.city || "");
+        setPrimaryColor(club.primary_color || "#1a7a4c");
+        if (club.logo_url) {
+          setLogoPreview(club.logo_url);
+        }
+        setStep("program");
+
+        toast({
+          title: "Complete Your Setup",
+          description: "Your club is ready! Now set up your loyalty program.",
+        });
+      }
     }
   };
 

@@ -86,8 +86,21 @@ export default function ClubClaim() {
           name: data.club_name,
           status: data.club_status,
         });
-        // Redirect to dashboard if already has a club
-        navigate("/club/dashboard", { replace: true });
+
+        // Check if the club has a loyalty program
+        const { data: programs } = await supabase
+          .from("loyalty_programs")
+          .select("id")
+          .eq("club_id", data.club_id)
+          .limit(1);
+
+        if (programs && programs.length > 0) {
+          // Both club and program exist - redirect to dashboard
+          navigate("/club/dashboard", { replace: true });
+        } else {
+          // Club exists but no program - redirect to onboarding (step 2)
+          navigate("/club/onboarding", { replace: true });
+        }
         return;
       }
 
@@ -139,11 +152,11 @@ export default function ClubClaim() {
 
       toast({
         title: "Community Claimed!",
-        description: `${data.name} is now your club. Complete verification to activate your loyalty program.`,
+        description: `${data.name} is now your club. Complete your loyalty program setup.`,
       });
 
-      // Navigate to onboarding to set up program
-      navigate("/club/onboarding?claimed=true", { replace: true });
+      // Navigate to onboarding to complete program setup
+      navigate("/club/onboarding", { replace: true });
     } catch (err) {
       const error = err as Error;
       toast({

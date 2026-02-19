@@ -63,10 +63,11 @@ export default function AuthPage() {
       // Navigate to appropriate page based on role
       let destination: string;
       if (profile.role === "club_admin") {
-        // Check if this is a claim action
+        // Check if this is a claim action from explore page
         if (claimAction === "claim" && claimCommunityId) {
           destination = `/club/claim?community_id=${claimCommunityId}&name=${encodeURIComponent(claimCommunityName || "")}`;
         } else {
+          // Go to claim page to either claim a community or create new
           destination = "/club/claim";
         }
       } else if (profile.role === "system_admin" || profile.role === "admin") {
