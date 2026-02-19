@@ -523,18 +523,28 @@ export default function ClubDashboard() {
                   </div>
                   <div>
                     <CardTitle className="text-base font-display">Fan Chants</CardTitle>
-                    <p className="text-sm text-muted-foreground">Configure points for fan social posts</p>
+                    <p className="text-sm text-muted-foreground">View and configure fan social posts</p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setChantSettingsOpen(true)}
-                  className="rounded-full"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/club/chants")}
+                    className="rounded-full"
+                  >
+                    View Chants
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setChantSettingsOpen(true)}
+                    className="rounded-full"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">

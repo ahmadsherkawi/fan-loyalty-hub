@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Heart, MoreHorizontal, Edit2, Trash2, Clock, X, Check } from "lucide-react";
+import { Mic, MoreHorizontal, Edit2, Trash2, Clock, X, Check, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +37,10 @@ interface ChantCardProps {
   onCheer: (chantId: string) => Promise<void>;
   onEdit: (chantId: string, content: string, imageUrl: string | null) => Promise<void>;
   onDelete: (chantId: string) => Promise<void>;
+  onReport?: (chantId: string, reason: string) => Promise<void>;
   isCheering?: boolean;
+  isReporting?: boolean;
+  hideActions?: boolean; // For club/admin view
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -64,19 +67,57 @@ function getInitials(name: string | null): string {
   return name.substring(0, 2).toUpperCase();
 }
 
+// Parse content and highlight @mentions
+function renderContentWithMentions(content: string): React.ReactNode {
+  const mentionRegex = /@([\w.]+)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    // Add text before the mention
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+    // Add the highlighted mention
+    parts.push(
+      <span
+        key={match.index}
+        className="text-primary font-semibold hover:underline cursor-pointer"
+      >
+        @{match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : content;
+}
+
 export function ChantCard({
   chant,
   currentFanId,
   onCheer,
   onEdit,
   onDelete,
+  onReport,
   isCheering = false,
+  isReporting = false,
+  hideActions = false,
 }: ChantCardProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
   const [editContent, setEditContent] = useState(chant.content);
+  const [reportReason, setReportReason] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
 
   const isOwnChant = chant.fan_id === currentFanId;
 
@@ -102,6 +143,18 @@ export function ChantCard({
       setShowDeleteDialog(false);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (!onReport || !reportReason.trim()) return;
+    setIsReportSubmitting(true);
+    try {
+      await onReport(chant.id, reportReason.trim());
+      setShowReportDialog(false);
+      setReportReason("");
+    } finally {
+      setIsReportSubmitting(false);
     }
   };
 
@@ -137,8 +190,8 @@ export function ChantCard({
             </div>
           </div>
 
-          {/* Menu for own chants */}
-          {isOwnChant && (
+          {/* Menu */}
+          {!hideActions && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
@@ -146,31 +199,47 @@ export function ChantCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setEditContent(chant.content);
-                    setShowEditDialog(true);
-                  }}
-                  className="rounded-lg"
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="rounded-lg text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
+                {isOwnChant ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditContent(chant.content);
+                        setShowEditDialog(true);
+                      }}
+                      className="rounded-lg"
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="rounded-lg text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  onReport && (
+                    <DropdownMenuItem
+                      onClick={() => setShowReportDialog(true)}
+                      className="rounded-lg text-amber-600 focus:text-amber-600"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report
+                    </DropdownMenuItem>
+                  )
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
 
-        {/* Content */}
+        {/* Content with @mentions highlighted */}
         <div className="mt-3">
-          <p className="text-sm whitespace-pre-wrap break-words">{chant.content}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {renderContentWithMentions(chant.content)}
+          </p>
         </div>
 
         {/* Image */}
@@ -190,14 +259,14 @@ export function ChantCard({
             variant="ghost"
             size="sm"
             onClick={handleCheer}
-            disabled={isCheering}
+            disabled={isCheering || hideActions}
             className={`rounded-full gap-1.5 h-8 px-3 ${
               chant.cheered_by_me
-                ? "text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                : "text-muted-foreground hover:text-red-500"
+                ? "text-accent hover:text-accent/80 hover:bg-accent/10"
+                : "text-muted-foreground hover:text-accent"
             }`}
           >
-            <Heart
+            <Mic
               className={`h-4 w-4 ${chant.cheered_by_me ? "fill-current" : ""}`}
             />
             <span className="text-xs font-medium">{chant.cheers_count}</span>
@@ -220,6 +289,7 @@ export function ChantCard({
               maxLength={280}
             />
             <div className="flex justify-between items-center text-xs text-muted-foreground">
+              <span>Use @username to mention other fans</span>
               <span>{editContent.length}/280</span>
             </div>
           </div>
@@ -273,6 +343,50 @@ export function ChantCard({
               className="rounded-xl"
             >
               {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle>Report Chant</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please let us know why you're reporting this chant.
+            </p>
+            <Textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="Reason for reporting..."
+              className="rounded-xl border-border/40 min-h-[80px] resize-none"
+              maxLength={500}
+            />
+            <div className="text-xs text-muted-foreground text-right">
+              {reportReason.length}/500
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReportDialog(false);
+                setReportReason("");
+              }}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReport}
+              disabled={isReportSubmitting || !reportReason.trim()}
+              className="rounded-xl"
+            >
+              {isReportSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
           </DialogFooter>
         </DialogContent>

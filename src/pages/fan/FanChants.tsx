@@ -76,6 +76,7 @@ export default function FanChants() {
   const [dataLoading, setDataLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [cheeringId, setCheeringId] = useState<string | null>(null);
+  const [reportingId, setReportingId] = useState<string | null>(null);
 
   // Compose state
   const [content, setContent] = useState("");
@@ -369,6 +370,31 @@ export default function FanChants() {
     }
   };
 
+  const handleReport = async (chantId: string, reason: string) => {
+    if (!profile) return;
+
+    setReportingId(chantId);
+    try {
+      const { error } = await supabase.rpc("report_chant", {
+        p_chant_id: chantId,
+        p_reporter_id: profile.id,
+        p_reason: reason,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Report submitted", description: "Thank you for helping keep our community safe." });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.message || "Could not submit report.",
+        variant: "destructive",
+      });
+    } finally {
+      setReportingId(null);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
@@ -450,7 +476,7 @@ export default function FanChants() {
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind?"
+              placeholder="What's on your mind? Use @username to mention other fans!"
               className="rounded-xl border-border/40 min-h-[100px] resize-none"
               maxLength={280}
             />
@@ -566,7 +592,9 @@ export default function FanChants() {
                 onCheer={handleCheer}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onReport={handleReport}
                 isCheering={cheeringId === chant.id}
+                isReporting={reportingId === chant.id}
               />
             ))}
           </div>

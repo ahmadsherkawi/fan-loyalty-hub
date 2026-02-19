@@ -36,6 +36,8 @@ import FanProfileEdit from "./pages/fan/FanProfileEdit";
 import JoinClub from "./pages/fan/JoinClub";
 import FanNotifications from "./pages/fan/FanNotifications";
 import FanChants from "./pages/fan/FanChants";
+import ClubChants from "./pages/club/ClubChants";
+import AdminReportedChants from "./pages/admin/AdminReportedChants";
 import SystemAdmin from "./pages/SystemAdmin";
 
 const queryClient = new QueryClient();
@@ -68,6 +70,7 @@ const App = () => {
                 {/* ✅ Tier management */}
                 <Route path="/club/tiers" element={<TierManagement />} />
                 <Route path="/club/profile" element={<ClubProfileEdit />} />
+                <Route path="/club/chants" element={<ClubChants />} />
                 {/* ================= FAN ================= */}
                 <Route path="/fan/home" element={<FanHome />} />
                 <Route path="/fan/activities" element={<FanActivities />} />
@@ -80,6 +83,7 @@ const App = () => {
                 <Route path="/fan/chants" element={<FanChants />} />
                 {/* System Admin */}
                 <Route path="/admin" element={<SystemAdmin />} />
+                <Route path="/admin/reports" element={<AdminReportedChants />} />
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

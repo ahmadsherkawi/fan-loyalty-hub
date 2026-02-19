@@ -1376,6 +1376,29 @@ export default function SystemAdmin() {
               <FileText className="h-4 w-4" /> Club Reports
             </h2>
 
+            {/* Reported Chants Quick Access */}
+            <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Reported Chants</h3>
+                      <p className="text-sm text-muted-foreground">Review and moderate reported fan chants</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => navigate("/admin/reports")}
+                    className="rounded-xl"
+                  >
+                    View Reported Chants
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {clubReports.length === 0 ? (
               <Card className="rounded-2xl border-border/40">
                 <CardContent className="pt-8 pb-8 text-center">
