@@ -592,7 +592,7 @@ export type Database = {
       claim_status: "pending" | "approved" | "rejected"
       club_status: "unverified" | "verified" | "official"
       redemption_method: "voucher" | "manual_fulfillment" | "code_display"
-      user_role: "club_admin" | "fan"
+      user_role: "club_admin" | "fan" | "system_admin" | "admin"
       verification_method:
         | "qr_scan"
         | "location_checkin"
@@ -734,7 +734,7 @@ export const Constants = {
       claim_status: ["pending", "approved", "rejected"],
       club_status: ["unverified", "verified", "official"],
       redemption_method: ["voucher", "manual_fulfillment", "code_display"],
-      user_role: ["club_admin", "fan"],
+      user_role: ["club_admin", "fan", "system_admin", "admin"],
       verification_method: [
         "qr_scan",
         "location_checkin",

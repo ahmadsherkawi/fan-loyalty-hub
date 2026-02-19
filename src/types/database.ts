@@ -1,7 +1,7 @@
 // Database types for the football loyalty platform
 // These types match the Supabase schema exactly
 
-export type UserRole = "club_admin" | "fan";
+export type UserRole = "club_admin" | "fan" | "system_admin" | "admin";
 export type ClubStatus = "unverified" | "verified" | "official";
 export type ActivityFrequency = "once_ever" | "once_per_match" | "once_per_day" | "unlimited";
 export type VerificationMethod = "qr_scan" | "location_checkin" | "in_app_completion" | "manual_proof";

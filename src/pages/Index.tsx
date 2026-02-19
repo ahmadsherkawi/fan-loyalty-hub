@@ -27,6 +27,8 @@ const Index = () => {
         // Redirect authenticated users to their dashboard
         if (profile.role === 'club_admin') {
           navigate('/club/onboarding', { replace: true });
+        } else if (profile.role === 'system_admin' || profile.role === 'admin') {
+          navigate('/admin', { replace: true });
         } else {
           navigate('/fan/home', { replace: true });
         }
