@@ -275,10 +275,10 @@ export default function FanCommunity() {
       return;
     }
 
-    if (content.length > 280) {
+    if (content.length > 500) {
       toast({
         title: "Too long",
-        description: "Chants must be 280 characters or less.",
+        description: "Chants must be 500 characters or less.",
         variant: "destructive",
       });
       return;
@@ -584,7 +584,7 @@ export default function FanCommunity() {
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Share your thoughts with the community..."
                 className="rounded-xl border-border/40 min-h-[80px] resize-none"
-                maxLength={280}
+                maxLength={500}
               />
 
               {imageUrl && (
@@ -633,13 +633,13 @@ export default function FanCommunity() {
                     </Button>
                   </label>
                   <span className="text-xs text-muted-foreground">
-                    {content.length}/280
+                    {content.length}/500
                   </span>
                 </div>
 
                 <Button
                   onClick={handlePost}
-                  disabled={posting || !content.trim() || content.length > 280}
+                  disabled={posting || !content.trim() || content.length > 500}
                   className="rounded-full gradient-stadium"
                 >
                   {posting ? (

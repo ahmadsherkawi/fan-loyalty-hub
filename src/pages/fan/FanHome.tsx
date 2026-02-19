@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Logo } from "@/components/ui/Logo";
@@ -24,10 +24,11 @@ import {
   Bell,
   Star,
   Sparkles,
-  TrendingUp,
   Camera,
   BarChart3,
   Megaphone,
+  Globe,
+  CheckCircle,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -43,6 +44,19 @@ interface Tier {
   perks: any;
 }
 
+interface Community {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  city: string | null;
+  country: string | null;
+  primary_color: string | null;
+  is_official: boolean;
+  member_count: number;
+}
+
+const MAX_COMMUNITIES = 3;
+
 export default function FanHome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -51,6 +65,10 @@ export default function FanHome() {
 
   const isPreviewMode = searchParams.get("preview") === "fan";
 
+  // Community memberships
+  const [communities, setCommunities] = useState<Community[]>([]);
+  
+  // Official club membership (for loyalty program)
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [club, setClub] = useState<Club | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
@@ -74,19 +92,17 @@ export default function FanHome() {
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
-  /* ================= LOAD AVATAR FROM PROFILE (consistent with FanProfilePage) ================= */
+  /* ================= LOAD AVATAR FROM PROFILE ================= */
   useEffect(() => {
     if (isPreviewMode) return;
     if (!profile?.id) return;
 
     const loadAvatar = async () => {
-      // First, try to get avatar_url from the profile (database)
       if (profile.avatar_url) {
         setAvatarUrl(profile.avatar_url + "?t=" + Date.now());
         return;
       }
 
-      // Fallback: check storage bucket
       const { data } = await supabase.storage.from("fan-avatars").list(profile.id);
       if (data && data.length > 0) {
         const avatarFile = data.find((f) => f.name.startsWith("avatar"));
@@ -124,142 +140,95 @@ export default function FanHome() {
     setDataLoading(true);
 
     try {
+      // Fetch community memberships
+      const { data: myCommunities } = await supabase.rpc("get_my_communities", {
+        p_fan_id: profile.id,
+      });
+      setCommunities((myCommunities || []) as Community[]);
+
+      // Fetch official club membership (fan_memberships for loyalty program)
       const { data: memberships } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
 
-      if (!memberships?.length) {
-        navigate("/fan/discover");
-        return;
-      }
+      if (memberships?.length) {
+        const m = memberships[0] as FanMembership;
+        setMembership(m);
 
-      const m = memberships[0] as FanMembership;
-      setMembership(m);
+        const { data: multData } = await supabase.rpc("get_membership_multiplier", {
+          p_membership_id: m.id,
+        });
+        setMultiplier(Number(multData ?? 1));
 
-      /* 🔹 REAL BACKEND MULTIPLIER */
-      const { data: multData } = await supabase.rpc("get_membership_multiplier", {
-        p_membership_id: m.id,
-      });
-      setMultiplier(Number(multData ?? 1));
+        const { data: discountData } = await supabase.rpc("get_membership_discount", {
+          p_membership_id: m.id,
+        });
+        setDiscountPercent(Number(discountData ?? 0));
 
-      /* 🔹 REAL BACKEND DISCOUNT */
-      const { data: discountData } = await supabase.rpc("get_membership_discount", {
-        p_membership_id: m.id,
-      });
-      setDiscountPercent(Number(discountData ?? 0));
+        const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+        setClub(clubData as Club);
 
-      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-      setClub(clubData as Club);
+        const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+        setProgram(programData as LoyaltyProgram);
 
-      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-      setProgram(programData as LoyaltyProgram);
+        const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
+        setActivities((acts ?? []) as Activity[]);
 
-      const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).limit(3);
-      setActivities((acts ?? []) as Activity[]);
+        const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
+        setRewards((rews ?? []) as Reward[]);
 
-      const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).limit(3);
-      setRewards((rews ?? []) as Reward[]);
-
-      const { data: tiersData } = await supabase
-        .from("tiers")
-        .select("*")
-        .eq("program_id", m.program_id)
-        .order("rank", { ascending: true });
-
-      const tierList = (tiersData ?? []) as Tier[];
-      setTiers(tierList);
-
-      const { data: completions } = await supabase
-        .from("activity_completions")
-        .select("points_earned")
-        .eq("fan_id", profile.id);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
-      setEarnedPoints(totalEarned);
-
-      let current: Tier | null = null;
-      let next: Tier | null = null;
-
-      for (let i = 0; i < tierList.length; i++) {
-        if (totalEarned >= tierList[i].points_threshold) {
-          current = tierList[i];
-          next = tierList[i + 1] ?? null;
-        }
-      }
-
-      setCurrentTier(current);
-      setNextTier(next);
-
-      if (current?.id) {
-        // Get tier benefits from tier_benefits table
-        const { data: benefits } = await supabase
-          .from("tier_benefits")
+        const { data: tiersData } = await supabase
+          .from("tiers")
           .select("*")
-          .eq("tier_id", current.id);
-        
-        if (benefits && benefits.length > 0) {
-          // Map the tier_benefits to the expected format
-          setTierBenefits(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            benefits.map((b: any) => ({
-              id: b.id,
-              name: b.benefit_label || b.benefit_type,
-              description: `${b.benefit_type === 'points_multiplier' ? 'Earn ' + b.benefit_value + 'x points' : b.benefit_value + '% off rewards'}`,
-              benefit_type: b.benefit_type,
-              benefit_value: b.benefit_value,
-            }))
-          );
-        } else if (current.perks) {
-          // Fallback: use perks from the tier itself
-          const perksArray = Array.isArray(current.perks) ? current.perks : [current.perks];
-          setTierBenefits(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            perksArray.map((p: any, i: number) => {
-              // Handle different perk formats
-              if (typeof p === "string") {
-                return {
-                  id: `perk-${i}`,
-                  name: p,
-                  description: p,
-                };
-              } else if (typeof p === "object" && p !== null) {
-                return {
-                  id: `perk-${i}`,
-                  name: p.name || p.title || p.description || `Benefit ${i + 1}`,
-                  description: p.description || p.name || "",
-                };
-              }
-              return {
-                id: `perk-${i}`,
-                name: `Benefit ${i + 1}`,
-                description: "",
-              };
-            }),
-          );
-        } else {
-          // Default benefits based on multiplier and discount
-          const defaultBenefits = [];
-          if (current.multiplier && current.multiplier > 1) {
-            defaultBenefits.push({
-              id: `${current.id}-multiplier`,
-              name: "Points Multiplier",
-              description: `Earn ${current.multiplier}x points on all activities`,
-            });
+          .eq("program_id", m.program_id)
+          .order("rank", { ascending: true });
+
+        const tierList = (tiersData ?? []) as Tier[];
+        setTiers(tierList);
+
+        const { data: completions } = await supabase
+          .from("activity_completions")
+          .select("points_earned")
+          .eq("fan_id", profile.id);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+        setEarnedPoints(totalEarned);
+
+        let current: Tier | null = null;
+        let next: Tier | null = null;
+
+        for (let i = 0; i < tierList.length; i++) {
+          if (totalEarned >= tierList[i].points_threshold) {
+            current = tierList[i];
+            next = tierList[i + 1] ?? null;
           }
-          if (current.discount_percent && current.discount_percent > 0) {
-            defaultBenefits.push({
-              id: `${current.id}-discount`,
-              name: "Reward Discount",
-              description: `Get ${current.discount_percent}% off on reward redemptions`,
-            });
-          }
-          setTierBenefits(defaultBenefits);
         }
-      } else {
-        setTierBenefits([]);
+
+        setCurrentTier(current);
+        setNextTier(next);
+
+        if (current?.id) {
+          const { data: benefits } = await supabase
+            .from("tier_benefits")
+            .select("*")
+            .eq("tier_id", current.id);
+          
+          if (benefits && benefits.length > 0) {
+            setTierBenefits(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              benefits.map((b: any) => ({
+                id: b.id,
+                name: b.benefit_label || b.benefit_type,
+                description: `${b.benefit_type === 'points_multiplier' ? 'Earn ' + b.benefit_value + 'x points' : b.benefit_value + '% off rewards'}`,
+                benefit_type: b.benefit_type,
+                benefit_value: b.benefit_value,
+              }))
+            );
+          }
+        }
       }
 
       const { count } = await supabase
@@ -301,7 +270,6 @@ export default function FanHome() {
       const { data: publicUrl } = supabase.storage.from("fan-avatars").getPublicUrl(filePath);
       const newAvatarUrl = publicUrl.publicUrl + "?t=" + Date.now();
 
-      // Save avatar_url to profile in database for consistency
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrl.publicUrl })
@@ -332,6 +300,10 @@ export default function FanHome() {
         100
       : 100;
 
+  // Separate communities into official and fan
+  const officialCommunities = communities.filter((c) => c.is_official);
+  const fanCommunities = communities.filter((c) => !c.is_official);
+
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
@@ -343,10 +315,21 @@ export default function FanHome() {
           <div className="flex items-center gap-3">
             <Logo size="sm" />
             <div className="h-5 w-px bg-border/40" />
-            <span className="font-display font-bold text-foreground tracking-tight text-sm hidden sm:block">{club?.name}</span>
+            <span className="font-display font-bold text-foreground tracking-tight text-sm hidden sm:block">
+              Fan Hub
+            </span>
           </div>
 
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/fan/discover")}
+              className="relative rounded-full text-muted-foreground hover:text-foreground h-9 w-9"
+              title="Discover"
+            >
+              <Globe className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -390,207 +373,288 @@ export default function FanHome() {
       </header>
 
       <main className="container py-8 space-y-8">
-        {/* HERO CARD */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+        {/* MY COMMUNITIES SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              My Communities
+              <Badge variant="outline" className="text-xs">
+                {communities.length}/{MAX_COMMUNITIES}
+              </Badge>
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/fan/discover")}
+              className="rounded-full"
+            >
+              <Globe className="h-4 w-4 mr-1.5" />
+              Discover More
+            </Button>
+          </div>
 
-          <div className="relative z-10 p-6 md:p-10">
-            {/* Top row: avatar + name + points */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-5">
-                {/* Fan Avatar */}
-                <div className="relative group flex-shrink-0">
-                  <div className="w-20 h-20 rounded-2xl border-2 border-white/20 shadow-lg overflow-hidden bg-white/10">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <User className="h-9 w-9 text-white/40" />
+          {communities.length === 0 ? (
+            <Card className="rounded-2xl border-dashed border-2 border-border/40">
+              <CardContent className="py-8 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No communities joined yet.</p>
+                <Button
+                  onClick={() => navigate("/fan/discover")}
+                  className="mt-4 rounded-xl gradient-stadium"
+                >
+                  Discover Communities
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {communities.map((community) => (
+                <Card
+                  key={community.id}
+                  className="rounded-2xl border-border/40 hover:border-primary/30 transition-all cursor-pointer"
+                  onClick={() => navigate(`/fan/community/${community.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+                        style={{
+                          backgroundColor: community.primary_color || "#16a34a",
+                        }}
+                      >
+                        {community.logo_url ? (
+                          <img
+                            src={community.logo_url}
+                            alt={community.name}
+                            className="h-full w-full rounded-xl object-cover"
+                          />
+                        ) : (
+                          community.name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-semibold truncate">{community.name}</h3>
+                          {community.is_official && (
+                            <CheckCircle className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {community.city ? `${community.city}, ` : ""}
+                          {community.country}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {community.member_count} members
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* OFFICIAL CLUB LOYALTY PROGRAM (if member) */}
+        {membership && club && (
+          <>
+            {/* HERO CARD */}
+            <div className="relative overflow-hidden rounded-3xl border border-border/40">
+              <div className="absolute inset-0 gradient-hero" />
+              <div className="absolute inset-0 stadium-pattern" />
+              <div className="absolute inset-0 pitch-lines opacity-30" />
+
+              <div className="relative z-10 p-6 md:p-10">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-5">
+                    <div className="relative group flex-shrink-0">
+                      <div className="w-20 h-20 rounded-2xl border-2 border-white/20 shadow-lg overflow-hidden bg-white/10">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <User className="h-9 w-9 text-white/40" />
+                          </div>
+                        )}
+                      </div>
+                      <label className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
+                        {avatarUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="h-3.5 w-3.5 text-accent" />
+                        <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Official Club</span>
+                      </div>
+                      <h1 className="text-2xl md:text-3xl font-display font-bold text-white leading-tight">{club?.name}</h1>
+                      <p className="text-white/50 text-sm mt-0.5">{profile?.full_name} · {program?.name}</p>
+                    </div>
+                  </div>
+
+                  {/* Points pill */}
+                  <div className="glass-dark px-6 py-4 rounded-2xl flex items-center gap-3 flex-shrink-0">
+                    <Trophy className="h-6 w-6 text-accent animate-float" />
+                    <div>
+                      <div className="text-3xl font-display font-bold text-gradient-accent leading-none">{effectivePointsBalance}</div>
+                      <div className="text-white/40 text-xs mt-0.5">{program?.points_currency_name ?? "Points"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tier info */}
+                {currentTier && (
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full px-3 py-1">
+                      <Star className="h-3 w-3 mr-1.5" />
+                      {currentTier.name} Tier
+                    </Badge>
+
+                    {multiplier > 1 && (
+                      <span className="text-xs text-white/60 glass-dark px-2.5 py-1 rounded-full">✨ {multiplier}× points</span>
+                    )}
+                    {discountPercent > 0 && (
+                      <span className="text-xs text-white/60 glass-dark px-2.5 py-1 rounded-full">🎁 {discountPercent}% off</span>
+                    )}
+
+                    {nextTier && (
+                      <div className="w-full mt-1">
+                        <Progress value={progress} className="h-1.5 bg-white/10" />
+                        <p className="text-xs text-white/35 mt-1">{nextTier.points_threshold - earnedPoints} pts to {nextTier.name}</p>
                       </div>
                     )}
                   </div>
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
-                    {avatarUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
-                  </label>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="h-3.5 w-3.5 text-accent" />
-                    <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Fan Hub</span>
-                  </div>
-                  <h1 className="text-2xl md:text-3xl font-display font-bold text-white leading-tight">{club?.name}</h1>
-                  <p className="text-white/50 text-sm mt-0.5">{profile?.full_name} · {program?.name}</p>
-                </div>
-              </div>
-
-              {/* Points pill */}
-              <div className="glass-dark px-6 py-4 rounded-2xl flex items-center gap-3 flex-shrink-0">
-                <Trophy className="h-6 w-6 text-accent animate-float" />
-                <div>
-                  <div className="text-3xl font-display font-bold text-gradient-accent leading-none">{effectivePointsBalance}</div>
-                  <div className="text-white/40 text-xs mt-0.5">{program?.points_currency_name ?? "Points"}</div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Tier info */}
-            {currentTier && (
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Badge className="bg-accent/20 text-accent border-accent/30 rounded-full px-3 py-1">
-                  <Star className="h-3 w-3 mr-1.5" />
-                  {currentTier.name} Tier
-                </Badge>
+            {/* QUICK NAV BENTO ROW */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                onClick={() => navigate("/fan/activities")}
+                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none rounded-3xl" />
+                <div className="h-11 w-11 rounded-2xl bg-primary/15 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+                  <Zap className="h-5 w-5 text-primary" />
+                </div>
+                <span className="text-xs font-semibold text-foreground relative z-10">Activities</span>
+              </button>
+              <button
+                onClick={() => navigate("/fan/rewards")}
+                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none rounded-3xl" />
+                <div className="h-11 w-11 rounded-2xl bg-accent/15 flex items-center justify-center group-hover:bg-accent/25 transition-colors">
+                  <Gift className="h-5 w-5 text-accent" />
+                </div>
+                <span className="text-xs font-semibold text-foreground relative z-10">Rewards</span>
+              </button>
+              <button
+                onClick={() => navigate("/fan/leaderboard")}
+                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent pointer-events-none rounded-3xl" />
+                <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <span className="text-xs font-semibold text-foreground relative z-10">Rankings</span>
+              </button>
+              <button
+                onClick={() => navigate("/fan/chants")}
+                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent pointer-events-none rounded-3xl" />
+                <div className="h-11 w-11 rounded-2xl bg-red-500/15 flex items-center justify-center group-hover:bg-red-500/25 transition-colors">
+                  <Megaphone className="h-5 w-5 text-red-500" />
+                </div>
+                <span className="text-xs font-semibold text-foreground relative z-10">Chants</span>
+              </button>
+            </div>
 
-                {multiplier > 1 && (
-                  <span className="text-xs text-white/60 glass-dark px-2.5 py-1 rounded-full">✨ {multiplier}× points</span>
-                )}
-                {discountPercent > 0 && (
-                  <span className="text-xs text-white/60 glass-dark px-2.5 py-1 rounded-full">🎁 {discountPercent}% off</span>
-                )}
+            {/* ACTIVITIES SECTION */}
+            {activities.length > 0 && (
+              <div>
+                <SectionHeader
+                  title="Activities"
+                  icon={<Zap className="h-4 w-4 text-primary" />}
+                  onClick={() => navigate("/fan/activities")}
+                />
 
-                {tierBenefits.length > 0 && (
-                  <div className="w-full mt-2 flex flex-wrap gap-2">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {tierBenefits.map((b: any) => (
-                      <span key={b.id} className="text-xs text-white/70 glass-dark px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                        <Sparkles className="h-2.5 w-2.5 text-accent" />
-                        {b.name || b.description || "Perk"}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {nextTier && (
-                  <div className="w-full mt-1">
-                    <Progress value={progress} className="h-1.5 bg-white/10" />
-                    <p className="text-xs text-white/35 mt-1">{nextTier.points_threshold - earnedPoints} pts to {nextTier.name}</p>
-                  </div>
-                )}
+                <div className="grid gap-3">
+                  {activities.map((a) => {
+                    const multiplied = Math.round(a.points_awarded * multiplier);
+                    return (
+                      <SportCard
+                        key={a.id}
+                        title={a.name}
+                        badge={multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
+                        badgeColor="primary"
+                        onClick={() => navigate("/fan/activities")}
+                        actionLabel="Participate"
+                        icon={<Zap className="h-4 w-4 text-primary" />}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* QUICK NAV BENTO ROW */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button
-            onClick={() => navigate("/fan/activities")}
-            className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none rounded-3xl" />
-            <div className="h-11 w-11 rounded-2xl bg-primary/15 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-              <Zap className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xs font-semibold text-foreground relative z-10">Activities</span>
-          </button>
-          <button
-            onClick={() => navigate("/fan/rewards")}
-            className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none rounded-3xl" />
-            <div className="h-11 w-11 rounded-2xl bg-accent/15 flex items-center justify-center group-hover:bg-accent/25 transition-colors">
-              <Gift className="h-5 w-5 text-accent" />
-            </div>
-            <span className="text-xs font-semibold text-foreground relative z-10">Rewards</span>
-          </button>
-          <button
-            onClick={() => navigate("/fan/leaderboard")}
-            className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent pointer-events-none rounded-3xl" />
-            <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xs font-semibold text-foreground relative z-10">Rankings</span>
-          </button>
-          <button
-            onClick={() => navigate("/fan/chants")}
-            className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent pointer-events-none rounded-3xl" />
-            <div className="h-11 w-11 rounded-2xl bg-red-500/15 flex items-center justify-center group-hover:bg-red-500/25 transition-colors">
-              <Megaphone className="h-5 w-5 text-red-500" />
-            </div>
-            <span className="text-xs font-semibold text-foreground relative z-10">Chants</span>
-          </button>
-        </div>
-
-        {/* ACTIVITIES SECTION */}
-        <div>
-          <SectionHeader
-            title="Activities"
-            icon={<Zap className="h-4 w-4 text-primary" />}
-            onClick={() => navigate("/fan/activities")}
-          />
-
-          <div className="grid gap-3">
-            {activities.map((a) => {
-              const multiplied = Math.round(a.points_awarded * multiplier);
-              return (
-                <SportCard
-                  key={a.id}
-                  title={a.name}
-                  badge={multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
-                  badgeColor="primary"
-                  onClick={() => navigate("/fan/activities")}
-                  actionLabel="Participate"
-                  icon={<Zap className="h-4 w-4 text-primary" />}
+            {/* REWARDS SECTION */}
+            {rewards.length > 0 && (
+              <div>
+                <SectionHeader
+                  title="Rewards"
+                  icon={<Gift className="h-4 w-4 text-accent" />}
+                  onClick={() => navigate("/fan/rewards")}
                 />
-              );
-            })}
-          </div>
-        </div>
 
-        {/* REWARDS SECTION */}
-        <div>
-          <SectionHeader
-            title="Rewards"
-            icon={<Gift className="h-4 w-4 text-accent" />}
-            onClick={() => navigate("/fan/rewards")}
-          />
+                <div className="grid md:grid-cols-3 gap-4">
+                  {rewards.map((r) => {
+                    const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
+                    const canAfford = effectivePointsBalance >= discounted;
 
-          <div className="grid md:grid-cols-3 gap-4">
-            {rewards.map((r) => {
-              const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
-              const canAfford = effectivePointsBalance >= discounted;
-
-              return (
-                <div
-                  key={r.id}
-                  className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 card-hover flex flex-col gap-3"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-3xl" />
-                  <div className="relative z-10 flex items-start justify-between gap-2">
-                    <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
-                      <Gift className="h-5 w-5 text-accent" />
-                    </div>
-                    <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
-                      {discounted} pts
-                    </Badge>
-                  </div>
-                  <div className="relative z-10">
-                    <h3 className="font-display font-bold text-foreground text-sm leading-tight">{r.name}</h3>
-                    {discountPercent > 0 && (
-                      <p className="text-xs text-primary mt-0.5">−{discountPercent}% discount</p>
-                    )}
-                  </div>
-                  <Button
-                    disabled={!canAfford}
-                    size="sm"
-                    className="relative z-10 w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
-                    onClick={() => navigate("/fan/rewards")}
-                  >
-                    Redeem
-                  </Button>
+                    return (
+                      <div
+                        key={r.id}
+                        className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 card-hover flex flex-col gap-3"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-3xl" />
+                        <div className="relative z-10 flex items-start justify-between gap-2">
+                          <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
+                            <Gift className="h-5 w-5 text-accent" />
+                          </div>
+                          <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
+                            {discounted} pts
+                          </Badge>
+                        </div>
+                        <div className="relative z-10">
+                          <h3 className="font-display font-bold text-foreground text-sm leading-tight">{r.name}</h3>
+                          {discountPercent > 0 && (
+                            <p className="text-xs text-primary mt-0.5">−{discountPercent}% discount</p>
+                          )}
+                        </div>
+                        <Button
+                          disabled={!canAfford}
+                          size="sm"
+                          className="relative z-10 w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
+                          onClick={() => navigate("/fan/rewards")}
+                        >
+                          Redeem
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

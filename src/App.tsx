@@ -29,6 +29,7 @@ import ClubProfileEdit from "./pages/club/ClubProfileEdit";
 
 // Fan pages
 import FanHome from "./pages/fan/FanHome";
+import FanOnboarding from "./pages/fan/FanOnboarding";
 import FanActivities from "./pages/fan/FanActivities";
 import FanRewards from "./pages/fan/FanRewards";
 import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
@@ -75,6 +76,7 @@ const App = () => {
                 <Route path="/club/profile" element={<ClubProfileEdit />} />
                 <Route path="/club/chants" element={<ClubChants />} />
                 {/* ================= FAN ================= */}
+                <Route path="/fan/onboarding" element={<FanOnboarding />} />
                 <Route path="/fan/home" element={<FanHome />} />
                 <Route path="/fan/activities" element={<FanActivities />} />
                 <Route path="/fan/rewards" element={<FanRewards />} />

@@ -29,6 +29,13 @@ const Index = () => {
           navigate('/club/onboarding', { replace: true });
         } else if (profile.role === 'system_admin' || profile.role === 'admin') {
           navigate('/admin', { replace: true });
+        } else if (profile.role === 'fan') {
+          // Check if fan has completed onboarding
+          if (profile.onboarding_completed) {
+            navigate('/fan/home', { replace: true });
+          } else {
+            navigate('/fan/onboarding', { replace: true });
+          }
         } else {
           navigate('/fan/home', { replace: true });
         }

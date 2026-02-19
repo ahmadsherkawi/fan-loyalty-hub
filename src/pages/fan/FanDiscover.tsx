@@ -18,6 +18,7 @@ import {
   Plus,
   Globe,
   LogOut,
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -41,6 +42,15 @@ interface Community {
   is_joined?: boolean;
 }
 
+interface CommunityLimit {
+  current_count: number;
+  max_communities: number;
+  slots_remaining: number;
+  can_join_more: boolean;
+}
+
+const MAX_COMMUNITIES = 3;
+
 export default function FanDiscover() {
   const navigate = useNavigate();
   const { profile, signOut, loading } = useAuth();
@@ -48,6 +58,7 @@ export default function FanDiscover() {
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
+  const [communityLimit, setCommunityLimit] = useState<CommunityLimit | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [joiningId, setJoiningId] = useState<string | null>(null);
@@ -96,6 +107,18 @@ export default function FanDiscover() {
 
       const joined = new Set((myCommunities || []).map((c: { id: string }) => c.id));
       setJoinedIds(joined);
+
+      // Fetch community limit
+      const { data: limitData, error: limitError } = await supabase.rpc(
+        "get_fan_community_limit",
+        { p_fan_id: profile.id }
+      );
+
+      if (limitError) {
+        console.error("[Discover] Error fetching community limit:", limitError);
+      } else {
+        setCommunityLimit(limitData as CommunityLimit);
+      }
     } catch (err) {
       console.error("[Discover] Fetch error:", err);
       toast({
@@ -122,6 +145,16 @@ export default function FanDiscover() {
   const handleJoin = async (clubId: string) => {
     if (!profile) return;
 
+    // Check if can join more
+    if (communityLimit && !communityLimit.can_join_more) {
+      toast({
+        title: "Limit reached",
+        description: `You've joined the maximum of ${MAX_COMMUNITIES} communities. Leave one to join another.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setJoiningId(clubId);
     try {
       const { error } = await supabase.rpc("join_community", {
@@ -132,6 +165,16 @@ export default function FanDiscover() {
       if (error) throw error;
 
       setJoinedIds((prev) => new Set([...prev, clubId]));
+      setCommunityLimit((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_count: prev.current_count + 1,
+              slots_remaining: prev.slots_remaining - 1,
+              can_join_more: prev.current_count + 1 < MAX_COMMUNITIES,
+            }
+          : null
+      );
       toast({ title: "Joined!", description: "You've joined the community." });
     } catch (err) {
       const error = err as Error;
@@ -193,6 +236,10 @@ export default function FanDiscover() {
     await signOut();
     navigate("/");
   };
+
+  // Separate communities into official and fan communities
+  const officialClubs = communities.filter((c) => c.is_official);
+  const fanCommunities = communities.filter((c) => !c.is_official);
 
   if (loading || dataLoading) {
     return (
@@ -268,134 +315,258 @@ export default function FanDiscover() {
         </div>
 
         {/* Stats */}
-        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Users className="h-4 w-4" />
-            <span>
-              <strong>{communities.filter(c => !c.is_official).length}</strong> fan communities
-            </span>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30">
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" />
+              <span>
+                <strong>{fanCommunities.length}</strong> fan communities
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <span>
+                <strong>{officialClubs.length}</strong> official clubs
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle className="h-4 w-4 text-primary" />
-            <span>
-              <strong>{communities.filter(c => c.is_official).length}</strong> official clubs
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle className="h-4 w-4 text-accent" />
-            <span>
-              <strong>{joinedIds.size}</strong> joined
-            </span>
+          
+          {/* Community Limit */}
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+            communityLimit?.can_join_more 
+              ? "bg-primary/10 text-primary" 
+              : "bg-amber-500/10 text-amber-600"
+          }`}>
+            {communityLimit?.can_join_more ? (
+              <>
+                <Users className="h-4 w-4" />
+                <span>{joinedIds.size}/{MAX_COMMUNITIES} joined</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-4 w-4" />
+                <span>Limit reached ({joinedIds.size}/{MAX_COMMUNITIES})</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Communities Grid */}
-        {communities.length === 0 ? (
-          <Card className="rounded-2xl border-border/40">
-            <CardContent className="py-12 text-center">
-              <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No communities found.</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Try a different search or add a new club!
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {communities.map((community) => {
-              const isJoined = joinedIds.has(community.id);
+        {/* Official Clubs Section */}
+        {officialClubs.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Official Clubs
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {officialClubs.map((community) => {
+                const isJoined = joinedIds.has(community.id);
+                const canJoin = communityLimit?.can_join_more ?? true;
 
-              return (
-                <Card
-                  key={community.id}
-                  className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      {/* Logo */}
-                      <div
-                        className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
-                        style={{
-                          backgroundColor: community.primary_color || "#16a34a",
-                        }}
-                      >
-                        {community.logo_url ? (
-                          <img
-                            src={community.logo_url}
-                            alt={community.name}
-                            className="h-full w-full rounded-xl object-cover"
-                          />
-                        ) : (
-                          community.name.charAt(0).toUpperCase()
-                        )}
-                      </div>
+                return (
+                  <Card
+                    key={community.id}
+                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Logo */}
+                        <div
+                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+                          style={{
+                            backgroundColor: community.primary_color || "#16a34a",
+                          }}
+                        >
+                          {community.logo_url ? (
+                            <img
+                              src={community.logo_url}
+                              alt={community.name}
+                              className="h-full w-full rounded-xl object-cover"
+                            />
+                          ) : (
+                            community.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-semibold truncate">{community.name}</h3>
-                          {community.is_official && (
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="font-semibold truncate">{community.name}</h3>
                             <Badge className="h-5 text-[10px] bg-primary/10 text-primary border-primary/20">
                               Official
                             </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {community.city ? `${community.city}, ` : ""}
-                          {community.country}
-                        </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {community.city ? `${community.city}, ` : ""}
+                            {community.country}
+                          </p>
 
-                        {/* Stats */}
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {community.member_count}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MessageCircle className="h-3 w-3" />
-                            {community.chant_count}
-                          </span>
+                          {/* Stats */}
+                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {community.member_count}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3 w-3" />
+                              {community.chant_count}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 mt-4">
-                      {isJoined ? (
-                        <>
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-4">
+                        {isJoined ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/fan/community/${community.id}`)}
+                              className="flex-1 rounded-xl"
+                            >
+                              View
+                            </Button>
+                            <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
+                              Joined
+                            </Badge>
+                          </>
+                        ) : (
                           <Button
-                            variant="outline"
                             size="sm"
-                            onClick={() => navigate(`/fan/community/${community.id}`)}
-                            className="flex-1 rounded-xl"
+                            onClick={() => handleJoin(community.id)}
+                            disabled={joiningId === community.id || !canJoin}
+                            className="flex-1 rounded-xl gradient-stadium"
                           >
-                            View
+                            {joiningId === community.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : !canJoin ? (
+                              "Limit reached"
+                            ) : (
+                              "Join Club"
+                            )}
                           </Button>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
-                            Joined
-                          </Badge>
-                        </>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => handleJoin(community.id)}
-                          disabled={joiningId === community.id}
-                          className="flex-1 rounded-xl gradient-stadium"
-                        >
-                          {joiningId === community.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "Join Community"
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         )}
+
+        {/* Fan Communities Section */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Fan Communities
+          </h2>
+          {fanCommunities.length === 0 ? (
+            <Card className="rounded-2xl border-border/40">
+              <CardContent className="py-12 text-center">
+                <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No fan communities found.</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Try a different search or add a new club!
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {fanCommunities.map((community) => {
+                const isJoined = joinedIds.has(community.id);
+                const canJoin = communityLimit?.can_join_more ?? true;
+
+                return (
+                  <Card
+                    key={community.id}
+                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Logo */}
+                        <div
+                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+                          style={{
+                            backgroundColor: community.primary_color || "#16a34a",
+                          }}
+                        >
+                          {community.logo_url ? (
+                            <img
+                              src={community.logo_url}
+                              alt={community.name}
+                              className="h-full w-full rounded-xl object-cover"
+                            />
+                          ) : (
+                            community.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="font-semibold truncate">{community.name}</h3>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {community.city ? `${community.city}, ` : ""}
+                            {community.country}
+                          </p>
+
+                          {/* Stats */}
+                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {community.member_count}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3 w-3" />
+                              {community.chant_count}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-4">
+                        {isJoined ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/fan/community/${community.id}`)}
+                              className="flex-1 rounded-xl"
+                            >
+                              View
+                            </Button>
+                            <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
+                              Joined
+                            </Badge>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => handleJoin(community.id)}
+                            disabled={joiningId === community.id || !canJoin}
+                            className="flex-1 rounded-xl gradient-stadium"
+                          >
+                            {joiningId === community.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : !canJoin ? (
+                              "Limit reached"
+                            ) : (
+                              "Join Community"
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Create Community Dialog */}
