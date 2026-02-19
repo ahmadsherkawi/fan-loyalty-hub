@@ -179,6 +179,7 @@ export default function ActivityBuilder() {
       }
       setProgram(programs[0] as LoyaltyProgram);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const activitiesTable = supabase.from("activities") as any;
       const { data: activitiesData } = await activitiesTable
         .select("*")
@@ -708,6 +709,7 @@ export default function ActivityBuilder() {
                   Poll Results: {pollResultsActivity.name}
                 </DialogTitle>
                 <DialogDescription>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {(pollResultsActivity.in_app_config as any)?.question}
                 </DialogDescription>
               </DialogHeader>

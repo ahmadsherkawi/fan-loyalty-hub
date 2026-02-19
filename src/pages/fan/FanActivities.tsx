@@ -97,6 +97,7 @@ export default function FanActivities() {
       if (pErr) throw pErr;
       if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: acts, error: aErr } = await (supabase as any).
       from("activities").
       select("*").
@@ -121,7 +122,9 @@ export default function FanActivities() {
       eq("status", "pending");
 
       if (clErr) throw clErr;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setPendingClaims((claims || []).map((c: any) => c.activity_id));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",
@@ -234,6 +237,7 @@ export default function FanActivities() {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     completeViaRpc(activity).catch((err: any) => {
       toast({
         title: "Error",
@@ -310,6 +314,7 @@ export default function FanActivities() {
       setSelectedActivity(null);
 
       await fetchData();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",
@@ -329,6 +334,7 @@ export default function FanActivities() {
       await completeViaRpc(selectedActivity);
       setQrScannerOpen(false);
       setSelectedActivity(null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",
@@ -348,6 +354,7 @@ export default function FanActivities() {
       await completeViaRpc(selectedActivity);
       setLocationModalOpen(false);
       setSelectedActivity(null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",
@@ -362,6 +369,7 @@ export default function FanActivities() {
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
     if (!selectedActivity) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
 
     if (!isPoll && !isCorrect) {
@@ -402,6 +410,7 @@ export default function FanActivities() {
 
       setPollQuizModalOpen(false);
       setSelectedActivity(null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast({
         title: "Error",

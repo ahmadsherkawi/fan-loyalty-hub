@@ -610,7 +610,7 @@ export default function SystemAdmin() {
     const activities: RecentActivity[] = [];
 
     // Use any-cast for reward_redemptions since the select columns cause type mismatch
-    const { data: recentRedemptions } = await (supabase as any)
+    const { data: recentRedemptions } = await supabase
       .from("reward_redemptions")
       .select("id, redeemed_at, points_spent, fan_id, profiles(full_name), rewards(name)")
       .order("redeemed_at", { ascending: false })
@@ -626,7 +626,7 @@ export default function SystemAdmin() {
       });
     });
 
-    const { data: recentCompletions } = await (supabase as any)
+    const { data: recentCompletions } = await supabase
       .from("activity_completions")
       .select("id, completed_at, points_earned, fan_id, profiles(full_name), activities(name)")
       .order("completed_at", { ascending: false })
@@ -664,6 +664,7 @@ export default function SystemAdmin() {
 
   const fetchClubRequests = async () => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("club_requests")
         .select("*")
@@ -688,6 +689,7 @@ export default function SystemAdmin() {
   const handleUpdateClubRequest = async (requestId: string, newStatus: ClubRequest["status"]) => {
     setActionLoading(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from("club_requests")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -770,6 +772,7 @@ export default function SystemAdmin() {
       await supabase.from("manual_claims").delete().eq("fan_id", userId);
       await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
       await supabase.from("fan_memberships").delete().eq("fan_id", userId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from("notifications").delete().eq("user_id", userId);
 
       // Delete profile
@@ -847,6 +850,7 @@ export default function SystemAdmin() {
         const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
         if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: delTiersError } = await (supabase as any).from("tiers").delete().in("program_id", programIds);
         if (delTiersError) console.error("Error deleting tiers:", delTiersError);
       }

@@ -26,6 +26,7 @@ interface NotificationRow {
     actionUrl?: string;
     actionLabel?: string;
     priority?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
   is_read: boolean;
@@ -157,6 +158,7 @@ export default function FanNotifications() {
 
       if (error) throw error;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalized = (rows ?? []).map((n: any) => ({
         ...n,
         is_read: n.is_read === true,

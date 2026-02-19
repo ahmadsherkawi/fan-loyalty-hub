@@ -98,6 +98,7 @@ export default function FanLeaderboardPage() {
     setDataLoading(true);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: memberships, error: mErr } = await (supabase as any)
         .from("fan_memberships")
         .select("*")
@@ -113,6 +114,7 @@ export default function FanLeaderboardPage() {
 
       const m = memberships[0] as FanMembership;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: clubData, error: cErr } = await (supabase as any)
         .from("clubs")
         .select("*")
@@ -121,6 +123,7 @@ export default function FanLeaderboardPage() {
       if (cErr) throw cErr;
       setClub(clubData as Club);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: programData, error: pErr } = await (supabase as any)
         .from("loyalty_programs")
         .select("*")
@@ -129,6 +132,7 @@ export default function FanLeaderboardPage() {
       if (pErr) throw pErr;
       setProgram(programData as LoyaltyProgram);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: rows, error: lErr } = await (supabase as any)
         .from("club_leaderboard")
         .select("*")
@@ -138,6 +142,7 @@ export default function FanLeaderboardPage() {
 
       if (lErr) throw lErr;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped: LeaderboardEntry[] = (rows ?? []).map((r: any) => ({
         id: r.fan_id,
         name: r.name,

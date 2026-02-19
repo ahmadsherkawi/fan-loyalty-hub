@@ -64,8 +64,9 @@ export function RewardRedemptionModal({
     try {
       const res = await onConfirmRedeem();
       setResult(res);
-    } catch (err: any) {
-      setResult({ success: false, error: err.message });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setResult({ success: false, error: errorMessage });
     } finally {
       setIsRedeeming(false);
     }

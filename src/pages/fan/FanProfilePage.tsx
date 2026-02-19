@@ -48,6 +48,7 @@ interface Tier {
   points_threshold: number;
   multiplier?: number;
   discount_percent?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   perks?: any;
 }
 

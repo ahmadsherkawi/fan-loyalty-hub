@@ -39,6 +39,7 @@ interface Tier {
   points_threshold: number;
   multiplier?: number;
   discount_percent?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   perks: any;
 }
 
@@ -61,6 +62,7 @@ export default function FanHome() {
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tierBenefits, setTierBenefits] = useState<any[]>([]);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -174,6 +176,7 @@ export default function FanHome() {
         .select("points_earned")
         .eq("fan_id", profile.id);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
       setEarnedPoints(totalEarned);
 
@@ -200,6 +203,7 @@ export default function FanHome() {
         if (benefits && benefits.length > 0) {
           // Map the tier_benefits to the expected format
           setTierBenefits(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             benefits.map((b: any) => ({
               id: b.id,
               name: b.benefit_label || b.benefit_type,
@@ -212,6 +216,7 @@ export default function FanHome() {
           // Fallback: use perks from the tier itself
           const perksArray = Array.isArray(current.perks) ? current.perks : [current.perks];
           setTierBenefits(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             perksArray.map((p: any, i: number) => {
               // Handle different perk formats
               if (typeof p === "string") {
@@ -449,6 +454,7 @@ export default function FanHome() {
 
                 {tierBenefits.length > 0 && (
                   <div className="w-full mt-2 flex flex-wrap gap-2">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {tierBenefits.map((b: any) => (
                       <span key={b.id} className="text-xs text-white/70 glass-dark px-2.5 py-1 rounded-full flex items-center gap-1.5">
                         <Sparkles className="h-2.5 w-2.5 text-accent" />
@@ -592,6 +598,7 @@ export default function FanHome() {
 
 /* ---------- reusable components ---------- */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function SectionHeader({ title, icon, onClick }: any) {
   return (
     <div className="flex justify-between items-center mb-4">
@@ -611,6 +618,7 @@ function SectionHeader({ title, icon, onClick }: any) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function SportCard({ title, badge, badgeColor = "primary", onClick, actionLabel, icon }: any) {
   return (
     <div className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-4 card-hover flex items-center gap-4">

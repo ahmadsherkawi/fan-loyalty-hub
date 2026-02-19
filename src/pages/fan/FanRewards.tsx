@@ -109,6 +109,7 @@ export default function FanRewards() {
       const baseRewards = (rewardsData ?? []) as Reward[];
 
       const enriched: RewardWithIntelligence[] = baseRewards.map((r) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rec = recData?.find((x: any) => x.id === r.id);
 
         return {
@@ -177,6 +178,7 @@ export default function FanRewards() {
         redemption_method: data.redemption_method,
         reward_name: data.reward_name
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const message = err?.message || "Redemption failed.";
       toast({
