@@ -3,20 +3,23 @@
 -- =====================================================
 
 -- 1. Update clubs table to support fan communities
-ALTER TABLE public.clubs 
+ALTER TABLE public.clubs
 ADD COLUMN IF NOT EXISTS is_official BOOLEAN DEFAULT true;
 
-ALTER TABLE public.clubs 
+ALTER TABLE public.clubs
 ADD COLUMN IF NOT EXISTS created_by_fan_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 
-ALTER TABLE public.clubs 
+ALTER TABLE public.clubs
 ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
 
-ALTER TABLE public.clubs 
+ALTER TABLE public.clubs
 ADD COLUMN IF NOT EXISTS original_club_id UUID; -- Links to the official club when claimed
 
 -- Set existing clubs as official
 UPDATE public.clubs SET is_official = true WHERE is_official IS NULL;
+
+-- Allow NULL admin_id for fan communities (pre-seeded clubs without an official admin)
+ALTER TABLE public.clubs ALTER COLUMN admin_id DROP NOT NULL;
 
 -- 2. Create community_events table for match trips and meetups
 CREATE TABLE IF NOT EXISTS public.community_events (
