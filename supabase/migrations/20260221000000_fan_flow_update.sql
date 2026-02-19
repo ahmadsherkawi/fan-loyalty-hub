@@ -6,9 +6,11 @@
 ALTER TABLE public.chants ALTER COLUMN membership_id DROP NOT NULL;
 
 -- 2. Update chants RLS policies to support community memberships
--- Drop existing policies
+-- Drop existing policies first (they may or may not exist)
 DROP POLICY IF EXISTS "Fans can view chants from their clubs" ON public.chants;
+DROP POLICY IF EXISTS "Fans can view chants from their communities" ON public.chants;
 DROP POLICY IF EXISTS "Fans can create chants" ON public.chants;
+DROP POLICY IF EXISTS "Fans can create chants for their communities" ON public.chants;
 
 -- New SELECT policy: Fans can see chants from clubs they are community members of
 CREATE POLICY "Fans can view chants from their communities"
