@@ -36,6 +36,8 @@ import FanProfileEdit from "./pages/fan/FanProfileEdit";
 import JoinClub from "./pages/fan/JoinClub";
 import FanNotifications from "./pages/fan/FanNotifications";
 import FanChants from "./pages/fan/FanChants";
+import FanDiscover from "./pages/fan/FanDiscover";
+import FanCommunity from "./pages/fan/FanCommunity";
 import ClubChants from "./pages/club/ClubChants";
 import AdminReportedChants from "./pages/admin/AdminReportedChants";
 import SystemAdmin from "./pages/SystemAdmin";
@@ -81,6 +83,8 @@ const App = () => {
                 <Route path="/fan/join" element={<JoinClub />} />
                 <Route path="/fan/notifications" element={<FanNotifications />} />
                 <Route path="/fan/chants" element={<FanChants />} />
+                <Route path="/fan/discover" element={<FanDiscover />} />
+                <Route path="/fan/community/:clubId" element={<FanCommunity />} />
                 {/* System Admin */}
                 <Route path="/admin" element={<SystemAdmin />} />
                 <Route path="/admin/reports" element={<AdminReportedChants />} />

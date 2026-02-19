@@ -263,3 +263,43 @@ export interface ChantCheer {
   fan_id: string;
   created_at: string;
 }
+
+// Community types (fan communities - pre-club social layer)
+export interface CommunityMembership {
+  id: string;
+  club_id: string;
+  fan_id: string;
+  joined_at: string;
+}
+
+export interface CommunityEvent {
+  id: string;
+  club_id: string;
+  created_by: string;
+  title: string;
+  description: string | null;
+  event_type: 'match' | 'meetup' | 'trip' | 'other';
+  home_team: string | null;
+  away_team: string | null;
+  venue: string | null;
+  match_date: string | null;
+  destination: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  estimated_budget: number | null;
+  currency: string | null;
+  image_url: string | null;
+  is_public: boolean;
+  max_participants: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventParticipant {
+  id: string;
+  event_id: string;
+  fan_id: string;
+  status: 'interested' | 'going' | 'not_going';
+  notes: string | null;
+  joined_at: string;
+}
