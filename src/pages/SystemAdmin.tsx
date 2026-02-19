@@ -397,7 +397,10 @@ export default function SystemAdmin() {
 
   const fetchAllData = useCallback(async () => {
     const isAdminUser = await checkAdminRole();
-    if (!isAdminUser) return;
+    if (!isAdminUser) {
+      setDataLoading(false);
+      return;
+    }
     
     setDataLoading(true);
     try {
@@ -409,6 +412,8 @@ export default function SystemAdmin() {
         fetchRecentActivity(),
         fetchClubRequests(),
       ]);
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
     } finally {
       setDataLoading(false);
     }
@@ -767,26 +772,19 @@ export default function SystemAdmin() {
     try {
       setActionLoading(true);
 
-      // Delete fan data
-      await supabase.from("activity_completions").delete().eq("fan_id", userId);
-      await supabase.from("manual_claims").delete().eq("fan_id", userId);
-      await supabase.from("reward_redemptions").delete().eq("fan_id", userId);
-      await supabase.from("fan_memberships").delete().eq("fan_id", userId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("notifications").delete().eq("user_id", userId);
+      const { data, error } = await supabase.rpc("admin_delete_fan", {
+        p_fan_id: userId
+      });
 
-      // Delete profile
-      const { error: profileError } = await supabase.from("profiles").delete().eq("user_id", userId);
-      if (profileError) {
-        toast({ title: "Error", description: `Failed to delete user: ${profileError.message}`, variant: "destructive" });
-        return;
-      }
+      if (error) throw error;
 
-      toast({ title: "User Deleted", description: "The user has been removed from the system." });
+      toast({ title: "Fan Deleted", description: "The fan has been completely removed from the system." });
+      setFanToDelete(null);
       await fetchAllData();
     } catch (error) {
       console.error("Delete user error:", error);
-      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+      const err = error as Error;
+      toast({ title: "Error", description: err.message || "Failed to delete user", variant: "destructive" });
     } finally {
       setActionLoading(false);
     }
@@ -796,95 +794,24 @@ export default function SystemAdmin() {
     try {
       setActionLoading(true);
 
-      // Get programs for this club
-      const { data: programs, error: programsError } = await supabase
-        .from("loyalty_programs")
-        .select("id")
-        .eq("club_id", clubId);
-      
-      if (programsError) {
-        console.error("Error fetching programs:", programsError);
-      }
-      
-      const programIds = programs?.map(p => p.id) || [];
+      const { data, error } = await supabase.rpc("admin_convert_club_to_community", {
+        p_club_id: clubId
+      });
 
-      if (programIds.length > 0) {
-        const { data: activities, error: activitiesError } = await supabase
-          .from("activities")
-          .select("id")
-          .in("program_id", programIds);
-        
-        if (activitiesError) {
-          console.error("Error fetching activities:", activitiesError);
-        }
-        
-        const activityIds = activities?.map(a => a.id) || [];
+      if (error) throw error;
 
-        if (activityIds.length > 0) {
-          const { error: completionsError } = await supabase.from("activity_completions").delete().in("activity_id", activityIds);
-          if (completionsError) console.error("Error deleting completions:", completionsError);
-          
-          const { error: claimsError } = await supabase.from("manual_claims").delete().in("activity_id", activityIds);
-          if (claimsError) console.error("Error deleting claims:", claimsError);
-        }
-
-        const { data: rewards, error: rewardsError } = await supabase
-          .from("rewards")
-          .select("id")
-          .in("program_id", programIds);
-        
-        if (rewardsError) {
-          console.error("Error fetching rewards:", rewardsError);
-        }
-        
-        const rewardIds = rewards?.map(r => r.id) || [];
-
-        if (rewardIds.length > 0) {
-          const { error: redemptionsError } = await supabase.from("reward_redemptions").delete().in("reward_id", rewardIds);
-          if (redemptionsError) console.error("Error deleting redemptions:", redemptionsError);
-        }
-
-        const { error: delRewardsError } = await supabase.from("rewards").delete().in("program_id", programIds);
-        if (delRewardsError) console.error("Error deleting rewards:", delRewardsError);
-        
-        const { error: delActivitiesError } = await supabase.from("activities").delete().in("program_id", programIds);
-        if (delActivitiesError) console.error("Error deleting activities:", delActivitiesError);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: delTiersError } = await (supabase as any).from("tiers").delete().in("program_id", programIds);
-        if (delTiersError) console.error("Error deleting tiers:", delTiersError);
-      }
-
-      const { error: membershipsError } = await supabase.from("fan_memberships").delete().eq("club_id", clubId);
-      if (membershipsError) console.error("Error deleting memberships:", membershipsError);
-      
-      const { error: verificationsError } = await supabase.from("club_verifications").delete().eq("club_id", clubId);
-      if (verificationsError) console.error("Error deleting verifications:", verificationsError);
-      
-      const { error: delProgramsError } = await supabase.from("loyalty_programs").delete().eq("club_id", clubId);
-      if (delProgramsError) console.error("Error deleting programs:", delProgramsError);
-
-      const { data: clubData } = await supabase.from("clubs").select("admin_id").eq("id", clubId).single();
-
-      const { error: clubDeleteError } = await supabase.from("clubs").delete().eq("id", clubId);
-      if (clubDeleteError) {
-        toast({ title: "Error", description: `Failed to delete club: ${clubDeleteError.message}`, variant: "destructive" });
-        return;
-      }
-
-      if (clubData?.admin_id) {
-        const { error: profileError } = await supabase.from("profiles").delete().eq("id", clubData.admin_id);
-        if (profileError) console.error("Error deleting admin profile:", profileError);
-      }
-
-      toast({ title: "Club Deleted", description: `${clubName} and all associated data have been removed.` });
+      toast({ 
+        title: "Club Converted to Community", 
+        description: `${clubName} has been converted to a fan community. The admin account has been removed.` 
+      });
+      setClubToDelete(null);
       await fetchAllData();
     } catch (error) {
       console.error("Delete club error:", error);
-      toast({ title: "Error", description: "Failed to delete club", variant: "destructive" });
+      const err = error as Error;
+      toast({ title: "Error", description: err.message || "Failed to convert club", variant: "destructive" });
     } finally {
       setActionLoading(false);
-      setClubToDelete(null);
     }
   };
 
@@ -1313,7 +1240,7 @@ export default function SystemAdmin() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem className="text-destructive" onClick={() => setClubToDelete(club)}>
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete Club
+                              <Trash2 className="h-4 w-4 mr-2" /> Convert to Community
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1452,9 +1379,16 @@ export default function SystemAdmin() {
       <AlertDialog open={!!clubToDelete} onOpenChange={() => setClubToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Club</AlertDialogTitle>
+            <AlertDialogTitle>Convert to Community</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{clubToDelete?.name}&quot;? This will also delete all associated data including activities, rewards, and member data. This action cannot be undone.
+              Are you sure you want to convert &quot;{clubToDelete?.name}&quot; to a fan community? This will:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Remove the club admin account</li>
+                <li>Delete the loyalty program, activities, and rewards</li>
+                <li>Keep the community and its chants</li>
+                <li>Allow another club to claim this community later</li>
+              </ul>
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1464,7 +1398,7 @@ export default function SystemAdmin() {
               onClick={() => clubToDelete && handleDeleteClub(clubToDelete.id, clubToDelete.name)}
             >
               {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete
+              Convert
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
