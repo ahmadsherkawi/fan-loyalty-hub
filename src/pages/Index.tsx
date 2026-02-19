@@ -31,7 +31,9 @@ const Index = () => {
           navigate('/admin', { replace: true });
         } else if (profile.role === 'fan') {
           // Check if fan has completed onboarding
-          if (profile.onboarding_completed) {
+          // Note: onboarding_completed may not exist if migration not run
+          const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
+          if (onboardingDone) {
             navigate('/fan/home', { replace: true });
           } else {
             navigate('/fan/onboarding', { replace: true });

@@ -64,8 +64,22 @@ export default function FanOnboarding() {
     setDataLoading(true);
 
     try {
-      // Check if onboarding already completed
-      if (profile.onboarding_completed) {
+      // Check if fan already has community memberships
+      // If so, they're already "onboarded" (handles case where migration not run yet)
+      const { data: myCommunities } = await supabase.rpc("get_my_communities", {
+        p_fan_id: profile.id,
+      });
+
+      if (myCommunities && myCommunities.length > 0) {
+        // Fan already has communities, go to home
+        console.log("[Onboarding] Fan already has", myCommunities.length, "communities, redirecting to home");
+        navigate("/fan/home", { replace: true });
+        return;
+      }
+
+      // Check if onboarding already completed (if column exists)
+      const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
+      if (onboardingDone) {
         navigate("/fan/home", { replace: true });
         return;
       }
@@ -133,12 +147,23 @@ export default function FanOnboarding() {
 
     setSubmitting(true);
     try {
+      // Try using the RPC function first
       const { error } = await supabase.rpc("complete_fan_onboarding", {
         p_fan_id: profile.id,
         p_community_ids: Array.from(selectedIds),
       });
 
-      if (error) throw error;
+      if (error) {
+        // If RPC fails (migration not run), fall back to manual join
+        console.log("[Onboarding] RPC failed, using manual join:", error.message);
+        
+        for (const clubId of Array.from(selectedIds)) {
+          await supabase.rpc("join_community", {
+            p_club_id: clubId,
+            p_fan_id: profile.id,
+          });
+        }
+      }
 
       toast({
         title: "Welcome aboard!",

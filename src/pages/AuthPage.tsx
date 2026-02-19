@@ -55,7 +55,18 @@ export default function AuthPage() {
       setIsRedirecting(true);
       
       // Navigate to appropriate page based on role
-      const redirectPath = profile.role === "club_admin" ? "/club/onboarding" : "/fan/join";
+      let redirectPath: string;
+      if (profile.role === "club_admin") {
+        redirectPath = "/club/onboarding";
+      } else if (profile.role === "system_admin" || profile.role === "admin") {
+        redirectPath = "/admin";
+      } else {
+        // Fan - check if onboarding completed
+        // Note: onboarding_completed may not exist if migration not run
+        // Default to onboarding if undefined/false
+        const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
+        redirectPath = onboardingDone ? "/fan/home" : "/fan/onboarding";
+      }
       
       // Small delay to ensure state updates are processed
       setTimeout(() => {

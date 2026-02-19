@@ -108,7 +108,7 @@ export default function FanLeaderboardPage() {
       if (mErr) throw mErr;
 
       if (!memberships?.length) {
-        navigate("/fan/join");
+        navigate("/fan/discover");
         return;
       }
 

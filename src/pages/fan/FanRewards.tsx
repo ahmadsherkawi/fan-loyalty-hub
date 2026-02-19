@@ -72,7 +72,7 @@ export default function FanRewards() {
         .limit(1);
 
       if (!memberships?.length) {
-        navigate("/fan/join");
+        navigate("/fan/discover");
         return;
       }
 
