@@ -74,9 +74,22 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, rounded, asChild = false, loading, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+    // When using asChild, we can't add extra elements (like loading spinner)
+    // So we just pass through the loading state and let the parent handle it
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, rounded, className }))}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </Slot>
+      );
+    }
+
     return (
-      <Comp
+      <button
         className={cn(buttonVariants({ variant, size, rounded, className }))}
         ref={ref}
         disabled={loading || disabled}
@@ -84,7 +97,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
         {children}
-      </Comp>
+      </button>
     );
   },
 );
