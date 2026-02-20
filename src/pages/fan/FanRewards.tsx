@@ -9,19 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { RewardRedemptionModal } from "@/components/ui/RewardRedemptionModal";
+import { AnimatedBorderCard } from "@/components/design-system";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Gift, Loader2, Trophy, Percent, LogOut, Sparkles, Clock, CheckCircle, Copy } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 
 import { Reward, FanMembership, LoyaltyProgram, RewardRedemption } from "@/types/database";
-
-interface RedemptionWithReward extends RewardRedemption {
-  rewards?: {
-    name: string;
-    description: string | null;
-    redemption_method?: string;
-  };
-}
+import type { 
+  RedemptionWithRewardInfo, 
+  RewardRecommendationResult,
+  RedeemRewardResult 
+} from "@/types/database-extended";
 
 interface RewardWithIntelligence extends Reward {
   final_cost?: number;
@@ -40,7 +38,7 @@ export default function FanRewards() {
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [program, setProgram] = useState<LoyaltyProgram | null>(null);
   const [rewards, setRewards] = useState<RewardWithIntelligence[]>([]);
-  const [redemptions, setRedemptions] = useState<RedemptionWithReward[]>([]);
+  const [redemptions, setRedemptions] = useState<RedemptionWithRewardInfo[]>([]);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   const [dataLoading, setDataLoading] = useState(true);
@@ -65,32 +63,46 @@ export default function FanRewards() {
     setDataLoading(true);
 
     try {
-      const { data: memberships } = await supabase
+      const { data: memberships, error: mErr } = await supabase
         .from("fan_memberships")
         .select("*")
         .eq("fan_id", profile.id)
         .limit(1);
 
-      if (!memberships?.length) {
+      if (mErr) throw mErr;
+      
+      if (!memberships || memberships.length === 0) {
         navigate("/fan/discover");
         return;
       }
 
-      const m = memberships[0] as FanMembership;
+      const m = memberships[0];
       setMembership(m);
 
-      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-      setProgram(programData as LoyaltyProgram);
+      const { data: programData, error: pErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .single();
+      
+      if (pErr) throw pErr;
+      setProgram(programData);
 
-      const { data: rewardsData } = await supabase.from("rewards").select("*").eq("program_id", m.program_id);
+      const { data: rewardsData, error: rErr } = await supabase
+        .from("rewards")
+        .select("*")
+        .eq("program_id", m.program_id);
+      
+      if (rErr) throw rErr;
 
-      const { data: redemptionsData } = await supabase
+      const { data: redemptionsData, error: redErr } = await supabase
         .from("reward_redemptions")
-        .select(`*, rewards (name, description)`)
+        .select(`*, rewards (name, description, redemption_method)`)
         .eq("fan_id", profile.id)
         .order("redeemed_at", { ascending: false });
 
-      setRedemptions((redemptionsData ?? []) as RedemptionWithReward[]);
+      if (redErr) throw redErr;
+      setRedemptions((redemptionsData ?? []) as RedemptionWithRewardInfo[]);
 
       const { data: discountData, error: discountError } = await supabase.rpc("get_membership_discount", {
         p_membership_id: m.id,
@@ -106,11 +118,11 @@ export default function FanRewards() {
 
       if (recError) throw recError;
 
-      const baseRewards = (rewardsData ?? []) as Reward[];
+      const baseRewards = rewardsData ?? [];
+      const recommendations = (recData ?? []) as RewardRecommendationResult[];
 
       const enriched: RewardWithIntelligence[] = baseRewards.map((r) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rec = recData?.find((x: any) => x.id === r.id);
+        const rec = recommendations.find((x) => x.id === r.id);
 
         return {
           ...r,
@@ -131,9 +143,10 @@ export default function FanRewards() {
       setRewards(enriched);
     } catch (err) {
       console.error("FanRewards fetch error:", err);
+      const message = err instanceof Error ? err.message : "Please try again.";
       toast({
         title: "Error loading rewards",
-        description: "Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -142,7 +155,15 @@ export default function FanRewards() {
   };
 
   /* ================= REDEEM ================= */
-  const handleConfirmRedeem = async () => {
+  const handleConfirmRedeem = async (): Promise<{
+    success: boolean;
+    error?: string;
+    final_cost?: number;
+    balance_after?: number;
+    redemption_code?: string | null;
+    redemption_method?: string;
+    reward_name?: string;
+  }> => {
     if (!membership || !selectedReward) {
       return { success: false, error: "Missing required data" };
     }
@@ -159,11 +180,12 @@ export default function FanRewards() {
 
       if (error) throw error;
 
+      const result = data as RedeemRewardResult;
       const currency = program?.points_currency_name ?? "Points";
 
       toast({
         title: "Reward redeemed!",
-        description: `Spent ${data.final_cost} ${currency}. New balance: ${data.balance_after}.`,
+        description: `Spent ${result.final_cost} ${currency}. New balance: ${result.balance_after}.`,
       });
 
       setRedemptionModalOpen(false);
@@ -172,15 +194,14 @@ export default function FanRewards() {
 
       return { 
         success: true, 
-        final_cost: data.final_cost,
-        balance_after: data.balance_after,
-        redemption_code: data.redemption_code,
-        redemption_method: data.redemption_method,
-        reward_name: data.reward_name
+        final_cost: result.final_cost,
+        balance_after: result.balance_after,
+        redemption_code: result.redemption_code,
+        redemption_method: result.redemption_method,
+        reward_name: result.reward_name
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      const message = err?.message || "Redemption failed.";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Redemption failed.";
       toast({
         title: "Redemption failed",
         description: message,
@@ -293,35 +314,36 @@ export default function FanRewards() {
                 const canAfford = balance >= finalCost;
 
                 return (
-                  <div key={reward.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 card-hover flex flex-col gap-3">
-                    <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-3xl" />
-                    <div className="relative z-10 flex items-start justify-between gap-2">
-                      <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
-                        <Gift className="h-5 w-5 text-accent" />
+                  <AnimatedBorderCard key={reward.id} className="cursor-pointer">
+                    <div className="flex flex-col gap-3 h-full">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
+                          <Gift className="h-5 w-5 text-accent" />
+                        </div>
+                        <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs shrink-0">
+                          {finalCost} {currency}
+                        </Badge>
                       </div>
-                      <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs shrink-0">
-                        {finalCost} {currency}
-                      </Badge>
+                      <div className="flex-1">
+                        <h3 className="font-display font-bold text-foreground text-sm">{reward.name}</h3>
+                        {reward.description && <p className="text-xs text-muted-foreground mt-0.5">{reward.description}</p>}
+                        {discountPercent > 0 && (
+                          <p className="text-xs text-primary mt-1">−{discountPercent}% discount applied</p>
+                        )}
+                        {reward.days_to_reach !== null && reward.days_to_reach !== undefined && (
+                          <p className="text-xs text-muted-foreground mt-1">~{Math.ceil(reward.days_to_reach)} days to unlock</p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
+                        disabled={!canAfford || redeeming}
+                        onClick={() => { setSelectedReward(reward); setRedemptionModalOpen(true); }}
+                      >
+                        {canAfford ? "Redeem" : "Need more points"}
+                      </Button>
                     </div>
-                    <div className="relative z-10 flex-1">
-                      <h3 className="font-display font-bold text-foreground text-sm">{reward.name}</h3>
-                      {reward.description && <p className="text-xs text-muted-foreground mt-0.5">{reward.description}</p>}
-                      {discountPercent > 0 && (
-                        <p className="text-xs text-primary mt-1">−{discountPercent}% discount applied</p>
-                      )}
-                      {reward.days_to_reach !== null && reward.days_to_reach !== undefined && (
-                        <p className="text-xs text-muted-foreground mt-1">~{Math.ceil(reward.days_to_reach)} days to unlock</p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      className="relative z-10 w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
-                      disabled={!canAfford || redeeming}
-                      onClick={() => { setSelectedReward(reward); setRedemptionModalOpen(true); }}
-                    >
-                      {canAfford ? "Redeem" : "Need more points"}
-                    </Button>
-                  </div>
+                  </AnimatedBorderCard>
                 );
               })}
             </div>
@@ -339,9 +361,8 @@ export default function FanRewards() {
                 const copyCode = (code: string) => { navigator.clipboard.writeText(code); sonnerToast.success("Code copied!"); };
 
                 return (
-                  <div key={r.id} className="relative overflow-hidden rounded-3xl bg-card border border-border/50 px-5 py-4">
-                    <div className="absolute inset-0 bg-gradient-to-r from-accent/5 to-transparent rounded-3xl pointer-events-none" />
-                    <div className="relative z-10 flex justify-between items-start gap-4">
+                  <AnimatedBorderCard key={r.id}>
+                    <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-foreground text-sm">{r.rewards?.name}</p>
@@ -365,7 +386,7 @@ export default function FanRewards() {
                       </div>
                       <Badge className="rounded-full bg-destructive/10 text-destructive border-destructive/20 text-xs shrink-0">-{r.points_spent}</Badge>
                     </div>
-                  </div>
+                  </AnimatedBorderCard>
                 );
               })}
             </div>

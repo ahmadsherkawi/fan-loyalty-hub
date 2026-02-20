@@ -12,9 +12,15 @@ import { ManualProofModal } from "@/components/ui/ManualProofModal";
 import { QRScannerModal } from "@/components/ui/QRScannerModal";
 import { LocationCheckinModal } from "@/components/ui/LocationCheckinModal";
 import { PollQuizParticipation, InAppConfig } from "@/components/ui/PollQuizParticipation";
+import { AnimatedBorderCard } from "@/components/design-system";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Zap, QrCode, MapPin, Smartphone, FileCheck, Loader2, CheckCircle, LogOut, Sparkles } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import type { 
+  CompleteActivityResult, 
+  ManualClaimActivityId,
+  InAppOption 
+} from "@/types/database-extended";
 
 type Activity = Database["public"]["Tables"]["activities"]["Row"];
 type FanMembership = Database["public"]["Tables"]["fan_memberships"]["Row"];
@@ -63,11 +69,11 @@ export default function FanActivities() {
     setDataLoading(true);
 
     try {
-      const { data: memberships, error: mErr } = await supabase.
-      from("fan_memberships").
-      select("*").
-      eq("fan_id", profile.id).
-      limit(1);
+      const { data: memberships, error: mErr } = await supabase
+        .from("fan_memberships")
+        .select("*")
+        .eq("fan_id", profile.id)
+        .limit(1);
 
       if (mErr) throw mErr;
 
@@ -76,7 +82,7 @@ export default function FanActivities() {
         return;
       }
 
-      const m = memberships[0] as FanMembership;
+      const m = memberships[0];
       setMembership(m);
 
       const { data: multData, error: multErr } = await supabase.rpc("get_membership_multiplier", {
@@ -88,47 +94,47 @@ export default function FanActivities() {
       const multValue = Number(multData ?? 1);
       setMultiplier(Number.isFinite(multValue) && multValue > 0 ? multValue : 1);
 
-      const { data: prog, error: pErr } = await supabase.
-      from("loyalty_programs").
-      select("*").
-      eq("id", m.program_id).
-      limit(1);
+      const { data: prog, error: pErr } = await supabase
+        .from("loyalty_programs")
+        .select("*")
+        .eq("id", m.program_id)
+        .limit(1);
 
       if (pErr) throw pErr;
-      if (prog?.length) setProgram(prog[0] as LoyaltyProgram);
+      if (prog?.length) setProgram(prog[0]);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: acts, error: aErr } = await (supabase as any).
-      from("activities").
-      select("*").
-      eq("program_id", m.program_id).
-      eq("is_active", true);
+      const { data: acts, error: aErr } = await supabase
+        .from("activities")
+        .select("*")
+        .eq("program_id", m.program_id)
+        .eq("is_active", true);
 
       if (aErr) throw aErr;
-      setActivities((acts || []) as unknown as Activity[]);
+      setActivities(acts || []);
 
-      const { data: comps, error: cErr } = await supabase.
-      from("activity_completions").
-      select("*").
-      eq("fan_id", profile.id);
+      const { data: comps, error: cErr } = await supabase
+        .from("activity_completions")
+        .select("*")
+        .eq("fan_id", profile.id);
 
       if (cErr) throw cErr;
-      setCompletions((comps || []) as ActivityCompletion[]);
+      setCompletions(comps || []);
 
-      const { data: claims, error: clErr } = await supabase.
-      from("manual_claims").
-      select("activity_id").
-      eq("fan_id", profile.id).
-      eq("status", "pending");
+      const { data: claims, error: clErr } = await supabase
+        .from("manual_claims")
+        .select("activity_id")
+        .eq("fan_id", profile.id)
+        .eq("status", "pending");
 
       if (clErr) throw clErr;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setPendingClaims((claims || []).map((c: any) => c.activity_id));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+      
+      const claimActivityIds = (claims || []).map((c) => c.activity_id);
+      setPendingClaims(claimActivityIds);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load activities.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to load activities.",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -182,16 +188,17 @@ export default function FanActivities() {
     });
     if (error) throw error;
 
+    const result = data as CompleteActivityResult;
     const earned =
-    data?.final_points != null ?
-    Number(data.final_points) :
-    Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
+      result?.final_points != null
+        ? Number(result.final_points)
+        : Math.round(Number(activity.points_awarded || 0) * (multiplier || 1));
     const mult =
-    data?.multiplier != null ?
-    Number(data.multiplier) :
-    Number.isFinite(multiplier) && multiplier > 0 ?
-    multiplier :
-    1;
+      result?.multiplier != null
+        ? Number(result.multiplier)
+        : Number.isFinite(multiplier) && multiplier > 0
+        ? multiplier
+        : 1;
 
     toast({
       title: "Activity Completed!",
@@ -237,11 +244,11 @@ export default function FanActivities() {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    completeViaRpc(activity).catch((err: any) => {
+    completeViaRpc(activity).catch((err) => {
+      const message = err instanceof Error ? err.message : "Failed to complete activity.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to complete activity.",
+        description: message,
         variant: "destructive"
       });
     });
@@ -314,11 +321,11 @@ export default function FanActivities() {
       setSelectedActivity(null);
 
       await fetchData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to submit proof.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to submit proof.",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -334,11 +341,11 @@ export default function FanActivities() {
       await completeViaRpc(selectedActivity);
       setQrScannerOpen(false);
       setSelectedActivity(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to complete QR activity.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to complete QR activity.",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -354,11 +361,11 @@ export default function FanActivities() {
       await completeViaRpc(selectedActivity);
       setLocationModalOpen(false);
       setSelectedActivity(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to complete check-in.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to complete check-in.",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -369,8 +376,8 @@ export default function FanActivities() {
   const handlePollQuizSubmit = async (selectedOptionId: string, isCorrect: boolean) => {
     if (!selectedActivity) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isPoll = (selectedActivity.in_app_config as any)?.type === "poll";
+    const inAppConfig = selectedActivity.in_app_config as { type: "poll" | "quiz" } | null;
+    const isPoll = inAppConfig?.type === "poll";
 
     if (!isPoll && !isCorrect) {
       toast({ title: "Incorrect", description: "Better luck next time!" });
@@ -410,11 +417,11 @@ export default function FanActivities() {
 
       setPollQuizModalOpen(false);
       setSelectedActivity(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to record response.";
       toast({
         title: "Error",
-        description: err?.message || "Failed to record response.",
+        description: message,
         variant: "destructive"
       });
     }
@@ -425,7 +432,7 @@ export default function FanActivities() {
     navigate("/");
   };
 
-  const icons: Record<VerificationMethod, React.ComponentType<{className?: string;}>> = {
+  const icons: Record<VerificationMethod, React.ComponentType<{className?: string}>> = {
     qr_scan: QrCode,
     location_checkin: MapPin,
     in_app_completion: Smartphone,
@@ -511,12 +518,11 @@ export default function FanActivities() {
               const pending = hasPendingClaim(activity.id);
 
               return (
-                <div
-                  key={activity.id}
-                  className={`relative overflow-hidden rounded-3xl bg-card border border-border/50 card-hover ${completed ? "opacity-60" : ""}`}
+                <AnimatedBorderCard 
+                  key={activity.id} 
+                  className={`cursor-pointer ${completed ? "opacity-60" : ""}`}
                 >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${completed ? "from-primary/8" : "from-primary/5"} to-transparent pointer-events-none rounded-3xl`} />
-                  <div className="relative z-10 px-5 py-5 flex justify-between items-center gap-4">
+                  <div className="flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-xl bg-card/80 border border-border/30 flex items-center justify-center text-primary">
                         <Icon className="h-5 w-5" />
@@ -543,7 +549,7 @@ export default function FanActivities() {
                       <Button onClick={() => handleStart(activity)} className="rounded-2xl gradient-stadium font-semibold shadow-stadium text-sm px-4">Start</Button>
                     )}
                   </div>
-                </div>
+                </AnimatedBorderCard>
               );
             })}
           </div>

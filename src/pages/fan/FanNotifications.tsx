@@ -18,7 +18,7 @@ import type { Club, FanMembership, Notification, NotificationData } from "@/type
 import type { NotificationWithData } from "@/types/database-extended";
 
 // Use the extended type from database-extended.ts
-interface NotificationRow extends NotificationWithData {}
+type NotificationRow = NotificationWithData;
 
 export default function FanNotifications() {
   const navigate = useNavigate();

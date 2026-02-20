@@ -85,6 +85,81 @@ export interface RewardRecommendation {
 }
 
 // ============================================================
+// RPC FUNCTION SPECIFIC RETURN TYPES
+// ============================================================
+
+// get_reward_recommendations RPC return type
+export interface RewardRecommendationResult {
+  id: string;
+  name: string;
+  description: string | null;
+  points_cost: number;
+  final_cost: number;
+  days_to_reach: number | null;
+  points_needed: number | null;
+}
+
+// redeem_reward RPC return type
+export interface RedeemRewardResult {
+  success: boolean;
+  final_cost: number;
+  balance_after: number;
+  redemption_code: string | null;
+  redemption_method: string;
+  reward_name: string;
+}
+
+// complete_activity RPC return type
+export interface CompleteActivityResult {
+  success: boolean;
+  final_points: number;
+  multiplier: number;
+  message?: string;
+}
+
+// get_membership_multiplier RPC return type
+export interface MembershipMultiplierResult {
+  multiplier: number;
+}
+
+// get_membership_discount RPC return type
+export interface MembershipDiscountResult {
+  discount_percent: number;
+}
+
+// get_club_chants RPC return type
+export interface ClubChantResult {
+  id: string;
+  fan_id: string;
+  fan_name: string | null;
+  fan_avatar_url: string | null;
+  content: string;
+  image_url: string | null;
+  cheers_count: number;
+  is_edited: boolean;
+  created_at: string;
+  updated_at: string;
+  cheered_by_me: boolean;
+}
+
+// get_my_communities RPC return type
+export interface MyCommunityResult {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  city: string | null;
+  country: string | null;
+  primary_color: string | null;
+  is_official: boolean;
+  member_count: number;
+}
+
+// Manual claim activity ID result
+export interface ManualClaimActivityId {
+  activity_id: string;
+}
+
+// ============================================================
 // JOINED TABLE TYPES
 // ============================================================
 
@@ -103,6 +178,14 @@ export interface ActivityWithCompletions extends Activity {
   isCompleted?: boolean;
   isOnCooldown?: boolean;
   cooldownEndsAt?: string | null;
+}
+
+export interface RedemptionWithRewardInfo extends RewardRedemption {
+  rewards?: {
+    name: string;
+    description: string | null;
+    redemption_method?: string;
+  };
 }
 
 // ============================================================
@@ -248,3 +331,19 @@ export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
 export type Prettify<T> = {
   [K in keyof T]: T[K];
 } & {};
+
+// ============================================================
+// IN-APP CONFIG TYPES (for polls and quizzes)
+// ============================================================
+
+export interface InAppOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+}
+
+export interface InAppConfig {
+  type: "poll" | "quiz";
+  question: string;
+  options: InAppOption[];
+}
