@@ -321,33 +321,33 @@ export default function ClubDashboard() {
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="relative container py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 md:gap-4">
             <Logo />
-            <div className="h-6 w-px bg-border/40" />
+            <div className="h-6 w-px bg-border/40 hidden sm:block" />
             {/* Club Logo */}
             {club?.logo_url ? (
-              <img src={club.logo_url} alt={club.name} className="w-8 h-8 rounded-full object-cover border border-border/30" />
+              <img src={club.logo_url} alt={club.name} className="w-8 h-8 rounded-full object-cover border border-border/30 hidden sm:block" />
             ) : (
-              <div className="w-8 h-8 rounded-full flex items-center justify-center border border-border/30" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center border border-border/30 hidden sm:flex" style={{ backgroundColor: club?.primary_color || "#1a7a4c" }}>
                 <span className="text-xs font-bold text-white">{club?.name?.charAt(0)}</span>
               </div>
             )}
-            <span className="font-display font-bold text-foreground tracking-tight">{club?.name}</span>
+            <span className="font-display font-bold text-foreground tracking-tight text-sm hidden sm:block">{club?.name}</span>
 
             {verified && (
-              <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs">
+              <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs hidden md:flex">
                 <ShieldCheck className="h-3 w-3 mr-1" /> Verified
               </Badge>
             )}
             
             {!verified && (
-              <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 rounded-full text-xs">
-                <Clock className="h-3 w-3 mr-1" /> Pending Verification
+              <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 rounded-full text-xs hidden md:flex">
+                <Clock className="h-3 w-3 mr-1" /> Pending
               </Badge>
             )}
 
-            <div className="hidden md:flex items-center gap-1 ml-4">
+            <div className="hidden lg:flex items-center gap-1 ml-4">
               {navLinks.map((link) =>
                 <Button
                   key={link.label}
@@ -363,7 +363,8 @@ export default function ClubDashboard() {
           </div>
 
           <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
-            <LogOut className="h-4 w-4 mr-2" /> Sign out
+            <LogOut className="h-4 w-4 mr-2" /> 
+            <span className="hidden sm:inline">Sign out</span>
           </Button>
         </div>
       </header>

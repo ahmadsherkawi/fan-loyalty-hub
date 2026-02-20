@@ -215,16 +215,31 @@ export default function FanRewards() {
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex items-center justify-between">
+        <div className="relative container py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/home")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate("/fan/home")} 
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> 
+              <span className="hidden sm:inline">Back</span>
             </Button>
+            <div className="h-5 w-px bg-border/40 hidden sm:block" />
             <Logo size="sm" />
           </div>
-          <Button variant="ghost" size="sm" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
-            <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleSignOut} 
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <LogOut className="h-4 w-4 mr-1.5" /> 
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
