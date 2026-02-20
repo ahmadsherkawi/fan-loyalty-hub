@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
+import { SpotlightCard } from "@/components/design-system";
 
 interface Tier {
   id: string;
@@ -41,8 +42,7 @@ interface Tier {
   points_threshold: number;
   multiplier?: number;
   discount_percent?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  perks: any;
+  perks: Record<string, unknown>;
 }
 
 interface Community {
@@ -81,8 +81,7 @@ export default function FanHome() {
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [tierBenefits, setTierBenefits] = useState<any[]>([]);
+  const [tierBenefits, setTierBenefits] = useState<Record<string, unknown>[]>([]);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
@@ -194,8 +193,7 @@ export default function FanHome() {
           .select("points_earned")
           .eq("fan_id", profile.id);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const totalEarned = completions?.reduce((s, c: any) => s + (c.points_earned || 0), 0) ?? 0;
+        const totalEarned = completions?.reduce((s, c) => s + (c.points_earned || 0), 0) ?? 0;
         setEarnedPoints(totalEarned);
 
         let current: Tier | null = null;
@@ -436,46 +434,46 @@ export default function FanHome() {
 
             {/* QUICK NAV BENTO ROW */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button
+              <SpotlightCard
+                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
+                spotlightColor="hsl(var(--primary) / 0.15)"
                 onClick={() => navigate("/fan/activities")}
-                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none rounded-3xl" />
                 <div className="h-11 w-11 rounded-2xl bg-primary/15 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
                   <Zap className="h-5 w-5 text-primary" />
                 </div>
                 <span className="text-xs font-semibold text-foreground relative z-10">Activities</span>
-              </button>
-              <button
+              </SpotlightCard>
+              <SpotlightCard
+                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
+                spotlightColor="hsl(var(--accent) / 0.15)"
                 onClick={() => navigate("/fan/rewards")}
-                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-events-none rounded-3xl" />
                 <div className="h-11 w-11 rounded-2xl bg-accent/15 flex items-center justify-center group-hover:bg-accent/25 transition-colors">
                   <Gift className="h-5 w-5 text-accent" />
                 </div>
                 <span className="text-xs font-semibold text-foreground relative z-10">Rewards</span>
-              </button>
-              <button
+              </SpotlightCard>
+              <SpotlightCard
+                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
+                spotlightColor="hsl(var(--primary) / 0.1)"
                 onClick={() => navigate("/fan/leaderboard")}
-                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent pointer-events-none rounded-3xl" />
                 <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <span className="text-xs font-semibold text-foreground relative z-10">Rankings</span>
-              </button>
-              <button
+              </SpotlightCard>
+              <SpotlightCard
+                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
+                spotlightColor="hsl(0 84% 60% / 0.15)"
                 onClick={() => navigate("/fan/chants")}
-                className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 flex flex-col items-center gap-2 card-hover group text-center"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent pointer-events-none rounded-3xl" />
                 <div className="h-11 w-11 rounded-2xl bg-red-500/15 flex items-center justify-center group-hover:bg-red-500/25 transition-colors">
                   <Megaphone className="h-5 w-5 text-red-500" />
                 </div>
                 <span className="text-xs font-semibold text-foreground relative z-10">Chants</span>
-              </button>
+              </SpotlightCard>
             </div>
 
             {/* ACTIVITIES SECTION */}
@@ -665,8 +663,13 @@ export default function FanHome() {
 
 /* ---------- reusable components ---------- */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SectionHeader({ title, icon, onClick }: any) {
+interface SectionHeaderProps {
+  title: string;
+  icon?: React.ReactNode;
+  onClick?: () => void;
+}
+
+function SectionHeader({ title, icon, onClick }: SectionHeaderProps) {
   return (
     <div className="flex justify-between items-center mb-4">
       <h2 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
@@ -685,8 +688,16 @@ function SectionHeader({ title, icon, onClick }: any) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SportCard({ title, badge, badgeColor = "primary", onClick, actionLabel, icon }: any) {
+interface SportCardProps {
+  title: string;
+  badge: string | number;
+  badgeColor?: "primary" | "accent" | "success" | "warning" | "error";
+  onClick?: () => void;
+  actionLabel?: string;
+  icon?: React.ReactNode;
+}
+
+function SportCard({ title, badge, badgeColor = "primary", onClick, actionLabel, icon }: SportCardProps) {
   return (
     <div className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-4 card-hover flex items-center gap-4">
       <div className={`absolute inset-0 bg-gradient-to-br ${badgeColor === "accent" ? "from-accent/8" : "from-primary/8"} to-transparent pointer-events-none rounded-3xl`} />

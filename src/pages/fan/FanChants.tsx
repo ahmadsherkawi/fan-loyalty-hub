@@ -510,22 +510,15 @@ export default function FanChants() {
                     className="hidden"
                     disabled={uploadingImage}
                   />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    disabled={uploadingImage}
-                    className="rounded-full text-muted-foreground"
-                    asChild
+                  <span
+                    className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 rounded-xl bg-transparent hover:bg-card/60 rounded-full text-muted-foreground`}
                   >
-                    <span>
-                      {uploadingImage ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ImagePlus className="h-4 w-4" />
-                      )}
-                    </span>
-                  </Button>
+                    {uploadingImage ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImagePlus className="h-4 w-4" />
+                    )}
+                  </span>
                 </label>
                 <span className="text-xs text-muted-foreground">
                   {content.length}/280

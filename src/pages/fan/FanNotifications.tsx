@@ -14,24 +14,11 @@ import {
   Target, Star, Clock, MapPin, Users, TrendingUp, Calendar, AlertCircle, ChevronRight
 } from "lucide-react";
 
-import type { Club, FanMembership, Notification } from "@/types/database";
+import type { Club, FanMembership, Notification, NotificationData } from "@/types/database";
+import type { NotificationWithData } from "@/types/database-extended";
 
-interface NotificationRow {
-  id: string;
-  user_id: string;
-  type: string;
-  data: {
-    title?: string;
-    message?: string;
-    actionUrl?: string;
-    actionLabel?: string;
-    priority?: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
-  };
-  is_read: boolean;
-  created_at: string;
-}
+// Use the extended type from database-extended.ts
+interface NotificationRow extends NotificationWithData {}
 
 export default function FanNotifications() {
   const navigate = useNavigate();
@@ -158,11 +145,11 @@ export default function FanNotifications() {
 
       if (error) throw error;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (rows ?? []).map((n: any) => ({
+      const normalized = (rows ?? []).map((n) => ({
         ...n,
         is_read: n.is_read === true,
-      }));
+        data: typeof n.data === "string" ? JSON.parse(n.data) : n.data || {},
+      })) as NotificationRow[];
 
       setNotifications(normalized);
     } catch (err) {
