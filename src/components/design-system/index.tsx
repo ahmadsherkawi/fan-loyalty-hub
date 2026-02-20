@@ -104,7 +104,7 @@ const cardVariants = cva(
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof cardVariants> {
-  gradientColor?: "primary" | "accent" | "purple" | "blue";
+  gradientColor?: "primary" | "accent" | "purple" | "blue" | "orange";
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
@@ -373,7 +373,7 @@ interface HeroSectionProps extends React.HTMLAttributes<HTMLElement> {
   avatar?: { src?: string; fallback: string; onUpload?: () => void };
 }
 
-const HeroSection = React.forwardRef<HTMLElement, HeroSectionProps>(
+const HeroSection = React.forwardRef<HTMLDivElement, HeroSectionProps>(
   ({ 
     className, 
     variant = "compact", 

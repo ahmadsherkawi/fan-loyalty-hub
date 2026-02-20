@@ -177,7 +177,7 @@ export type Database = {
       }
       clubs: {
         Row: {
-          admin_id: string | null
+          admin_id: string
           city: string
           country: string
           created_at: string
@@ -190,13 +190,9 @@ export type Database = {
           stadium_name: string | null
           status: Database["public"]["Enums"]["club_status"]
           updated_at: string
-          is_official: boolean
-          created_by_fan_id: string | null
-          claimed_at: string | null
-          original_club_id: string | null
         }
         Insert: {
-          admin_id?: string | null
+          admin_id: string
           city: string
           country: string
           created_at?: string
@@ -209,13 +205,9 @@ export type Database = {
           stadium_name?: string | null
           status?: Database["public"]["Enums"]["club_status"]
           updated_at?: string
-          is_official?: boolean
-          created_by_fan_id?: string | null
-          claimed_at?: string | null
-          original_club_id?: string | null
         }
         Update: {
-          admin_id?: string | null
+          admin_id?: string
           city?: string
           country?: string
           created_at?: string
@@ -228,10 +220,6 @@ export type Database = {
           stadium_name?: string | null
           status?: Database["public"]["Enums"]["club_status"]
           updated_at?: string
-          is_official?: boolean
-          created_by_fan_id?: string | null
-          claimed_at?: string | null
-          original_club_id?: string | null
         }
         Relationships: [
           {
@@ -419,9 +407,6 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string
-          avatar_url: string | null
-          onboarding_completed: boolean
-          onboarding_completed_at: string | null
         }
         Insert: {
           created_at?: string
@@ -431,9 +416,6 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id: string
-          avatar_url?: string | null
-          onboarding_completed?: boolean
-          onboarding_completed_at?: string | null
         }
         Update: {
           created_at?: string
@@ -443,9 +425,6 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string
-          avatar_url?: string | null
-          onboarding_completed?: boolean
-          onboarding_completed_at?: string | null
         }
         Relationships: []
       }
@@ -603,87 +582,6 @@ export type Database = {
         Args: { p_membership_id: string; p_points: number }
         Returns: boolean
       }
-      // Community functions
-      get_communities: {
-        Args: { p_search: string | null; p_limit: number; p_offset: number }
-        Returns: {
-          id: string
-          name: string
-          logo_url: string | null
-          city: string | null
-          country: string | null
-          primary_color: string | null
-          is_official: boolean
-          member_count: number
-          chant_count: number
-        }[]
-      }
-      get_my_communities: {
-        Args: { p_fan_id: string }
-        Returns: {
-          id: string
-          name: string
-          logo_url: string | null
-          city: string | null
-          country: string | null
-          primary_color: string | null
-          is_official: boolean
-          member_count: number
-          joined_at: string
-        }[]
-      }
-      join_community: {
-        Args: { p_club_id: string; p_fan_id: string }
-        Returns: { id: string; club_id: string; joined: boolean }
-      }
-      leave_community: {
-        Args: { p_club_id: string; p_fan_id: string }
-        Returns: boolean
-      }
-      get_community_stats: {
-        Args: { p_club_id: string }
-        Returns: { member_count: number; chant_count: number; event_count: number }
-      }
-      create_fan_community: {
-        Args: { p_name: string; p_country: string; p_city: string | null; p_fan_id: string; p_logo_url: string | null }
-        Returns: { id: string; name: string; is_official: boolean }
-      }
-      get_fan_community_limit: {
-        Args: { p_fan_id: string }
-        Returns: { current_count: number; max_communities: number; slots_remaining: number; can_join_more: boolean }
-      }
-      complete_fan_onboarding: {
-        Args: { p_fan_id: string; p_community_ids: string[] }
-        Returns: { success: boolean; joined_count: number; errors: string[] | null }
-      }
-      get_club_chants: {
-        Args: { p_club_id: string; p_fan_id: string; p_sort: string; p_limit: number; p_offset: number }
-        Returns: {
-          id: string
-          fan_id: string
-          fan_name: string | null
-          fan_avatar_url: string | null
-          content: string
-          image_url: string | null
-          cheers_count: number
-          is_edited: boolean
-          created_at: string
-          updated_at: string
-          cheered_by_me: boolean
-        }[]
-      }
-      toggle_chant_cheer: {
-        Args: { p_chant_id: string; p_fan_id: string }
-        Returns: { cheered: boolean; cheers_count: number }
-      }
-      update_chant: {
-        Args: { p_chant_id: string; p_fan_id: string; p_content: string; p_image_url: string | null }
-        Returns: { id: string; content: string; image_url: string | null; is_edited: boolean; updated_at: string }
-      }
-      delete_chant: {
-        Args: { p_chant_id: string; p_fan_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
       activity_frequency:
@@ -694,7 +592,7 @@ export type Database = {
       claim_status: "pending" | "approved" | "rejected"
       club_status: "unverified" | "verified" | "official"
       redemption_method: "voucher" | "manual_fulfillment" | "code_display"
-      user_role: "club_admin" | "fan" | "system_admin" | "admin"
+      user_role: "club_admin" | "fan"
       verification_method:
         | "qr_scan"
         | "location_checkin"
@@ -836,7 +734,7 @@ export const Constants = {
       claim_status: ["pending", "approved", "rejected"],
       club_status: ["unverified", "verified", "official"],
       redemption_method: ["voucher", "manual_fulfillment", "code_display"],
-      user_role: ["club_admin", "fan", "system_admin", "admin"],
+      user_role: ["club_admin", "fan"],
       verification_method: [
         "qr_scan",
         "location_checkin",
