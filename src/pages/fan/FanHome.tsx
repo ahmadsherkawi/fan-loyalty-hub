@@ -30,10 +30,15 @@ import {
   Globe,
   CheckCircle,
   MessageCircle,
+  TrendingUp,
+  Crown,
+  Target,
+  Heart,
+  ArrowRight,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
-import { SpotlightCard } from "@/components/design-system";
+import { SpotlightCard, AnimatedBorderCard } from "@/components/design-system";
 
 interface Tier {
   id: string;
@@ -54,6 +59,13 @@ interface Community {
   primary_color: string | null;
   is_official: boolean;
   member_count: number;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  fan_id: string;
+  fan_name: string;
+  points: number;
 }
 
 const MAX_COMMUNITIES = 3;
@@ -81,7 +93,6 @@ export default function FanHome() {
   const [currentTier, setCurrentTier] = useState<Tier | null>(null);
   const [nextTier, setNextTier] = useState<Tier | null>(null);
 
-  const [tierBenefits, setTierBenefits] = useState<Record<string, unknown>[]>([]);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
@@ -89,6 +100,10 @@ export default function FanHome() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  
+  // Ranking state
+  const [fanRank, setFanRank] = useState<number | null>(null);
+  const [totalFans, setTotalFans] = useState<number>(0);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
@@ -208,6 +223,19 @@ export default function FanHome() {
 
         setCurrentTier(current);
         setNextTier(next);
+        
+        // Fetch fan's rank
+        const { data: leaderboardData } = await supabase
+          .from("fan_memberships")
+          .select("fan_id, points_balance")
+          .eq("club_id", m.club_id)
+          .order("points_balance", { ascending: false });
+          
+        if (leaderboardData) {
+          const fanIndex = leaderboardData.findIndex((entry) => entry.fan_id === profile.id);
+          setFanRank(fanIndex !== -1 ? fanIndex + 1 : null);
+          setTotalFans(leaderboardData.length);
+        }
       }
 
       const { count } = await supabase
@@ -279,13 +307,11 @@ export default function FanHome() {
         100
       : 100;
 
-  // Separate communities into official and fan
-  const officialCommunities = communities.filter((c) => c.is_official);
-  const fanCommunities = communities.filter((c) => !c.is_official);
-
   // Find the official club that the fan is a loyalty member of
   const loyaltyClubId = membership?.club_id;
-  const loyaltyCommunity = communities.find((c) => c.id === loyaltyClubId);
+  
+  // Filter communities: exclude the current club if fan is viewing their official club's page
+  const filteredCommunities = communities.filter((c) => c.id !== loyaltyClubId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -294,7 +320,7 @@ export default function FanHome() {
       {/* HEADER */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex items-center justify-between">
+        <div className="relative container py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo size="sm" />
             <div className="h-5 w-px bg-border/40" />
@@ -302,6 +328,20 @@ export default function FanHome() {
               Fan Hub
             </span>
           </div>
+
+          {/* RANKING BADGE - Moved from quick nav */}
+          {fanRank && (
+            <div 
+              className="hidden sm:flex items-center gap-2 glass-dark px-3 py-1.5 rounded-full cursor-pointer hover:bg-white/10 transition-colors"
+              onClick={() => navigate("/fan/leaderboard")}
+            >
+              <Crown className="h-4 w-4 text-accent" />
+              <span className="text-sm font-semibold text-white">
+                #{fanRank} <span className="text-white/50 text-xs font-normal">/ {totalFans}</span>
+              </span>
+              <TrendingUp className="h-3.5 w-3.5 text-green-400" />
+            </div>
+          )}
 
           <div className="flex items-center gap-1">
             <Button
@@ -317,7 +357,7 @@ export default function FanHome() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/fan/leaderboard")}
-              className="relative rounded-full text-muted-foreground hover:text-foreground h-9 w-9"
+              className="relative rounded-full text-muted-foreground hover:text-foreground h-9 w-9 sm:hidden"
               title="Leaderboard"
             >
               <BarChart3 className="h-4 w-4" />
@@ -355,11 +395,11 @@ export default function FanHome() {
         </div>
       </header>
 
-      <main className="container py-8 space-y-8">
+      <main className="container py-6 space-y-6">
         {/* LOYALTY PROGRAM SECTION (if member) */}
         {membership && club && (
           <>
-            {/* HERO CARD */}
+            {/* HERO CARD - KEPT AS IS */}
             <div className="relative overflow-hidden rounded-3xl border border-border/40">
               <div className="absolute inset-0 gradient-hero" />
               <div className="absolute inset-0 stadium-pattern" />
@@ -432,291 +472,312 @@ export default function FanHome() {
               </div>
             </div>
 
-            {/* QUICK NAV BENTO ROW */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SpotlightCard
-                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
-                spotlightColor="hsl(var(--primary) / 0.15)"
-                onClick={() => navigate("/fan/activities")}
-              >
-                <div className="h-11 w-11 rounded-2xl bg-primary/15 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-                  <Zap className="h-5 w-5 text-primary" />
+            {/* BENTO GRID LAYOUT - Split into Loyalty & Social */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* ===== LOYALTY PROGRAM COLUMN ===== */}
+              <div className="space-y-6">
+                {/* Section Header */}
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
+                    <Target className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-display font-bold text-foreground">Loyalty Program</h2>
+                    <p className="text-xs text-muted-foreground">Earn points and unlock rewards</p>
+                  </div>
                 </div>
-                <span className="text-xs font-semibold text-foreground relative z-10">Activities</span>
-              </SpotlightCard>
-              <SpotlightCard
-                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
-                spotlightColor="hsl(var(--accent) / 0.15)"
-                onClick={() => navigate("/fan/rewards")}
-              >
-                <div className="h-11 w-11 rounded-2xl bg-accent/15 flex items-center justify-center group-hover:bg-accent/25 transition-colors">
-                  <Gift className="h-5 w-5 text-accent" />
-                </div>
-                <span className="text-xs font-semibold text-foreground relative z-10">Rewards</span>
-              </SpotlightCard>
-              <SpotlightCard
-                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
-                spotlightColor="hsl(var(--primary) / 0.1)"
-                onClick={() => navigate("/fan/leaderboard")}
-              >
-                <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <span className="text-xs font-semibold text-foreground relative z-10">Rankings</span>
-              </SpotlightCard>
-              <SpotlightCard
-                className="p-5 flex flex-col items-center gap-2 cursor-pointer text-center"
-                spotlightColor="hsl(0 84% 60% / 0.15)"
-                onClick={() => navigate("/fan/chants")}
-              >
-                <div className="h-11 w-11 rounded-2xl bg-red-500/15 flex items-center justify-center group-hover:bg-red-500/25 transition-colors">
-                  <Megaphone className="h-5 w-5 text-red-500" />
-                </div>
-                <span className="text-xs font-semibold text-foreground relative z-10">Chants</span>
-              </SpotlightCard>
-            </div>
 
-            {/* ACTIVITIES SECTION */}
-            {activities.length > 0 && (
-              <div>
-                <SectionHeader
-                  title="Activities"
-                  icon={<Zap className="h-4 w-4 text-primary" />}
-                  onClick={() => navigate("/fan/activities")}
-                />
-
-                <div className="grid gap-3">
-                  {activities.map((a) => {
-                    const multiplied = Math.round(a.points_awarded * multiplier);
-                    return (
-                      <SportCard
-                        key={a.id}
-                        title={a.name}
-                        badge={multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
-                        badgeColor="primary"
+                {/* ACTIVITIES SECTION - With AnimatedBorderCard */}
+                {activities.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-primary" />
+                        Activities
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => navigate("/fan/activities")}
-                        actionLabel="Participate"
-                        icon={<Zap className="h-4 w-4 text-primary" />}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* REWARDS SECTION */}
-            {rewards.length > 0 && (
-              <div>
-                <SectionHeader
-                  title="Rewards"
-                  icon={<Gift className="h-4 w-4 text-accent" />}
-                  onClick={() => navigate("/fan/rewards")}
-                />
-
-                <div className="grid md:grid-cols-3 gap-4">
-                  {rewards.map((r) => {
-                    const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
-                    const canAfford = effectivePointsBalance >= discounted;
-
-                    return (
-                      <div
-                        key={r.id}
-                        className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-5 card-hover flex flex-col gap-3"
+                        className="rounded-full text-xs h-7"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-3xl" />
-                        <div className="relative z-10 flex items-start justify-between gap-2">
-                          <div className="h-10 w-10 rounded-2xl bg-accent/15 flex items-center justify-center flex-shrink-0">
-                            <Gift className="h-5 w-5 text-accent" />
-                          </div>
-                          <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
-                            {discounted} pts
-                          </Badge>
-                        </div>
-                        <div className="relative z-10">
-                          <h3 className="font-display font-bold text-foreground text-sm leading-tight">{r.name}</h3>
-                          {discountPercent > 0 && (
-                            <p className="text-xs text-primary mt-0.5">−{discountPercent}% discount</p>
-                          )}
-                        </div>
-                        <Button
-                          disabled={!canAfford}
-                          size="sm"
-                          className="relative z-10 w-full rounded-2xl gradient-golden font-semibold text-xs mt-auto"
-                          onClick={() => navigate("/fan/rewards")}
-                        >
-                          Redeem
-                        </Button>
+                        View all <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {activities.slice(0, 2).map((a, index) => {
+                        const multiplied = Math.round(a.points_awarded * multiplier);
+                        // Featured activity gets AnimatedBorderCard
+                        if (index === 0) {
+                          return (
+                            <AnimatedBorderCard key={a.id} className="cursor-pointer" onClick={() => navigate("/fan/activities")}>
+                              <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                                  <Zap className="h-5 w-5 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-foreground text-sm truncate">{a.name}</p>
+                                  <Badge className="mt-1 rounded-full text-xs bg-primary/15 text-primary border-primary/25">
+                                    {multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
+                                  </Badge>
+                                </div>
+                                <Button size="sm" className="rounded-xl gradient-stadium text-xs">
+                                  Start
+                                </Button>
+                              </div>
+                            </AnimatedBorderCard>
+                          );
+                        }
+                        return (
+                          <SpotlightCard
+                            key={a.id}
+                            className="p-4 cursor-pointer"
+                            spotlightColor="hsl(var(--primary) / 0.1)"
+                            onClick={() => navigate("/fan/activities")}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <Zap className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground text-sm truncate">{a.name}</p>
+                                <span className="text-xs text-muted-foreground">
+                                  +{a.points_awarded} pts
+                                </span>
+                              </div>
+                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </SpotlightCard>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* REWARDS SECTION - With AnimatedBorderCard */}
+                {rewards.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Gift className="h-4 w-4 text-accent" />
+                        Rewards
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate("/fan/rewards")}
+                        className="rounded-full text-xs h-7"
+                      >
+                        View all <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {rewards.slice(0, 2).map((r, index) => {
+                        const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
+                        const canAfford = effectivePointsBalance >= discounted;
+                        
+                        // Featured reward gets AnimatedBorderCard
+                        if (index === 0) {
+                          return (
+                            <AnimatedBorderCard key={r.id} className="cursor-pointer" onClick={() => navigate("/fan/rewards")}>
+                              <div className="flex flex-col gap-2">
+                                <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                                  <Gift className="h-5 w-5 text-accent" />
+                                </div>
+                                <h4 className="font-semibold text-foreground text-sm leading-tight truncate">{r.name}</h4>
+                                <div className="flex items-center justify-between">
+                                  <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
+                                    {discounted} pts
+                                  </Badge>
+                                  {canAfford && (
+                                    <span className="text-[10px] text-green-500 font-medium">Available</span>
+                                  )}
+                                </div>
+                              </div>
+                            </AnimatedBorderCard>
+                          );
+                        }
+                        
+                        return (
+                          <SpotlightCard
+                            key={r.id}
+                            className="p-4 cursor-pointer"
+                            spotlightColor="hsl(var(--accent) / 0.1)"
+                            onClick={() => navigate("/fan/rewards")}
+                          >
+                            <div className="flex flex-col gap-2">
+                              <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
+                                <Gift className="h-4 w-4 text-accent" />
+                              </div>
+                              <h4 className="font-medium text-foreground text-sm leading-tight truncate">{r.name}</h4>
+                              <span className="text-xs text-muted-foreground">{discounted} pts</span>
+                            </div>
+                          </SpotlightCard>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== SOCIAL COLUMN ===== */}
+              <div className="space-y-6">
+                {/* Section Header */}
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-xl bg-red-500/15 flex items-center justify-center">
+                    <Heart className="h-4 w-4 text-red-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-display font-bold text-foreground">Social</h2>
+                    <p className="text-xs text-muted-foreground">Connect with your fan community</p>
+                  </div>
+                </div>
+
+                {/* CHANTS SECTION - Featured with AnimatedBorderCard */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Megaphone className="h-4 w-4 text-red-400" />
+                      Chants
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate("/fan/chants")}
+                      className="rounded-full text-xs h-7"
+                    >
+                      View all <ChevronRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+
+                  <AnimatedBorderCard 
+                    className="cursor-pointer" 
+                    onClick={() => navigate("/fan/chants")}
+                    style={{ '--border-color': 'hsl(0 84% 60%)' } as React.CSSProperties}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                        <Megaphone className="h-5 w-5 text-red-400" />
                       </div>
-                    );
-                  })}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-foreground text-sm">Fan Chants</p>
+                        <p className="text-xs text-muted-foreground">Share your voice with the community</p>
+                      </div>
+                      <Button size="sm" className="rounded-xl bg-red-500/90 hover:bg-red-500 text-white text-xs">
+                        Join
+                      </Button>
+                    </div>
+                  </AnimatedBorderCard>
+                </div>
+
+                {/* COMMUNITIES SECTION - Filtered */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Communities
+                      <Badge variant="outline" className="text-xs ml-1">
+                        {filteredCommunities.length}
+                      </Badge>
+                    </h3>
+                    {filteredCommunities.length < MAX_COMMUNITIES && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate("/fan/discover")}
+                        className="rounded-full text-xs h-7"
+                      >
+                        Discover <Globe className="h-3 w-3 ml-1" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {filteredCommunities.length === 0 ? (
+                    <Card className="rounded-2xl border-dashed border-2 border-border/40 bg-muted/30">
+                      <CardContent className="py-6 text-center">
+                        <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                        <p className="text-sm text-muted-foreground">No other communities joined yet.</p>
+                        <Button
+                          onClick={() => navigate("/fan/discover")}
+                          size="sm"
+                          className="mt-3 rounded-xl gradient-stadium text-xs"
+                        >
+                          Discover Communities
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredCommunities.map((community) => (
+                        <SpotlightCard
+                          key={community.id}
+                          className="p-4 cursor-pointer"
+                          spotlightColor="hsl(var(--primary) / 0.1)"
+                          onClick={() => navigate(`/fan/community/${community.id}`)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-11 w-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
+                              style={{
+                                backgroundColor: community.primary_color || "#16a34a",
+                              }}
+                            >
+                              {community.logo_url ? (
+                                <img
+                                  src={community.logo_url}
+                                  alt={community.name}
+                                  className="h-full w-full rounded-xl object-cover"
+                                />
+                              ) : (
+                                community.name.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="font-semibold text-sm truncate">{community.name}</h4>
+                                {community.is_official && (
+                                  <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {community.member_count}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MessageCircle className="h-3 w-3" />
+                                  Chants
+                                </span>
+                              </div>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </SpotlightCard>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
 
-        {/* MY COMMUNITIES SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              My Communities
-              <Badge variant="outline" className="text-xs">
-                {communities.length}/{MAX_COMMUNITIES}
-              </Badge>
-            </h2>
-            {communities.length < MAX_COMMUNITIES && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/fan/discover")}
-                className="rounded-full"
-              >
-                <Globe className="h-4 w-4 mr-1.5" />
-                Discover More
-              </Button>
-            )}
+        {/* NO MEMBERSHIP STATE */}
+        {!membership && (
+          <div className="text-center py-12">
+            <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h2 className="text-xl font-display font-bold mb-2">Join a Club</h2>
+            <p className="text-muted-foreground mb-6">Start your loyalty journey by joining an official club.</p>
+            <Button onClick={() => navigate("/fan/discover")} className="rounded-xl gradient-stadium">
+              <Globe className="h-4 w-4 mr-2" />
+              Discover Clubs
+            </Button>
           </div>
-
-          {communities.length === 0 ? (
-            <Card className="rounded-2xl border-dashed border-2 border-border/40">
-              <CardContent className="py-8 text-center">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No communities joined yet.</p>
-                <Button
-                  onClick={() => navigate("/fan/discover")}
-                  className="mt-4 rounded-xl gradient-stadium"
-                >
-                  Discover Communities
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {communities.map((community) => {
-                const isLoyaltyClub = community.id === loyaltyClubId;
-                
-                return (
-                  <Card
-                    key={community.id}
-                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all cursor-pointer"
-                    onClick={() => navigate(`/fan/community/${community.id}`)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
-                          style={{
-                            backgroundColor: community.primary_color || "#16a34a",
-                          }}
-                        >
-                          {community.logo_url ? (
-                            <img
-                              src={community.logo_url}
-                              alt={community.name}
-                              className="h-full w-full rounded-xl object-cover"
-                            />
-                          ) : (
-                            community.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-semibold truncate">{community.name}</h3>
-                            {community.is_official && (
-                              <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {community.city ? `${community.city}, ` : ""}
-                            {community.country}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {community.member_count} members
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="h-3 w-3" />
-                              Chants
-                            </span>
-                          </div>
-                          {isLoyaltyClub && (
-                            <Badge className="mt-2 text-[10px] bg-accent/10 text-accent border-accent/20">
-                              <Star className="h-3 w-3 mr-1" />
-                              Loyalty Member
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </main>
-    </div>
-  );
-}
-
-/* ---------- reusable components ---------- */
-
-interface SectionHeaderProps {
-  title: string;
-  icon?: React.ReactNode;
-  onClick?: () => void;
-}
-
-function SectionHeader({ title, icon, onClick }: SectionHeaderProps) {
-  return (
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
-        {icon}
-        {title}
-      </h2>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onClick}
-        className="rounded-full text-muted-foreground hover:text-foreground text-xs h-8"
-      >
-        View all <ChevronRight className="h-3.5 w-3.5 ml-1" />
-      </Button>
-    </div>
-  );
-}
-
-interface SportCardProps {
-  title: string;
-  badge: string | number;
-  badgeColor?: "primary" | "accent" | "success" | "warning" | "error";
-  onClick?: () => void;
-  actionLabel?: string;
-  icon?: React.ReactNode;
-}
-
-function SportCard({ title, badge, badgeColor = "primary", onClick, actionLabel, icon }: SportCardProps) {
-  return (
-    <div className="relative overflow-hidden rounded-3xl bg-card border border-border/50 p-4 card-hover flex items-center gap-4">
-      <div className={`absolute inset-0 bg-gradient-to-br ${badgeColor === "accent" ? "from-accent/8" : "from-primary/8"} to-transparent pointer-events-none rounded-3xl`} />
-      <div className={`h-10 w-10 rounded-2xl ${badgeColor === "accent" ? "bg-accent/15" : "bg-primary/15"} flex items-center justify-center flex-shrink-0 relative z-10`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0 relative z-10">
-        <p className="font-semibold text-foreground text-sm truncate">{title}</p>
-        <Badge className={`mt-1 rounded-full text-xs ${badgeColor === "accent" ? "bg-accent/15 text-accent border-accent/25" : "bg-primary/15 text-primary border-primary/25"}`}>
-          {badge}
-        </Badge>
-      </div>
-      <Button
-        size="sm"
-        onClick={onClick}
-        className={`relative z-10 rounded-2xl font-semibold text-xs flex-shrink-0 ${badgeColor === "accent" ? "gradient-golden" : "gradient-stadium"}`}
-      >
-        {actionLabel}
-      </Button>
     </div>
   );
 }
