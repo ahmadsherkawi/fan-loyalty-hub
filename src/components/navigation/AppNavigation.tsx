@@ -221,7 +221,7 @@ function AppNavigation({
               </Button>
             )}
 
-            <Logo size={showBack ? "sm" : "default"} />
+            <Logo size={showBack ? "sm" : "md"} />
 
             {/* Divider */}
             {(clubName || title) && (

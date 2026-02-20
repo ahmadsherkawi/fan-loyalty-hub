@@ -411,7 +411,7 @@ export default function ClubDashboard() {
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />
 
-          <div className="relative z-10 p-8 md:p-10 bg-popover-foreground">
+          <div className="relative z-10 p-8 md:p-10">
             <div className="flex items-start gap-6">
               {/* Large Club Logo in Hero with upload */}
               <div className="relative group flex-shrink-0">
