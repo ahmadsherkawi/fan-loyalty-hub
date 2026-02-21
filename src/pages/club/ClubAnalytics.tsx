@@ -23,10 +23,20 @@ export default function ClubAnalytics() {
 
   const [club, setClub] = useState<Club | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [fansGrowth, setFansGrowth] = useState<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pointsFlow, setPointsFlow] = useState<any[]>([]);
+  
+  interface FansGrowthData {
+    month: string;
+    fans: number;
+  }
+  
+  interface PointsFlowData {
+    month: string;
+    issued: number;
+    spent: number;
+  }
+  
+  const [fansGrowth, setFansGrowth] = useState<FansGrowthData[]>([]);
+  const [pointsFlow, setPointsFlow] = useState<PointsFlowData[]>([]);
   const [activeFans, setActiveFans] = useState(0);
 
   useEffect(() => {

@@ -12,7 +12,19 @@ import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, FileCheck, CheckCircle, XCircle, Clock, Loader2, Gift, LogOut, Sparkles, Package, ClipboardCheck, User, Hash, Calendar } from "lucide-react";
 
-import type { ManualClaim, Activity, Profile, LoyaltyProgram, RewardRedemption, Reward } from "@/types/database";
+import type { 
+  ManualClaim, 
+  Activity, 
+  Profile, 
+  LoyaltyProgram, 
+  RewardRedemption, 
+  Reward,
+  ManualClaimWithJoins,
+  RewardRedemptionWithReward,
+  FanProfileForRedemption,
+  CompleteActivityResult,
+  Notification
+} from "@/types/database";
 
 interface ClaimWithDetails extends ManualClaim {
   activity: Activity;
@@ -94,16 +106,13 @@ export default function ClaimReview() {
         .eq("activities.program_id", p.id)
         .order("created_at", { ascending: false });
       if (claimsErr) throw claimsErr;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedClaims = ((claimsData ?? []) as any[]).map((row: any) => {
-        const c = row as ManualClaim & { activities: Activity; profiles: Profile };
-        return { ...c, activity: c.activities, fan_profile: c.profiles } as ClaimWithDetails;
+      const formattedClaims = ((claimsData ?? []) as ManualClaimWithJoins[]).map((row) => {
+        return { ...row, activity: row.activities, fan_profile: row.profiles } as ClaimWithDetails;
       });
       setActivityClaims(formattedClaims);
       
       // Fetch ALL redemptions for this program
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: redemptionsData, error: redsErr } = await (supabase as any)
+      const { data: redemptionsData, error: redsErr } = await supabase
         .from("reward_redemptions")
         .select(`id, reward_id, fan_id, membership_id, points_spent, redemption_code, fulfilled_at, completed_at, redeemed_at, rewards!inner(id, name, description, points_cost, redemption_method, program_id)`)
         .eq("rewards.program_id", p.id)
@@ -115,24 +124,22 @@ export default function ClaimReview() {
       }
       
       // Fetch fan profiles separately to avoid join issues
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fanIds = [...new Set(((redemptionsData ?? []) as any[]).map((r: any) => r.fan_id))];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: fanProfiles } = await (supabase as any)
+      const redemptions = (redemptionsData ?? []) as RewardRedemptionWithReward[];
+      const fanIds = [...new Set(redemptions.map((r) => r.fan_id))];
+      const { data: fanProfiles } = await supabase
         .from("profiles")
         .select("id, full_name, email, user_id, phone")
         .in("id", fanIds);
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fanProfileMap = new Map(((fanProfiles ?? []) as any[]).map((p: any) => [p.id, p]));
+      const fanProfileMap = new Map<string, FanProfileForRedemption>(
+        ((fanProfiles ?? []) as FanProfileForRedemption[]).map((p) => [p.id, p])
+      );
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedRedemptions = ((redemptionsData ?? []) as any[]).map((row: any) => {
-        const r = row as RewardRedemption & { rewards: Reward };
-        const fanProfile = fanProfileMap.get(r.fan_id);
+      const formattedRedemptions = redemptions.map((row) => {
+        const fanProfile = fanProfileMap.get(row.fan_id);
         return { 
-          ...r, 
-          reward: r.rewards, 
+          ...row, 
+          reward: row.rewards, 
           fan_profile: fanProfile ? { 
             id: fanProfile.id, 
             full_name: fanProfile.full_name, 
@@ -173,8 +180,10 @@ export default function ClaimReview() {
     try {
       const { error: claimError } = await supabase.from("manual_claims").update({ status: "approved", reviewed_by: profile?.id, reviewed_at: new Date().toISOString() }).eq("id", claim.id);
       if (claimError) throw claimError;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: completeError } = await (supabase as any).rpc("complete_activity", { p_membership_id: claim.membership_id, p_activity_id: claim.activity_id });
+      const { error: completeError } = await supabase.rpc("complete_activity", { 
+        p_membership_id: claim.membership_id, 
+        p_activity_id: claim.activity_id 
+      });
       if (completeError) throw completeError;
       toast({ title: "Claim Approved", description: `Awarded ${claim.activity.points_awarded} ${program?.points_currency_name || "Points"}.` });
       await fetchData();
@@ -219,12 +228,11 @@ export default function ClaimReview() {
       
       // Create notification for the fan
       if (fanProfile?.user_id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: notifError } = await (supabase as any).from("notifications").insert({
+        const { error: notifError } = await supabase.from("notifications").insert({
           user_id: fanProfile.user_id,
           type: "reward_fulfilled",
+          title: "Reward Ready! 🎁",
           data: {
-            title: "Reward Ready! 🎁",
             message: `Your "${redemption.reward?.name}" is ready for pickup! Show your code at the venue.`,
             rewardName: redemption.reward?.name,
             redemptionCode: redemption.redemption_code,
@@ -232,7 +240,7 @@ export default function ClaimReview() {
             actionLabel: "View My Rewards",
             priority: "high"
           }
-        });
+        } as Partial<Notification>);
         
         if (notifError) {
           console.error("Failed to create notification:", notifError);
@@ -257,8 +265,7 @@ export default function ClaimReview() {
       
       console.log("Marking redemption as completed:", redemption.id);
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: updateError } = await (supabase as any).from("reward_redemptions").update({ 
+      const { error: updateError } = await supabase.from("reward_redemptions").update({ 
         completed_at: now 
       }).eq("id", redemption.id);
       
@@ -285,19 +292,18 @@ export default function ClaimReview() {
       
       // Create notification for the fan confirming completion (non-blocking)
       if (fanUserId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: notifError } = await (supabase as any).from("notifications").insert({
+        const { error: notifError } = await supabase.from("notifications").insert({
           user_id: fanUserId,
           type: "reward_completed",
+          title: "Reward Collected! ✅",
           data: {
-            title: "Reward Collected! ✅",
             message: `You have successfully collected your "${redemption.reward?.name}". Enjoy!`,
             rewardName: redemption.reward?.name,
             pointsSpent: redemption.points_spent,
             completedAt: now,
             priority: "normal"
           }
-        });
+        } as Partial<Notification>);
         
         if (notifError) {
           console.error("Notification error (non-blocking):", notifError);

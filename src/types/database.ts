@@ -231,12 +231,21 @@ export type NotificationType =
   | "smart_nudge"
   | "streak_reminder"
   | "new_reward"
-  | "proximity_nudge";
+  | "proximity_nudge"
+  | "reward_fulfilled"
+  | "reward_completed"
+  | "tier_progress"
+  | "reward_available"
+  | "reward_close"
+  | "pending_claims"
+  | "morning_motivation"
+  | "evening_recap"
+  | "new_activities";
 
 export interface Notification {
   id: string;
   user_id: string;
-  type: NotificationType;
+  type: NotificationType | string;
   title: string | null;
   data: Record<string, unknown>;
   is_read: boolean;
@@ -302,4 +311,113 @@ export interface EventParticipant {
   status: 'interested' | 'going' | 'not_going';
   notes: string | null;
   joined_at: string;
+}
+
+// ============================================================
+// JOIN QUERY RESULT TYPES
+// ============================================================
+
+// Manual claims with joined activity and profile data
+export interface ManualClaimWithJoins extends ManualClaim {
+  activities: Activity;
+  profiles: Profile;
+}
+
+// Reward redemption with joined reward data
+export interface RewardRedemptionWithReward extends RewardRedemption {
+  rewards: Reward;
+}
+
+// Fan profile for redemption display
+export interface FanProfileForRedemption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  user_id: string | null;
+  phone: string | null;
+}
+
+// Profile with user_id for notifications
+export interface ProfileWithUserId extends Profile {
+  user_id: string;
+}
+
+// ============================================================
+// RPC FUNCTION RETURN TYPES
+// ============================================================
+
+// Result from complete_activity RPC
+export interface CompleteActivityResult {
+  success: boolean;
+  points_awarded: number;
+  message?: string;
+}
+
+// Result from create_chant RPC
+export interface CreateChantResult {
+  id: string;
+  points_awarded: number;
+}
+
+// Result from toggle_chant_cheer RPC
+export interface ToggleChantCheerResult {
+  cheered: boolean;
+  cheers_count: number;
+}
+
+// Leaderboard entry type
+export interface LeaderboardEntry {
+  rank: number;
+  fan_id: string;
+  fan_name: string | null;
+  fan_avatar_url: string | null;
+  points: number;
+  tier_name: string | null;
+}
+
+// Chant with fan details from RPC
+export interface ChantWithFanDetails {
+  id: string;
+  fan_id: string;
+  fan_name: string | null;
+  fan_avatar_url: string | null;
+  content: string;
+  image_url: string | null;
+  cheers_count: number;
+  is_edited: boolean;
+  created_at: string;
+  updated_at: string;
+  cheered_by_me: boolean;
+}
+
+// Reported chant for admin review
+export interface ReportedChant {
+  id: string;
+  chant_id: string;
+  chant_content: string;
+  chant_image_url: string | null;
+  reporter_id: string;
+  reporter_name: string | null;
+  reason: string;
+  status: 'pending' | 'reviewed' | 'removed' | 'dismissed';
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+// Analytics data types
+export interface AnalyticsDataPoint {
+  date: string;
+  value: number;
+}
+
+export interface ClubAnalyticsData {
+  total_members: number;
+  active_members: number;
+  total_points_earned: number;
+  total_points_redeemed: number;
+  activities_completed: number;
+  rewards_redeemed: number;
+  member_growth: AnalyticsDataPoint[];
+  points_distribution: AnalyticsDataPoint[];
 }

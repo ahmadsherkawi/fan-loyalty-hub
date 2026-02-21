@@ -93,8 +93,7 @@ export default function AdminReportedChants() {
       }
 
       // Fetch reported chants
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).rpc("get_reported_chants", {
+      const { data, error } = await supabase.rpc("get_reported_chants", {
         p_limit: 100,
         p_offset: 0,
       });
@@ -128,8 +127,7 @@ export default function AdminReportedChants() {
   const fetchReports = async (chantId: string) => {
     setLoadingReports(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).rpc("get_chant_reports", {
+      const { data, error } = await supabase.rpc("get_chant_reports", {
         p_chant_id: chantId,
       });
 
@@ -156,8 +154,7 @@ export default function AdminReportedChants() {
     setIsSubmitting(true);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).rpc("admin_delete_reported_chant", {
+      const { error } = await supabase.rpc("admin_delete_reported_chant", {
         p_chant_id: actionChant.id,
         p_admin_id: profile.id,
         p_resolve_reports: true,
@@ -186,8 +183,7 @@ export default function AdminReportedChants() {
     setIsSubmitting(true);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).rpc("dismiss_chant_reports", {
+      const { error } = await supabase.rpc("dismiss_chant_reports", {
         p_chant_id: actionChant.id,
         p_admin_id: profile.id,
       });

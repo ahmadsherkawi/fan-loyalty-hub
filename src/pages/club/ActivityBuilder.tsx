@@ -179,9 +179,8 @@ export default function ActivityBuilder() {
       }
       setProgram(programs[0] as LoyaltyProgram);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const activitiesTable = supabase.from("activities") as any;
-      const { data: activitiesData } = await activitiesTable
+      const { data: activitiesData } = await supabase
+        .from("activities")
         .select("*")
         .eq("program_id", programs[0].id)
         .order("created_at", { ascending: false });
@@ -709,8 +708,7 @@ export default function ActivityBuilder() {
                   Poll Results: {pollResultsActivity.name}
                 </DialogTitle>
                 <DialogDescription>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {(pollResultsActivity.in_app_config as any)?.question}
+                  {pollResultsActivity.in_app_config?.question}
                 </DialogDescription>
               </DialogHeader>
               

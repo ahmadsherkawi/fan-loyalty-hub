@@ -669,8 +669,7 @@ export default function SystemAdmin() {
 
   const fetchClubRequests = async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("club_requests")
         .select("*")
         .order("created_at", { ascending: false });
@@ -694,8 +693,7 @@ export default function SystemAdmin() {
   const handleUpdateClubRequest = async (requestId: string, newStatus: ClubRequest["status"]) => {
     setActionLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("club_requests")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", requestId);
