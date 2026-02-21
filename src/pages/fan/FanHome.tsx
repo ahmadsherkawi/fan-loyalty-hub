@@ -35,8 +35,7 @@ import {
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 import { SpotlightCard, AnimatedBorderCard } from "@/components/design-system";
-import { LiveMatchCenter, PersonalizedFeed } from "@/components/ai";
-import type { FootballMatch } from "@/types/football";
+import { PersonalizedFeed } from "@/components/ai";
 
 interface Tier {
   id: string;
@@ -449,63 +448,77 @@ export default function FanHome() {
               </div>
             </div>
 
-            {/* ===================== AI-POWERED FEATURES ===================== */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Live Match Center */}
-              <div className="lg:col-span-2">
-                <LiveMatchCenter 
-                  clubId={club.id}
-                  clubName={club.name}
-                  onMatchSelect={(match) => {
-                    // Navigate to match detail or show prediction
-                    console.log('Match selected:', match);
-                  }}
-                />
-              </div>
+            {/* ===================== QUICK ACCESS CARDS ===================== */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Match Center Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--primary) / 0.08)"
+                onClick={() => navigate('/fan/matches')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-red-500/15 flex items-center justify-center">
+                    <Radio className="h-6 w-6 text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Match Center</h3>
+                    <p className="text-xs text-muted-foreground">Live scores & predictions</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
               
-              {/* Personalized Recommendations */}
-              <div>
-                <PersonalizedFeed
-                  fanId={profile?.id || ''}
-                  clubId={club.id}
-                  clubName={club.name}
-                  pointsBalance={effectivePointsBalance}
-                  tierName={currentTier?.name || null}
-                  upcomingMatches={[]}
-                  recentActivityTypes={recentActivityTypes}
-                  unreadNotifications={unreadCount}
-                />
-              </div>
+              {/* AI Chant Generator Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--accent) / 0.08)"
+                onClick={() => navigate('/fan/chants')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                    <Brain className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">AI Chants</h3>
+                    <p className="text-xs text-muted-foreground">Generate unique chants</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
               
-              {/* AI Chant Generator CTA */}
-              <div>
-                <SpotlightCard className="p-5 h-full" spotlightColor="hsl(var(--accent) / 0.08)">
-                  <div className="flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                        <Brain className="h-5 w-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">AI Chant Generator</h3>
-                        <p className="text-xs text-muted-foreground">Create unique chants for your club</p>
-                      </div>
+              {/* Leaderboard Card */}
+              {fanRank && (
+                <SpotlightCard 
+                  className="p-4 cursor-pointer"
+                  spotlightColor="hsl(var(--accent) / 0.08)"
+                  onClick={() => navigate('/fan/leaderboard')}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-accent/15 flex items-center justify-center">
+                      <Crown className="h-6 w-6 text-accent" />
                     </div>
-                    
-                    <p className="text-sm text-muted-foreground flex-1">
-                      Generate personalized, passionate football chants powered by AI. 
-                      Perfect for match days, player tributes, or showing your club spirit!
-                    </p>
-                    
-                    <Button 
-                      onClick={() => navigate('/fan/chants')}
-                      className="mt-4 w-full rounded-xl gradient-stadium"
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate a Chant
-                    </Button>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Your Rank</h3>
+                      <p className="text-xs text-muted-foreground">#{fanRank} of {totalFans} fans</p>
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-green-400" />
                   </div>
                 </SpotlightCard>
-              </div>
+              )}
+            </div>
+
+            {/* ===================== PERSONALIZED RECOMMENDATIONS ===================== */}
+            <div className="space-y-4">
+              <PersonalizedFeed
+                fanId={profile?.id || ''}
+                clubId={club.id}
+                clubName={club.name}
+                pointsBalance={effectivePointsBalance}
+                tierName={currentTier?.name || null}
+                upcomingMatches={[]}
+                recentActivityTypes={recentActivityTypes}
+                unreadNotifications={unreadCount}
+              />
             </div>
 
             {/* LOYALTY PROGRAM SECTION */}

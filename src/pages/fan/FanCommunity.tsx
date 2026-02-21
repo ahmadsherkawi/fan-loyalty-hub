@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Logo } from "@/components/ui/Logo";
 import { ChantCard } from "@/components/ui/ChantCard";
+import { SpotlightCard, AnimatedBorderCard } from "@/components/design-system";
+import { AIChantGenerator } from "@/components/ai";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -27,6 +29,8 @@ import {
   Gift,
   Star,
   ChevronRight,
+  Radio,
+  Brain,
 } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 
@@ -104,6 +108,7 @@ export default function FanCommunity() {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!profile || !clubId) return;
@@ -626,6 +631,43 @@ export default function FanCommunity() {
           </div>
         </div>
 
+        {/* Quick Access Cards - Available to all communities */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Match Center Card */}
+          <SpotlightCard 
+            className="p-3 cursor-pointer"
+            spotlightColor="hsl(var(--primary) / 0.08)"
+            onClick={() => navigate('/fan/matches')}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-red-500/15 flex items-center justify-center">
+                <Radio className="h-4 w-4 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">Matches</h3>
+                <p className="text-[10px] text-muted-foreground">Live scores</p>
+              </div>
+            </div>
+          </SpotlightCard>
+          
+          {/* AI Chant Generator Card */}
+          <SpotlightCard 
+            className="p-3 cursor-pointer"
+            spotlightColor="hsl(var(--accent) / 0.08)"
+            onClick={() => navigate('/fan/chants')}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                <Brain className="h-4 w-4 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">AI Chants</h3>
+                <p className="text-[10px] text-muted-foreground">Generate chants</p>
+              </div>
+            </div>
+          </SpotlightCard>
+        </div>
+
         {/* Loyalty Program Section for Official Clubs */}
         {community.is_official && loyaltyProgram && (
           <Card className="rounded-2xl border-accent/30 bg-gradient-to-br from-accent/5 to-transparent">
@@ -739,83 +781,128 @@ export default function FanCommunity() {
 
         {/* Chant Composer (only for members) */}
         {isMember && (
-          <Card className="rounded-2xl border-border/50">
-            <CardContent className="p-4 space-y-4">
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Share your thoughts with the community..."
-                className="rounded-xl border-border/40 min-h-[80px] resize-none"
-                maxLength={500}
-              />
-
-              {imageUrl && (
-                <div className="relative inline-block">
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="rounded-xl max-h-32 w-auto"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
-                    onClick={() => setImageUrl(null)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
+          <div className="space-y-4">
+            {/* AI Chant Generator for Communities */}
+            {showAIGenerator && (
+              <Card className="rounded-2xl border-purple-500/30 bg-purple-500/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-purple-400" />
+                      <span className="text-sm font-semibold text-purple-400">AI Chant Generator</span>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      type="button"
-                      disabled={uploadingImage}
-                      className="rounded-full text-muted-foreground"
-                      asChild
+                      onClick={() => setShowAIGenerator(false)}
+                      className="h-7 rounded-full text-xs"
                     >
-                      <span>
-                        {uploadingImage ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-4 w-4" />
-                        )}
-                      </span>
+                      Hide
                     </Button>
-                  </label>
-                  <span className="text-xs text-muted-foreground">
-                    {content.length}/500
-                  </span>
-                </div>
+                  </div>
+                  <AIChantGenerator
+                    clubName={community.name}
+                    onChantCreated={(chant) => {
+                      setContent(chant.content);
+                      setShowAIGenerator(false);
+                      sonnerToast.success("AI chant generated! Edit it or post as-is.");
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
-                <Button
-                  onClick={handlePost}
-                  disabled={posting || !content.trim() || content.length > 500}
-                  className="rounded-full gradient-stadium"
-                >
-                  {posting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Chant
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {/* AI Generator Toggle */}
+            {!showAIGenerator && (
+              <Button
+                variant="outline"
+                onClick={() => setShowAIGenerator(true)}
+                className="w-full rounded-xl border-dashed border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                Generate AI Chant
+              </Button>
+            )}
+
+            {/* Regular Chant Composer */}
+            <Card className="rounded-2xl border-border/50">
+              <CardContent className="p-4 space-y-4">
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Share your thoughts with the community..."
+                  className="rounded-xl border-border/40 min-h-[80px] resize-none"
+                  maxLength={500}
+                />
+
+                {imageUrl && (
+                  <div className="relative inline-block">
+                    <img
+                      src={imageUrl}
+                      alt="Preview"
+                      className="rounded-xl max-h-32 w-auto"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
+                      onClick={() => setImageUrl(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        disabled={uploadingImage}
+                        className="rounded-full text-muted-foreground"
+                        asChild
+                      >
+                        <span>
+                          {uploadingImage ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4" />
+                          )}
+                        </span>
+                      </Button>
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                      {content.length}/500
+                    </span>
+                  </div>
+
+                  <Button
+                    onClick={handlePost}
+                    disabled={posting || !content.trim() || content.length > 500}
+                    className="rounded-full gradient-stadium"
+                  >
+                    {posting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Chant
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Join CTA for non-members */}

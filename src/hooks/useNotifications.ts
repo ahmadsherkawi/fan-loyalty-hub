@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * Custom hook for managing smart notifications
  * Provides real-time notifications and smart nudge generation

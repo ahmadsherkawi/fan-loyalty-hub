@@ -16,6 +16,14 @@ export default defineConfig(({ mode }) => ({
       ".trycloudflare.com",
       ".loca.lt",
     ],
+    proxy: {
+      // Proxy AI API calls to Next.js backend
+      "/api/ai": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

@@ -42,6 +42,7 @@ import FanNotifications from "./pages/fan/FanNotifications";
 import FanChants from "./pages/fan/FanChants";
 import FanDiscover from "./pages/fan/FanDiscover";
 import FanCommunity from "./pages/fan/FanCommunity";
+import MatchCenterPage from "./pages/fan/MatchCenterPage";
 import ClubChants from "./pages/club/ClubChants";
 import AdminReportedChants from "./pages/admin/AdminReportedChants";
 import SystemAdmin from "./pages/SystemAdmin";
@@ -101,6 +102,7 @@ const AnimatedRoutes = () => {
           <Route path="/fan/notifications" element={<FanNotifications />} />
           <Route path="/fan/chants" element={<FanChants />} />
           <Route path="/fan/discover" element={<FanDiscover />} />
+          <Route path="/fan/matches" element={<MatchCenterPage />} />
           <Route path="/fan/community/:clubId" element={<FanCommunity />} />
           {/* System Admin */}
           <Route path="/admin" element={<SystemAdmin />} />
