@@ -335,39 +335,21 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
     return cached;
   }
 
-  // Try TheSportsDB first (more CORS-friendly for browser)
-  console.log('[FootballAPI] Searching TheSportsDB for:', query);
-  try {
-    const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
-    
-    if (result?.teams && result.teams.length > 0) {
-      console.log('[FootballAPI] TheSportsDB results:', result.teams.length);
-      const mapped = result.teams.map(t => ({
-        id: t.idTeam || String(Math.random()),
-        name: t.strTeam || 'Unknown',
-        logo: t.strTeamBadge || null,
-        country: t.strCountry || '',
-      })).filter(t => t.name && t.name !== 'Unknown');
-      setCache(cacheKey, mapped);
-      return mapped;
-    }
-  } catch (err) {
-    console.error('[FootballAPI] TheSportsDB error:', err);
-  }
-
-  // Try API-Football as backup
-  console.log('[FootballAPI] Trying API-Football for:', query);
+  // Try API-Football first (better fuzzy search)
+  console.log('[FootballAPI] Searching API-Football for:', query);
   try {
     const teams = await fetchApiFootball<Array<{ id: number; name: string; logo: string; country: string }>>('teams', { search: query });
     
     if (teams && teams.length > 0) {
-      console.log('[FootballAPI] API-Football results:', teams.length);
-      const result = teams.map(t => ({
-        id: String(t.id),
-        name: t.name,
-        logo: t.logo,
-        country: t.country,
-      }));
+      console.log('[FootballAPI] API-Football results:', teams.length, teams.slice(0, 3));
+      const result = teams
+        .filter(t => t && t.name)
+        .map(t => ({
+          id: String(t.id),
+          name: t.name,
+          logo: t.logo || null,
+          country: t.country || '',
+        }));
       setCache(cacheKey, result);
       return result;
     }
@@ -375,8 +357,72 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
     console.error('[FootballAPI] API-Football error:', err);
   }
 
+  // Fallback to TheSportsDB (requires more exact matching)
+  console.log('[FootballAPI] Trying TheSportsDB for:', query);
+  try {
+    // TheSportsDB search - try the search endpoint
+    const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
+    
+    if (result?.teams && result.teams.length > 0) {
+      console.log('[FootballAPI] TheSportsDB results:', result.teams.length);
+      const mapped = result.teams
+        .filter(t => t && t.strTeam)
+        .map(t => ({
+          id: t.idTeam || `tsdb-${Math.random().toString(36).slice(2)}`,
+          name: t.strTeam,
+          logo: t.strTeamBadge || null,
+          country: t.strCountry || '',
+        }));
+      setCache(cacheKey, mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.error('[FootballAPI] TheSportsDB error:', err);
+  }
+
+  // If both fail, return some popular teams as suggestions for partial matches
+  if (query.length >= 2) {
+    const popularTeams = getPopularTeamSuggestions(query);
+    if (popularTeams.length > 0) {
+      console.log('[FootballAPI] Using popular team suggestions for:', query);
+      return popularTeams;
+    }
+  }
+
   console.log('[FootballAPI] No results found for:', query);
   return [];
+}
+
+// Fallback popular teams for when API fails or rate-limited
+function getPopularTeamSuggestions(query: string): Array<{ id: string; name: string; logo: string | null; country: string }> {
+  const popularTeams = [
+    { id: 'barcelona', name: 'Barcelona', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/4/47/FC_Barcelona_%28crest%29.svg/1200px-FC_Barcelona_%28crest%29.svg.png', country: 'Spain' },
+    { id: 'real-madrid', name: 'Real Madrid', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/56/Real_Madrid_CF.svg/1200px-Real_Madrid_CF.svg.png', country: 'Spain' },
+    { id: 'man-united', name: 'Manchester United', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/7/7a/Manchester_United_FC_crest.svg/1200px-Manchester_United_FC_crest.svg.png', country: 'England' },
+    { id: 'man-city', name: 'Manchester City', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/e/eb/Manchester_City_FC_badge.svg/1200px-Manchester_City_FC_badge.svg.png', country: 'England' },
+    { id: 'liverpool', name: 'Liverpool', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/0c/Liverpool_FC.svg/1200px-Liverpool_FC.svg.png', country: 'England' },
+    { id: 'chelsea', name: 'Chelsea', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/1200px-Chelsea_FC.svg.png', country: 'England' },
+    { id: 'arsenal', name: 'Arsenal', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/1200px-Arsenal_FC.svg.png', country: 'England' },
+    { id: 'tottenham', name: 'Tottenham Hotspur', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b4/Tottenham_Hotspur.svg/1200px-Tottenham_Hotspur.svg.png', country: 'England' },
+    { id: 'bayern', name: 'Bayern Munich', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg/1200px-FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg.png', country: 'Germany' },
+    { id: 'dortmund', name: 'Borussia Dortmund', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Borussia_Dortmund_logo.svg/1200px-Borussia_Dortmund_logo.svg.png', country: 'Germany' },
+    { id: 'juventus', name: 'Juventus', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Juventus_FC_2017_icon_%28black%29.svg/1200px-Juventus_FC_2017_icon_%28black%29.svg.png', country: 'Italy' },
+    { id: 'ac-milan', name: 'AC Milan', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Logo_of_AC_Milan.svg/1200px-Logo_of_AC_Milan.svg.png', country: 'Italy' },
+    { id: 'inter', name: 'Inter Milan', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/FC_Internazionale_Milano_2021.svg/1200px-FC_Internazionale_Milano_2021.svg.png', country: 'Italy' },
+    { id: 'psg', name: 'Paris Saint-Germain', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a7/Paris_Saint-Germain_F.C..svg/1200px-Paris_Saint-Germain_F.C..svg.png', country: 'France' },
+    { id: 'benfica', name: 'Benfica', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a2/SL_Benfica_logo.svg/1200px-SL_Benfica_logo.svg.png', country: 'Portugal' },
+    { id: 'portuense', name: 'FC Porto', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/3/37/FC_Porto.svg/1200px-FC_Porto.svg.png', country: 'Portugal' },
+    { id: 'ajax', name: 'Ajax', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/7/79/Ajax_Amsterdam.svg/1200px-Ajax_Amsterdam.svg.png', country: 'Netherlands' },
+    { id: 'celtic', name: 'Celtic', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Celtic_FC.svg/1200px-Celtic_FC.svg.png', country: 'Scotland' },
+    { id: 'rangers', name: 'Rangers', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/11/Rangers_FC.svg/1200px-Rangers_FC.svg.png', country: 'Scotland' },
+    { id: 'galatasaray', name: 'Galatasaray', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Galatasaray_SK_logo.svg/1200px-Galatasaray_SK_logo.svg.png', country: 'Turkey' },
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  return popularTeams.filter(team => 
+    team.name.toLowerCase().includes(lowerQuery) ||
+    team.id.includes(lowerQuery)
+  );
 }
 
 /**
