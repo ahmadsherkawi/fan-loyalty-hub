@@ -57,18 +57,28 @@ export default function ExplorePage() {
       setLoading(true);
       
       try {
-        // Get member counts for each club
-        const { data: memberCounts } = await supabase
+        // Get member counts from community_memberships (fan communities)
+        const { data: communityMemberships } = await supabase
           .from("community_memberships")
           .select("club_id");
 
-        // Count members per club
+        // Get member counts from fan_memberships (official loyalty programs)
+        const { data: fanMemberships } = await supabase
+          .from("fan_memberships")
+          .select("club_id");
+
+        // Count members per club from both tables
         const countMap = new Map<string, number>();
-        (memberCounts || []).forEach((m) => {
+        (communityMemberships || []).forEach((m) => {
+          countMap.set(m.club_id, (countMap.get(m.club_id) || 0) + 1);
+        });
+        (fanMemberships || []).forEach((m) => {
           countMap.set(m.club_id, (countMap.get(m.club_id) || 0) + 1);
         });
 
-        // Get clubs with member count > 0
+        console.log("[Explore] Member counts:", Object.fromEntries(countMap));
+
+        // Get all clubs
         const { data, error } = await supabase
           .from("clubs")
           .select("id, name, logo_url, city, country, primary_color, is_official, api_team_id");
@@ -88,6 +98,7 @@ export default function ExplorePage() {
               return b.member_count - a.member_count;
             });
 
+          console.log("[Explore] Active communities:", active.length, active);
           setActiveCommunities(active);
         }
       } catch (err) {
