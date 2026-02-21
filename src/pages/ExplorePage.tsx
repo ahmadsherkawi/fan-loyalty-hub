@@ -63,7 +63,9 @@ export default function ExplorePage() {
       if (!error && data) {
         const commMap = new Map<string, Community>();
         data.forEach((c) => {
-          commMap.set(c.name.toLowerCase(), c as Community);
+          if (c.name) {
+            commMap.set(c.name.toLowerCase(), c as Community);
+          }
           if (c.api_team_id) {
             commMap.set(`api_${c.api_team_id}`, c as Community);
           }
@@ -228,8 +230,8 @@ export default function ExplorePage() {
                   </div>
                   
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {apiTeams.map((team) => {
-                      const community = existingCommunities.get(team.name.toLowerCase()) || 
+                    {apiTeams.filter(team => team && team.name).map((team) => {
+                      const community = existingCommunities.get(team.name?.toLowerCase() || '') || 
                                        existingCommunities.get(`api_${team.id}`);
                       
                       return (

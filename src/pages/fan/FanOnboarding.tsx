@@ -99,7 +99,9 @@ export default function FanOnboarding() {
       if (!error && data) {
         const commMap = new Map<string, Community>();
         data.forEach((c) => {
-          commMap.set(c.name.toLowerCase(), c as Community);
+          if (c.name) {
+            commMap.set(c.name.toLowerCase(), c as Community);
+          }
           if (c.api_team_id) {
             commMap.set(`api_${c.api_team_id}`, c as Community);
           }
@@ -165,7 +167,7 @@ export default function FanOnboarding() {
 
   // Add or remove team from selection
   const toggleTeam = (team: ApiTeam) => {
-    const existingCommunity = existingCommunities.get(team.name.toLowerCase()) || 
+    const existingCommunity = existingCommunities.get(team.name?.toLowerCase() || '') || 
                               existingCommunities.get(`api_${team.id}`);
     
     const teamId = existingCommunity ? existingCommunity.id : `api_${team.id}`;
@@ -241,7 +243,7 @@ export default function FanOnboarding() {
 
   // Check if team is selected
   const isTeamSelected = (team: ApiTeam) => {
-    const existingCommunity = existingCommunities.get(team.name.toLowerCase()) || 
+    const existingCommunity = existingCommunities.get(team.name?.toLowerCase() || '') || 
                               existingCommunities.get(`api_${team.id}`);
     const teamId = existingCommunity ? existingCommunity.id : `api_${team.id}`;
     return selectedTeams.some(t => t.id === teamId);
@@ -358,9 +360,9 @@ export default function FanOnboarding() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {apiTeams.map((team) => {
+                {apiTeams.filter(team => team && team.name).map((team) => {
                   const isSelected = isTeamSelected(team);
-                  const existingCommunity = existingCommunities.get(team.name.toLowerCase()) || 
+                  const existingCommunity = existingCommunities.get(team.name?.toLowerCase() || '') || 
                                            existingCommunities.get(`api_${team.id}`);
 
                   return (

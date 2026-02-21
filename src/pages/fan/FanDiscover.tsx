@@ -93,7 +93,9 @@ export default function FanDiscover() {
       const commMap = new Map<string, Community>();
       (allCommunities || []).forEach((c) => {
         // Map by name (lowercase) for matching
-        commMap.set(c.name.toLowerCase(), c);
+        if (c.name) {
+          commMap.set(c.name.toLowerCase(), c);
+        }
         // Also map by API team ID if available
         if (c.api_team_id) {
           commMap.set(`api_${c.api_team_id}`, c);
@@ -205,7 +207,7 @@ export default function FanDiscover() {
     setJoiningId(team.id);
     try {
       // Check if community already exists for this team
-      const community = existingCommunities.get(team.name.toLowerCase()) || 
+      const community = existingCommunities.get(team.name?.toLowerCase() || '') || 
                         existingCommunities.get(`api_${team.id}`);
 
       if (!community) {
@@ -536,8 +538,8 @@ export default function FanDiscover() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {apiTeams.map((team) => {
-                  const existingCommunity = existingCommunities.get(team.name.toLowerCase()) ||
+                {apiTeams.filter(team => team && team.name).map((team) => {
+                  const existingCommunity = existingCommunities.get(team.name?.toLowerCase() || '') ||
                                            existingCommunities.get(`api_${team.id}`);
                   const isJoined = existingCommunity ? joinedIds.has(existingCommunity.id) : false;
                   const canJoin = communityLimit?.can_join_more ?? true;
