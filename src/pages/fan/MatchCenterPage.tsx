@@ -30,6 +30,22 @@ import {
   X,
 } from 'lucide-react';
 
+// Utility functions - defined outside components for reuse
+const formatMatchTime = (datetime: string) => {
+  return new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatMatchDate = (datetime: string) => {
+  const date = new Date(datetime);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+  return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+};
+
 export default function MatchCenterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -169,21 +185,6 @@ export default function MatchCenterPage() {
       }
     });
     return Array.from(leagues.values());
-  };
-
-  const formatMatchTime = (datetime: string) => {
-    return new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatMatchDate = (datetime: string) => {
-    const date = new Date(datetime);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-    return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const getElapsedTime = (match: FootballMatch) => {
