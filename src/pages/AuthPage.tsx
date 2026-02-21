@@ -79,7 +79,7 @@ export default function AuthPage() {
         } else {
           // Check if onboarding completed
           const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
-          destination = onboardingDone ? "/fan/home" : "/fan/onboarding";
+          destination = onboardingDone ? "/fan/profile" : "/fan/onboarding";
         }
       }
       

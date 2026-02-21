@@ -71,16 +71,16 @@ export default function FanOnboarding() {
       });
 
       if (myCommunities && myCommunities.length > 0) {
-        // Fan already has communities, go to home
-        console.log("[Onboarding] Fan already has", myCommunities.length, "communities, redirecting to home");
-        navigate("/fan/home", { replace: true });
+        // Fan already has communities, go to profile
+        console.log("[Onboarding] Fan already has", myCommunities.length, "communities, redirecting to profile");
+        navigate("/fan/profile", { replace: true });
         return;
       }
 
       // Check if onboarding already completed (if column exists)
       const onboardingDone = (profile as { onboarding_completed?: boolean })?.onboarding_completed;
       if (onboardingDone) {
-        navigate("/fan/home", { replace: true });
+        navigate("/fan/profile", { replace: true });
         return;
       }
 
@@ -170,7 +170,7 @@ export default function FanOnboarding() {
         description: `You've joined ${selectedIds.size} communities.`,
       });
 
-      navigate("/fan/home", { replace: true });
+      navigate("/fan/profile", { replace: true });
     } catch (err) {
       const error = err as Error;
       toast({

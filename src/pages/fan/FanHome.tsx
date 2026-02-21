@@ -19,22 +19,16 @@ import {
   LogOut,
   Loader2,
   ChevronRight,
-  Users,
   User,
   Bell,
   Star,
   Sparkles,
   Camera,
   BarChart3,
-  Megaphone,
-  Globe,
-  CheckCircle,
-  MessageCircle,
-  TrendingUp,
   Crown,
   Target,
-  Heart,
-  ArrowRight,
+  ArrowLeft,
+  TrendingUp,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
@@ -50,26 +44,6 @@ interface Tier {
   perks: Record<string, unknown>;
 }
 
-interface Community {
-  id: string;
-  name: string;
-  logo_url: string | null;
-  city: string | null;
-  country: string | null;
-  primary_color: string | null;
-  is_official: boolean;
-  member_count: number;
-}
-
-interface LeaderboardEntry {
-  rank: number;
-  fan_id: string;
-  fan_name: string;
-  points: number;
-}
-
-const MAX_COMMUNITIES = 3;
-
 export default function FanHome() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -78,9 +52,6 @@ export default function FanHome() {
 
   const isPreviewMode = searchParams.get("preview") === "fan";
 
-  // Community memberships
-  const [communities, setCommunities] = useState<Community[]>([]);
-  
   // Official club membership (for loyalty program)
   const [membership, setMembership] = useState<FanMembership | null>(null);
   const [club, setClub] = useState<Club | null>(null);
@@ -155,12 +126,6 @@ export default function FanHome() {
     setDataLoading(true);
 
     try {
-      // Fetch community memberships
-      const { data: myCommunities } = await supabase.rpc("get_my_communities", {
-        p_fan_id: profile.id,
-      });
-      setCommunities((myCommunities || []) as Community[]);
-
       // Fetch official club membership (fan_memberships for loyalty program)
       const { data: memberships } = await supabase
         .from("fan_memberships")
@@ -168,74 +133,77 @@ export default function FanHome() {
         .eq("fan_id", profile.id)
         .limit(1);
 
-      if (memberships?.length) {
-        const m = memberships[0] as FanMembership;
-        setMembership(m);
+      if (!memberships?.length) {
+        navigate("/fan/profile");
+        return;
+      }
 
-        const { data: multData } = await supabase.rpc("get_membership_multiplier", {
-          p_membership_id: m.id,
-        });
-        setMultiplier(Number(multData ?? 1));
+      const m = memberships[0] as FanMembership;
+      setMembership(m);
 
-        const { data: discountData } = await supabase.rpc("get_membership_discount", {
-          p_membership_id: m.id,
-        });
-        setDiscountPercent(Number(discountData ?? 0));
+      const { data: multData } = await supabase.rpc("get_membership_multiplier", {
+        p_membership_id: m.id,
+      });
+      setMultiplier(Number(multData ?? 1));
 
-        const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
-        setClub(clubData as Club);
+      const { data: discountData } = await supabase.rpc("get_membership_discount", {
+        p_membership_id: m.id,
+      });
+      setDiscountPercent(Number(discountData ?? 0));
 
-        const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
-        setProgram(programData as LoyaltyProgram);
+      const { data: clubData } = await supabase.from("clubs").select("*").eq("id", m.club_id).single();
+      setClub(clubData as Club);
 
-        const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
-        setActivities((acts ?? []) as Activity[]);
+      const { data: programData } = await supabase.from("loyalty_programs").select("*").eq("id", m.program_id).single();
+      setProgram(programData as LoyaltyProgram);
 
-        const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(3);
-        setRewards((rews ?? []) as Reward[]);
+      const { data: acts } = await supabase.from("activities").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(5);
+      setActivities((acts ?? []) as Activity[]);
 
-        const { data: tiersData } = await supabase
-          .from("tiers")
-          .select("*")
-          .eq("program_id", m.program_id)
-          .order("rank", { ascending: true });
+      const { data: rews } = await supabase.from("rewards").select("*").eq("program_id", m.program_id).eq("is_active", true).limit(4);
+      setRewards((rews ?? []) as Reward[]);
 
-        const tierList = (tiersData ?? []) as Tier[];
-        setTiers(tierList);
+      const { data: tiersData } = await supabase
+        .from("tiers")
+        .select("*")
+        .eq("program_id", m.program_id)
+        .order("rank", { ascending: true });
 
-        const { data: completions } = await supabase
-          .from("activity_completions")
-          .select("points_earned")
-          .eq("fan_id", profile.id);
+      const tierList = (tiersData ?? []) as Tier[];
+      setTiers(tierList);
 
-        const totalEarned = completions?.reduce((s, c) => s + (c.points_earned || 0), 0) ?? 0;
-        setEarnedPoints(totalEarned);
+      const { data: completions } = await supabase
+        .from("activity_completions")
+        .select("points_earned")
+        .eq("fan_id", profile.id);
 
-        let current: Tier | null = null;
-        let next: Tier | null = null;
+      const totalEarned = completions?.reduce((s, c) => s + (c.points_earned || 0), 0) ?? 0;
+      setEarnedPoints(totalEarned);
 
-        for (let i = 0; i < tierList.length; i++) {
-          if (totalEarned >= tierList[i].points_threshold) {
-            current = tierList[i];
-            next = tierList[i + 1] ?? null;
-          }
+      let current: Tier | null = null;
+      let next: Tier | null = null;
+
+      for (let i = 0; i < tierList.length; i++) {
+        if (totalEarned >= tierList[i].points_threshold) {
+          current = tierList[i];
+          next = tierList[i + 1] ?? null;
         }
+      }
 
-        setCurrentTier(current);
-        setNextTier(next);
+      setCurrentTier(current);
+      setNextTier(next);
+      
+      // Fetch fan's rank
+      const { data: leaderboardData } = await supabase
+        .from("fan_memberships")
+        .select("fan_id, points_balance")
+        .eq("club_id", m.club_id)
+        .order("points_balance", { ascending: false });
         
-        // Fetch fan's rank
-        const { data: leaderboardData } = await supabase
-          .from("fan_memberships")
-          .select("fan_id, points_balance")
-          .eq("club_id", m.club_id)
-          .order("points_balance", { ascending: false });
-          
-        if (leaderboardData) {
-          const fanIndex = leaderboardData.findIndex((entry) => entry.fan_id === profile.id);
-          setFanRank(fanIndex !== -1 ? fanIndex + 1 : null);
-          setTotalFans(leaderboardData.length);
-        }
+      if (leaderboardData) {
+        const fanIndex = leaderboardData.findIndex((entry) => entry.fan_id === profile.id);
+        setFanRank(fanIndex !== -1 ? fanIndex + 1 : null);
+        setTotalFans(leaderboardData.length);
       }
 
       const { count } = await supabase
@@ -307,12 +275,6 @@ export default function FanHome() {
         100
       : 100;
 
-  // Find the official club that the fan is a loyalty member of
-  const loyaltyClubId = membership?.club_id;
-  
-  // Filter communities: exclude the current club if fan is viewing their official club's page
-  const filteredCommunities = communities.filter((c) => c.id !== loyaltyClubId);
-
   return (
     <div className="min-h-screen bg-background">
       {isPreviewMode && <PreviewBanner role="fan" />}
@@ -322,14 +284,18 @@ export default function FanHome() {
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/fan/profile")}
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
             <Logo size="sm" />
-            <div className="h-5 w-px bg-border/40" />
-            <span className="font-display font-bold text-foreground tracking-tight text-sm hidden sm:block">
-              Fan Hub
-            </span>
           </div>
 
-          {/* RANKING BADGE - Moved from quick nav */}
+          {/* RANKING BADGE */}
           {fanRank && (
             <div 
               className="hidden sm:flex items-center gap-2 glass-dark px-3 py-1.5 rounded-full cursor-pointer hover:bg-white/10 transition-colors"
@@ -344,15 +310,6 @@ export default function FanHome() {
           )}
 
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/fan/discover")}
-              className="relative rounded-full text-muted-foreground hover:text-foreground h-9 w-9"
-              title="Discover"
-            >
-              <Globe className="h-4 w-4" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -396,10 +353,10 @@ export default function FanHome() {
       </header>
 
       <main className="container py-6 space-y-6">
-        {/* LOYALTY PROGRAM SECTION (if member) */}
+        {/* LOYALTY PROGRAM SECTION */}
         {membership && club && (
           <>
-            {/* HERO CARD - KEPT AS IS */}
+            {/* HERO CARD */}
             <div className="relative overflow-hidden rounded-3xl border border-border/40">
               <div className="absolute inset-0 gradient-hero" />
               <div className="absolute inset-0 stadium-pattern" />
@@ -429,7 +386,7 @@ export default function FanHome() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="h-3.5 w-3.5 text-accent" />
-                        <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Official Club</span>
+                        <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Loyalty Program</span>
                       </div>
                       <h1 className="text-2xl md:text-3xl font-display font-bold text-white leading-tight">{club?.name}</h1>
                       <p className="text-white/50 text-sm mt-0.5">{profile?.full_name} · {program?.name}</p>
@@ -472,295 +429,178 @@ export default function FanHome() {
               </div>
             </div>
 
-            {/* BENTO GRID LAYOUT - Split into Loyalty & Social */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* ===== LOYALTY PROGRAM COLUMN ===== */}
-              <div className="space-y-6">
-                {/* Section Header */}
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
-                    <Target className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-bold text-foreground">Loyalty Program</h2>
-                    <p className="text-xs text-muted-foreground">Earn points and unlock rewards</p>
-                  </div>
+            {/* LOYALTY PROGRAM SECTION */}
+            <div className="space-y-6">
+              {/* Section Header */}
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
+                  <Target className="h-4 w-4 text-primary" />
                 </div>
-
-                {/* ACTIVITIES SECTION - With AnimatedBorderCard */}
-                {activities.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-primary" />
-                        Activities
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate("/fan/activities")}
-                        className="rounded-full text-xs h-7"
-                      >
-                        View all <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {activities.slice(0, 2).map((a, index) => {
-                        const multiplied = Math.round(a.points_awarded * multiplier);
-                        // Featured activity gets AnimatedBorderCard
-                        if (index === 0) {
-                          return (
-                            <AnimatedBorderCard key={a.id} className="cursor-pointer" onClick={() => navigate("/fan/activities")}>
-                              <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
-                                  <Zap className="h-5 w-5 text-primary" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-foreground text-sm truncate">{a.name}</p>
-                                  <Badge className="mt-1 rounded-full text-xs bg-primary/15 text-primary border-primary/25">
-                                    {multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
-                                  </Badge>
-                                </div>
-                                <Button size="sm" className="rounded-xl gradient-stadium text-xs">
-                                  Start
-                                </Button>
-                              </div>
-                            </AnimatedBorderCard>
-                          );
-                        }
-                        return (
-                          <SpotlightCard
-                            key={a.id}
-                            className="p-4 cursor-pointer"
-                            spotlightColor="hsl(var(--primary) / 0.1)"
-                            onClick={() => navigate("/fan/activities")}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <Zap className="h-4 w-4 text-primary" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-foreground text-sm truncate">{a.name}</p>
-                                <span className="text-xs text-muted-foreground">
-                                  +{a.points_awarded} pts
-                                </span>
-                              </div>
-                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          </SpotlightCard>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* REWARDS SECTION - With AnimatedBorderCard */}
-                {rewards.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <Gift className="h-4 w-4 text-accent" />
-                        Rewards
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate("/fan/rewards")}
-                        className="rounded-full text-xs h-7"
-                      >
-                        View all <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {rewards.slice(0, 2).map((r, index) => {
-                        const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
-                        const canAfford = effectivePointsBalance >= discounted;
-                        
-                        // Featured reward gets AnimatedBorderCard
-                        if (index === 0) {
-                          return (
-                            <AnimatedBorderCard key={r.id} className="cursor-pointer" onClick={() => navigate("/fan/rewards")}>
-                              <div className="flex flex-col gap-2">
-                                <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                                  <Gift className="h-5 w-5 text-accent" />
-                                </div>
-                                <h4 className="font-semibold text-foreground text-sm leading-tight truncate">{r.name}</h4>
-                                <div className="flex items-center justify-between">
-                                  <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
-                                    {discounted} pts
-                                  </Badge>
-                                  {canAfford && (
-                                    <span className="text-[10px] text-green-500 font-medium">Available</span>
-                                  )}
-                                </div>
-                              </div>
-                            </AnimatedBorderCard>
-                          );
-                        }
-                        
-                        return (
-                          <SpotlightCard
-                            key={r.id}
-                            className="p-4 cursor-pointer"
-                            spotlightColor="hsl(var(--accent) / 0.1)"
-                            onClick={() => navigate("/fan/rewards")}
-                          >
-                            <div className="flex flex-col gap-2">
-                              <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
-                                <Gift className="h-4 w-4 text-accent" />
-                              </div>
-                              <h4 className="font-medium text-foreground text-sm leading-tight truncate">{r.name}</h4>
-                              <span className="text-xs text-muted-foreground">{discounted} pts</span>
-                            </div>
-                          </SpotlightCard>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <h2 className="text-lg font-display font-bold text-foreground">Loyalty Program</h2>
+                  <p className="text-xs text-muted-foreground">Earn points and unlock exclusive rewards</p>
+                </div>
               </div>
 
-              {/* ===== SOCIAL COLUMN ===== */}
-              <div className="space-y-6">
-                {/* Section Header */}
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-xl bg-red-500/15 flex items-center justify-center">
-                    <Heart className="h-4 w-4 text-red-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-display font-bold text-foreground">Social</h2>
-                    <p className="text-xs text-muted-foreground">Connect with your fan community</p>
-                  </div>
-                </div>
-
-                {/* CHANTS SECTION - Featured with AnimatedBorderCard */}
+              {/* ACTIVITIES SECTION */}
+              {activities.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                      <Megaphone className="h-4 w-4 text-red-400" />
-                      Chants
+                      <Zap className="h-4 w-4 text-primary" />
+                      Activities
                     </h3>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => navigate("/fan/chants")}
+                      onClick={() => navigate("/fan/activities")}
                       className="rounded-full text-xs h-7"
                     >
                       View all <ChevronRight className="h-3 w-3 ml-1" />
                     </Button>
                   </div>
 
-                  <AnimatedBorderCard 
-                    className="cursor-pointer" 
-                    onClick={() => navigate("/fan/chants")}
-                    style={{ '--border-color': 'hsl(0 84% 60%)' } as React.CSSProperties}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
-                        <Megaphone className="h-5 w-5 text-red-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground text-sm">Fan Chants</p>
-                        <p className="text-xs text-muted-foreground">Share your voice with the community</p>
-                      </div>
-                      <Button size="sm" className="rounded-xl bg-red-500/90 hover:bg-red-500 text-white text-xs">
-                        Join
-                      </Button>
-                    </div>
-                  </AnimatedBorderCard>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {activities.map((a, index) => {
+                      const multiplied = Math.round(a.points_awarded * multiplier);
+                      // Featured activity gets AnimatedBorderCard
+                      if (index === 0) {
+                        return (
+                          <AnimatedBorderCard key={a.id} className="cursor-pointer" onClick={() => navigate("/fan/activities")}>
+                            <div className="flex items-center gap-4">
+                              <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                                <Zap className="h-5 w-5 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-foreground text-sm truncate">{a.name}</p>
+                                <Badge className="mt-1 rounded-full text-xs bg-primary/15 text-primary border-primary/25">
+                                  {multiplier > 1 ? `+${multiplied} pts (×${multiplier})` : `+${a.points_awarded} pts`}
+                                </Badge>
+                              </div>
+                              <Button size="sm" className="rounded-xl gradient-stadium text-xs">
+                                Start
+                              </Button>
+                            </div>
+                          </AnimatedBorderCard>
+                        );
+                      }
+                      return (
+                        <SpotlightCard
+                          key={a.id}
+                          className="p-4 cursor-pointer"
+                          spotlightColor="hsl(var(--primary) / 0.1)"
+                          onClick={() => navigate("/fan/activities")}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Zap className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground text-sm truncate">{a.name}</p>
+                              <span className="text-xs text-muted-foreground">
+                                +{a.points_awarded} pts
+                              </span>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </SpotlightCard>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
 
-                {/* COMMUNITIES SECTION - Filtered */}
+              {/* REWARDS SECTION */}
+              {rewards.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
-                      Communities
-                      <Badge variant="outline" className="text-xs ml-1">
-                        {filteredCommunities.length}
-                      </Badge>
+                      <Gift className="h-4 w-4 text-accent" />
+                      Rewards
                     </h3>
-                    {filteredCommunities.length < MAX_COMMUNITIES && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate("/fan/discover")}
-                        className="rounded-full text-xs h-7"
-                      >
-                        Discover <Globe className="h-3 w-3 ml-1" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate("/fan/rewards")}
+                      className="rounded-full text-xs h-7"
+                    >
+                      View all <ChevronRight className="h-3 w-3 ml-1" />
+                    </Button>
                   </div>
 
-                  {filteredCommunities.length === 0 ? (
-                    <Card className="rounded-2xl border-dashed border-2 border-border/40 bg-muted/30">
-                      <CardContent className="py-6 text-center">
-                        <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                        <p className="text-sm text-muted-foreground">No other communities joined yet.</p>
-                        <Button
-                          onClick={() => navigate("/fan/discover")}
-                          size="sm"
-                          className="mt-3 rounded-xl gradient-stadium text-xs"
-                        >
-                          Discover Communities
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="space-y-2">
-                      {filteredCommunities.map((community) => (
-                        <SpotlightCard
-                          key={community.id}
-                          className="p-4 cursor-pointer"
-                          spotlightColor="hsl(var(--primary) / 0.1)"
-                          onClick={() => navigate(`/fan/community/${community.id}`)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="h-11 w-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
-                              style={{
-                                backgroundColor: community.primary_color || "#16a34a",
-                              }}
-                            >
-                              {community.logo_url ? (
-                                <img
-                                  src={community.logo_url}
-                                  alt={community.name}
-                                  className="h-full w-full rounded-xl object-cover"
-                                />
-                              ) : (
-                                community.name.charAt(0).toUpperCase()
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <h4 className="font-semibold text-sm truncate">{community.name}</h4>
-                                {community.is_official && (
-                                  <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {rewards.map((r, index) => {
+                      const discounted = Math.round(r.points_cost * (1 - discountPercent / 100));
+                      const canAfford = effectivePointsBalance >= discounted;
+                      
+                      // Featured reward gets AnimatedBorderCard
+                      if (index === 0) {
+                        return (
+                          <AnimatedBorderCard key={r.id} className="cursor-pointer" onClick={() => navigate("/fan/rewards")}>
+                            <div className="flex flex-col gap-2">
+                              <div className="h-10 w-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                                <Gift className="h-5 w-5 text-accent" />
+                              </div>
+                              <h4 className="font-semibold text-foreground text-sm leading-tight truncate">{r.name}</h4>
+                              <div className="flex items-center justify-between">
+                                <Badge className="rounded-full bg-accent/15 text-accent border-accent/25 text-xs">
+                                  {discounted} pts
+                                </Badge>
+                                {canAfford && (
+                                  <span className="text-[10px] text-green-500 font-medium">Available</span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  {community.member_count}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <MessageCircle className="h-3 w-3" />
-                                  Chants
-                                </span>
-                              </div>
                             </div>
-                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </AnimatedBorderCard>
+                        );
+                      }
+                      
+                      return (
+                        <SpotlightCard
+                          key={r.id}
+                          className="p-4 cursor-pointer"
+                          spotlightColor="hsl(var(--accent) / 0.1)"
+                          onClick={() => navigate("/fan/rewards")}
+                        >
+                          <div className="flex flex-col gap-2">
+                            <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
+                              <Gift className="h-4 w-4 text-accent" />
+                            </div>
+                            <h4 className="font-medium text-foreground text-sm leading-tight truncate">{r.name}</h4>
+                            <span className="text-xs text-muted-foreground">{discounted} pts</span>
                           </div>
                         </SpotlightCard>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* RANKING CARD */}
+              {fanRank && (
+                <SpotlightCard 
+                  className="p-5 cursor-pointer"
+                  spotlightColor="hsl(var(--accent) / 0.1)"
+                  onClick={() => navigate("/fan/leaderboard")}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-accent/15 flex items-center justify-center">
+                      <Crown className="h-7 w-7 text-accent" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-foreground">Your Ranking</h4>
+                      <p className="text-sm text-muted-foreground">See where you stand among {totalFans} fans</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-display font-bold text-gradient-accent">#{fanRank}</div>
+                      <div className="flex items-center gap-1 text-xs text-green-500">
+                        <TrendingUp className="h-3 w-3" />
+                        <span>View Leaderboard</span>
+                      </div>
+                    </div>
+                  </div>
+                </SpotlightCard>
+              )}
             </div>
           </>
         )}
@@ -769,10 +609,9 @@ export default function FanHome() {
         {!membership && (
           <div className="text-center py-12">
             <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h2 className="text-xl font-display font-bold mb-2">Join a Club</h2>
-            <p className="text-muted-foreground mb-6">Start your loyalty journey by joining an official club.</p>
+            <h2 className="text-xl font-display font-bold mb-2">No Club Joined</h2>
+            <p className="text-muted-foreground mb-6">Join an official club to start your loyalty journey.</p>
             <Button onClick={() => navigate("/fan/discover")} className="rounded-xl gradient-stadium">
-              <Globe className="h-4 w-4 mr-2" />
               Discover Clubs
             </Button>
           </div>
