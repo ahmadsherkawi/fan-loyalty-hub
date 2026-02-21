@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { searchTeams } from "@/lib/footballApi";
 import { 
   Search, MapPin, CheckCircle, Compass, Users, 
-  MessageCircle, Building2, Sparkles, Loader2
+  Building2, Sparkles, Loader2
 } from "lucide-react";
 
 // API Team type
@@ -44,39 +44,60 @@ export default function ExplorePage() {
   const [apiLoading, setApiLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
   
-  // Database state
-  const [existingCommunities, setExistingCommunities] = useState<Map<string, Community>>(new Map());
+  // Active communities (with at least 1 member)
+  const [activeCommunities, setActiveCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Debounce timer
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch existing communities from database
+  // Fetch active communities (with at least 1 member) from database
   useEffect(() => {
-    const fetchCommunities = async () => {
+    const fetchActiveCommunities = async () => {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from("clubs")
-        .select("id, name, logo_url, city, country, primary_color, is_official, api_team_id");
+      try {
+        // Get member counts for each club
+        const { data: memberCounts } = await supabase
+          .from("community_memberships")
+          .select("club_id");
 
-      if (!error && data) {
-        const commMap = new Map<string, Community>();
-        data.forEach((c) => {
-          if (c.name) {
-            commMap.set(c.name.toLowerCase(), c as Community);
-          }
-          if (c.api_team_id) {
-            commMap.set(`api_${c.api_team_id}`, c as Community);
-          }
+        // Count members per club
+        const countMap = new Map<string, number>();
+        (memberCounts || []).forEach((m) => {
+          countMap.set(m.club_id, (countMap.get(m.club_id) || 0) + 1);
         });
-        setExistingCommunities(commMap);
+
+        // Get clubs with member count > 0
+        const { data, error } = await supabase
+          .from("clubs")
+          .select("id, name, logo_url, city, country, primary_color, is_official, api_team_id");
+
+        if (!error && data) {
+          // Filter clubs with at least 1 member and add member count
+          const active = data
+            .filter(c => c.name && countMap.get(c.id) > 0)
+            .map(c => ({
+              ...c,
+              member_count: countMap.get(c.id) || 0,
+              chant_count: 0,
+            } as Community))
+            .sort((a, b) => {
+              // Official clubs first, then by member count
+              if (a.is_official !== b.is_official) return a.is_official ? -1 : 1;
+              return b.member_count - a.member_count;
+            });
+
+          setActiveCommunities(active);
+        }
+      } catch (err) {
+        console.error("Error fetching active communities:", err);
       }
       
       setLoading(false);
     };
 
-    fetchCommunities();
+    fetchActiveCommunities();
   }, []);
 
   // Search API teams with debounce
@@ -115,21 +136,33 @@ export default function ExplorePage() {
   }, [search]);
 
   const handleJoinClub = (team: ApiTeam) => {
-    // Check if community exists
-    const community = existingCommunities.get(team.name.toLowerCase()) || 
-                      existingCommunities.get(`api_${team.id}`);
+    // Check if community exists in active communities
+    const existingCommunity = activeCommunities.find(
+      c => c.name.toLowerCase() === team.name?.toLowerCase() || 
+           c.api_team_id === team.id
+    );
     
-    if (community) {
-      navigate(`/auth?role=fan&redirect=/fan/community/${community.id}`);
+    if (existingCommunity) {
+      navigate(`/auth?role=fan&redirect=/fan/community/${existingCommunity.id}`);
     } else {
-      // Pass API team info for auto-creation
       navigate(`/auth?role=fan&action=create_community&name=${encodeURIComponent(team.name)}&country=${encodeURIComponent(team.country)}&logo=${encodeURIComponent(team.logo || '')}&api_team_id=${team.id}`);
     }
+  };
+
+  const handleJoinExisting = (community: Community) => {
+    navigate(`/auth?role=fan&redirect=/fan/community/${community.id}`);
   };
 
   const handleClaimCommunity = (communityId: string, communityName: string) => {
     navigate(`/auth?role=club_admin&action=claim&community_id=${communityId}&name=${encodeURIComponent(communityName)}`);
   };
+
+  // Filter API results to exclude clubs already in active communities
+  const filteredApiTeams = apiTeams.filter(team => {
+    return !activeCommunities.some(
+      c => c.name.toLowerCase() === team.name?.toLowerCase()
+    );
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -150,7 +183,7 @@ export default function ExplorePage() {
               <span className="text-gradient-hero">Communities</span>
             </h1>
             <p className="text-body text-white/40 mb-10 max-w-lg">
-              Search from thousands of clubs worldwide. Names match official football databases!
+              Join active fan communities or search for any club worldwide!
             </p>
 
             <div className="relative max-w-md">
@@ -167,7 +200,7 @@ export default function ExplorePage() {
             </div>
             <p className="text-xs text-center text-white/30 mt-3">
               <Sparkles className="h-3 w-3 inline mr-1" />
-              Powered by football database API
+              Search to find new clubs or join active communities below
             </p>
           </div>
         </section>
@@ -175,145 +208,205 @@ export default function ExplorePage() {
         {/* Content */}
         <section className="py-14">
           <div className="container">
-            {loading && !searchPerformed ? (
+            {loading ? (
               <div className="text-center py-20">
                 <div className="mx-auto h-14 w-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 animate-pulse">
                   <Compass className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <p className="text-muted-foreground font-medium">Loading...</p>
-              </div>
-            ) : !searchPerformed ? (
-              /* Empty State - Before Search */
-              <div className="text-center py-16">
-                <div className="mx-auto h-20 w-20 rounded-3xl bg-muted/30 border border-border/30 flex items-center justify-center mb-6">
-                  <Compass className="h-9 w-9 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-2">Search for Any Club</h3>
-                <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-                  Type at least 2 characters to search from our football database.
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {["Barcelona", "Manchester", "Real Madrid", "Liverpool", "Bayern", "Juventus"].map((term) => (
-                    <Badge 
-                      key={term}
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-primary/10 px-4 py-2"
-                      onClick={() => setSearch(term)}
-                    >
-                      {term}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ) : apiLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-              </div>
-            ) : apiTeams.filter(t => t && t.name).length === 0 ? (
-              <div className="text-center py-20">
-                <div className="mx-auto h-20 w-20 rounded-3xl bg-muted/30 border border-border/30 flex items-center justify-center mb-6">
-                  <Search className="h-9 w-9 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-2">No Clubs Found</h3>
-                <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
-                  {apiTeams.length > 0 
-                    ? `API returned ${apiTeams.length} result(s) but data format was unexpected. Check console for details.`
-                    : "No clubs match your search. The API might be rate-limited."}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Try: Barcelona, Manchester, Liverpool, Real Madrid
-                </p>
+                <p className="text-muted-foreground font-medium">Loading communities...</p>
               </div>
             ) : (
               <div className="space-y-14">
-                {/* Search Results */}
-                <div>
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className="h-9 w-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                      <Sparkles className="h-4 w-4 text-accent" />
+                {/* Search Results (when searching) */}
+                {searchPerformed && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-8">
+                      <div className="h-9 w-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                        <Search className="h-4 w-4 text-accent" />
+                      </div>
+                      <h2 className="text-xl font-display font-bold text-foreground">Search Results</h2>
+                      <span className="badge-section">{filteredApiTeams.length}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => { setSearch(""); setSearchPerformed(false); }}
+                        className="ml-auto"
+                      >
+                        Clear
+                      </Button>
                     </div>
-                    <h2 className="text-xl font-display font-bold text-foreground">Search Results</h2>
-                    <span className="badge-section">{apiTeams.filter(t => t && t.name).length}</span>
-                  </div>
-                  
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {apiTeams.filter(team => team && team.name && team.id).map((team) => {
-                      const community = existingCommunities.get(team.name?.toLowerCase() || '') || 
-                                       existingCommunities.get(`api_${team.id}`);
-                      
-                      return (
-                        <Card
-                          key={team.id}
-                          className="rounded-2xl border-border/40 overflow-hidden hover:border-primary/30 transition-all"
-                        >
-                          {/* Logo header */}
-                          <div className="h-24 flex items-center justify-center bg-muted relative">
-                            {team.logo ? (
-                              <img
-                                src={team.logo}
-                                alt={`${team.name} logo`}
-                                className="h-14 w-14 object-contain"
-                              />
-                            ) : (
-                              <div className="h-14 w-14 rounded-2xl bg-primary/20 flex items-center justify-center">
-                                <span className="text-xl font-bold text-primary">
-                                  {team.name.charAt(0)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <CardContent className="p-5">
-                            <div className="flex items-start justify-between mb-3">
-                              <h3 className="font-semibold text-foreground">{team.name}</h3>
-                              {community?.is_official ? (
-                                <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px]">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Verified
-                                </Badge>
+                    
+                    {apiLoading ? (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : filteredApiTeams.length === 0 ? (
+                      <Card className="rounded-2xl border-border/40">
+                        <CardContent className="py-12 text-center">
+                          <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground font-medium">No new clubs found</p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Try a different search or check the active communities below
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {filteredApiTeams.filter(team => team && team.name && team.id).map((team) => (
+                          <Card
+                            key={team.id}
+                            className="rounded-2xl border-border/40 overflow-hidden hover:border-primary/30 transition-all"
+                          >
+                            <div className="h-24 flex items-center justify-center bg-muted relative">
+                              {team.logo ? (
+                                <img src={team.logo} alt={`${team.name} logo`} className="h-14 w-14 object-contain" />
                               ) : (
-                                <Badge variant="outline" className="text-[11px]">
-                                  <Users className="h-3 w-3 mr-1" />
-                                  Community
-                                </Badge>
+                                <div className="h-14 w-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+                                  <span className="text-xl font-bold text-primary">{team.name.charAt(0)}</span>
+                                </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {team.country || 'Unknown'}
+                            <CardContent className="p-5">
+                              <div className="flex items-start justify-between mb-3">
+                                <h3 className="font-semibold text-foreground">{team.name}</h3>
+                                <Badge variant="outline" className="text-[11px]">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  New
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {team.country || 'Unknown'}
+                              </div>
+                              <Button
+                                className="w-full rounded-xl gradient-stadium font-semibold h-11"
+                                onClick={() => handleJoinClub(team)}
+                              >
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                Create & Join
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Active Communities (with members) */}
+                {!searchPerformed && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-8">
+                      <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <Users className="h-4 w-4 text-primary" />
+                      </div>
+                      <h2 className="text-xl font-display font-bold text-foreground">Active Communities</h2>
+                      <span className="badge-section">{activeCommunities.length}</span>
+                    </div>
+                    
+                    {activeCommunities.length === 0 ? (
+                      <Card className="rounded-2xl border-border/40">
+                        <CardContent className="py-16 text-center">
+                          <Compass className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">No Active Communities Yet</h3>
+                          <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                            Search for a club above to create the first community!
+                          </p>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {["Barcelona", "Manchester", "Real Madrid", "Liverpool", "Bayern", "Juventus"].map((term) => (
+                              <Badge 
+                                key={term}
+                                variant="outline" 
+                                className="cursor-pointer hover:bg-primary/10 px-4 py-2"
+                                onClick={() => setSearch(term)}
+                              >
+                                {term}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {activeCommunities.map((community) => (
+                          <Card
+                            key={community.id}
+                            className="rounded-2xl border-border/40 overflow-hidden hover:border-primary/30 transition-all"
+                          >
+                            <div 
+                              className="h-24 flex items-center justify-center relative"
+                              style={{ backgroundColor: community.primary_color || 'hsl(var(--muted))' }}
+                            >
+                              {community.logo_url ? (
+                                <img src={community.logo_url} alt={community.name} className="h-14 w-14 object-contain" />
+                              ) : (
+                                <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                                  <span className="text-xl font-bold text-white">{community.name.charAt(0)}</span>
+                                </div>
+                              )}
                             </div>
-                            
-                            {community && (
+                            <CardContent className="p-5">
+                              <div className="flex items-start justify-between mb-3">
+                                <h3 className="font-semibold text-foreground">{community.name}</h3>
+                                {community.is_official ? (
+                                  <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px]">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Official
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[11px]">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    Community
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {community.city ? `${community.city}, ` : ''}{community.country || 'Unknown'}
+                              </div>
                               <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Users className="h-3 w-3 text-primary" />
-                                  {community.member_count} members
+                                  {community.member_count} member{community.member_count !== 1 ? 's' : ''}
                                 </span>
                               </div>
-                            )}
-                            
-                            <Button
-                              className="w-full rounded-xl gradient-stadium font-semibold h-11"
-                              onClick={() => handleJoinClub(team)}
-                            >
-                              Join Community
-                            </Button>
-                            {!community?.is_official && community && (
-                              <Button
-                                variant="outline"
-                                className="w-full rounded-xl font-semibold h-11 mt-2"
-                                onClick={() => handleClaimCommunity(community.id, community.name)}
-                              >
-                                <Building2 className="h-4 w-4 mr-2" />
-                                Claim as Your Club
-                              </Button>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                              <div className="space-y-2">
+                                <Button
+                                  className="w-full rounded-xl gradient-stadium font-semibold h-11"
+                                  onClick={() => handleJoinExisting(community)}
+                                >
+                                  Join Community
+                                </Button>
+                                {!community.is_official && (
+                                  <Button
+                                    variant="outline"
+                                    className="w-full rounded-xl font-semibold h-11"
+                                    onClick={() => handleClaimCommunity(community.id, community.name)}
+                                  >
+                                    <Building2 className="h-4 w-4 mr-2" />
+                                    Claim as Your Club
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+
+                {/* Show active communities count when searching */}
+                {searchPerformed && activeCommunities.length > 0 && (
+                  <div className="text-center pt-6 border-t border-border/40">
+                    <p className="text-sm text-muted-foreground">
+                      Also {activeCommunities.length} active {activeCommunities.length === 1 ? 'community' : 'communities'} available. 
+                      <Button variant="link" className="px-1 h-auto" onClick={() => { setSearch(""); setSearchPerformed(false); }}>
+                        View all
+                      </Button>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
