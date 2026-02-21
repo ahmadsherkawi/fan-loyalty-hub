@@ -454,7 +454,7 @@ export default function FanHome() {
               <SpotlightCard 
                 className="p-4 cursor-pointer"
                 spotlightColor="hsl(var(--primary) / 0.08)"
-                onClick={() => navigate('/fan/matches')}
+                onClick={() => navigate(`/fan/matches?clubId=${club.id}`)}
               >
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-xl bg-red-500/15 flex items-center justify-center">

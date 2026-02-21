@@ -51,6 +51,9 @@ export default function MatchCenterPage() {
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
 
+  // Get clubId from URL params (for community-specific match viewing)
+  const urlClubId = searchParams.get('clubId');
+
   const [club, setClub] = useState<Club | null>(null);
   const [liveMatches, setLiveMatches] = useState<FootballMatch[]>([]);
   const [upcomingMatches, setUpcomingMatches] = useState<FootballMatch[]>([]);
@@ -69,7 +72,21 @@ export default function MatchCenterPage() {
     const loadClub = async () => {
       if (!profile?.id) return;
       
-      // Check for club in membership or community
+      // If clubId is in URL, use that (for community-specific viewing)
+      if (urlClubId) {
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('*')
+          .eq('id', urlClubId)
+          .single();
+        
+        if (clubData) {
+          setClub(clubData as Club);
+          return;
+        }
+      }
+      
+      // Otherwise, check for club in membership (loyalty program)
       const { data: membership } = await supabase
         .from('fan_memberships')
         .select('club_id')
@@ -89,7 +106,7 @@ export default function MatchCenterPage() {
     };
     
     loadClub();
-  }, [profile]);
+  }, [profile, urlClubId]);
 
   // Fetch matches
   const fetchData = useCallback(async (isRefresh = false) => {
