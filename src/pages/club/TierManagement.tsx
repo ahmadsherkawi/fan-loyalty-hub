@@ -459,37 +459,96 @@ export default function TierManagement() {
               const draft = benefitDrafts[tier.id] || { type: "", value: "" };
               const def = draft.type ? BENEFIT_DEFS[draft.type] : null;
 
-              // Tier-specific styling based on rank
-              const tierIcon = index === 0 ? Crown : index === 1 ? Star : index === 2 ? Zap : Gift;
-              const TierIcon = tierIcon;
-              const tierGradients = [
-                "from-accent/20 via-amber-500/10 to-transparent",
-                "from-primary/20 via-emerald-500/10 to-transparent",
-                "from-blue-500/20 via-indigo-500/10 to-transparent",
-                "from-purple-500/20 via-pink-500/10 to-transparent",
-              ];
-              const tierAccentColors = [
-                "text-accent",
-                "text-primary",
-                "text-blue-400",
-                "text-purple-400",
-              ];
-              const tierBorderColors = [
-                "border-accent/30 hover:border-accent/50",
-                "border-primary/30 hover:border-primary/50",
-                "border-blue-500/30 hover:border-blue-500/50",
-                "border-purple-500/30 hover:border-purple-500/50",
-              ];
-              const tierBgAccents = [
-                "bg-accent/10",
-                "bg-primary/10",
-                "bg-blue-500/10",
-                "bg-purple-500/10",
-              ];
-              const gradientClass = tierGradients[index % tierGradients.length];
-              const accentColor = tierAccentColors[index % tierAccentColors.length];
-              const borderColor = tierBorderColors[index % tierBorderColors.length];
-              const bgAccent = tierBgAccents[index % tierBgAccents.length];
+              // Color-match tiers by name keywords
+              const nameLower = tier.name.toLowerCase();
+              const getTierTheme = () => {
+                if (nameLower.includes("gold") || nameLower.includes("legendary") || nameLower.includes("elite")) {
+                  return {
+                    icon: Crown,
+                    gradient: "from-yellow-500/25 via-amber-400/15 to-orange-500/5",
+                    accent: "text-yellow-400",
+                    border: "border-yellow-500/30 hover:border-yellow-400/60",
+                    bg: "bg-yellow-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(45,95%,55%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("silver") || nameLower.includes("platinum") || nameLower.includes("diamond")) {
+                  return {
+                    icon: Star,
+                    gradient: "from-slate-300/20 via-gray-400/10 to-zinc-500/5",
+                    accent: "text-slate-300",
+                    border: "border-slate-400/30 hover:border-slate-300/60",
+                    bg: "bg-slate-400/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(220,15%,70%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("bronze") || nameLower.includes("copper")) {
+                  return {
+                    icon: Zap,
+                    gradient: "from-orange-600/20 via-amber-700/10 to-yellow-800/5",
+                    accent: "text-orange-400",
+                    border: "border-orange-500/30 hover:border-orange-400/60",
+                    bg: "bg-orange-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(25,80%,50%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("blue") || nameLower.includes("sapphire")) {
+                  return {
+                    icon: Star,
+                    gradient: "from-blue-500/25 via-sky-400/15 to-indigo-500/5",
+                    accent: "text-blue-400",
+                    border: "border-blue-500/30 hover:border-blue-400/60",
+                    bg: "bg-blue-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(215,80%,55%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("green") || nameLower.includes("emerald")) {
+                  return {
+                    icon: Zap,
+                    gradient: "from-emerald-500/25 via-green-400/15 to-teal-500/5",
+                    accent: "text-emerald-400",
+                    border: "border-emerald-500/30 hover:border-emerald-400/60",
+                    bg: "bg-emerald-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(152,68%,45%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("red") || nameLower.includes("ruby") || nameLower.includes("crimson")) {
+                  return {
+                    icon: Zap,
+                    gradient: "from-red-500/25 via-rose-400/15 to-pink-500/5",
+                    accent: "text-red-400",
+                    border: "border-red-500/30 hover:border-red-400/60",
+                    bg: "bg-red-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(0,72%,50%,0.3)]",
+                  };
+                }
+                if (nameLower.includes("purple") || nameLower.includes("amethyst") || nameLower.includes("vip")) {
+                  return {
+                    icon: Crown,
+                    gradient: "from-purple-500/25 via-violet-400/15 to-fuchsia-500/5",
+                    accent: "text-purple-400",
+                    border: "border-purple-500/30 hover:border-purple-400/60",
+                    bg: "bg-purple-500/10",
+                    glow: "hover:shadow-[0_0_30px_-5px_hsl(270,60%,55%,0.3)]",
+                  };
+                }
+                // Fallback: use rank-based coloring
+                const fallbackThemes = [
+                  { icon: Crown, gradient: "from-yellow-500/25 via-amber-400/15 to-transparent", accent: "text-yellow-400", border: "border-yellow-500/30 hover:border-yellow-400/60", bg: "bg-yellow-500/10", glow: "hover:shadow-[0_0_30px_-5px_hsl(45,95%,55%,0.3)]" },
+                  { icon: Star, gradient: "from-slate-300/20 via-gray-400/10 to-transparent", accent: "text-slate-300", border: "border-slate-400/30 hover:border-slate-300/60", bg: "bg-slate-400/10", glow: "hover:shadow-[0_0_30px_-5px_hsl(220,15%,70%,0.3)]" },
+                  { icon: Zap, gradient: "from-orange-600/20 via-amber-700/10 to-transparent", accent: "text-orange-400", border: "border-orange-500/30 hover:border-orange-400/60", bg: "bg-orange-500/10", glow: "hover:shadow-[0_0_30px_-5px_hsl(25,80%,50%,0.3)]" },
+                  { icon: Gift, gradient: "from-primary/20 via-emerald-500/10 to-transparent", accent: "text-primary", border: "border-primary/30 hover:border-primary/50", bg: "bg-primary/10", glow: "hover:shadow-[0_0_30px_-5px_hsl(152,68%,45%,0.3)]" },
+                ];
+                return fallbackThemes[index % fallbackThemes.length];
+              };
+
+              const theme = getTierTheme();
+              const TierIcon = theme.icon;
+              const gradientClass = theme.gradient;
+              const accentColor = theme.accent;
+              const borderColor = theme.border;
+              const bgAccent = theme.bg;
+              const glowClass = theme.glow;
 
               return (
                 <div key={tier.id} className="relative">
@@ -498,7 +557,7 @@ export default function TierManagement() {
                     <div className="absolute left-10 top-full w-px h-5 bg-gradient-to-b from-border/60 to-transparent z-10" />
                   )}
 
-                  <div className={`group relative overflow-hidden rounded-3xl border ${borderColor} bg-card transition-all duration-500 hover:shadow-lg`}>
+                  <div className={`group relative overflow-hidden rounded-3xl border ${borderColor} bg-card transition-all duration-500 ${glowClass}`}>
                     {/* Top gradient banner */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-60 pointer-events-none`} />
                     <div className="absolute inset-0 stadium-pattern opacity-20 pointer-events-none" />
