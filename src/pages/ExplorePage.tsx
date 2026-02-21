@@ -97,9 +97,11 @@ export default function ExplorePage() {
       
       try {
         const teams = await searchTeams(search);
-        setApiTeams(teams);
+        console.log("[Explore] API search results:", teams);
+        setApiTeams(teams || []);
       } catch (err) {
         console.error("API search error:", err);
+        setApiTeams([]);
       } finally {
         setApiLoading(false);
       }
@@ -207,14 +209,19 @@ export default function ExplorePage() {
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
               </div>
-            ) : apiTeams.length === 0 ? (
+            ) : apiTeams.filter(t => t && t.name).length === 0 ? (
               <div className="text-center py-20">
                 <div className="mx-auto h-20 w-20 rounded-3xl bg-muted/30 border border-border/30 flex items-center justify-center mb-6">
                   <Search className="h-9 w-9 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-2">No Results Found</h3>
-                <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-                  No clubs match your search. Try a different term or check spelling.
+                <h3 className="text-lg font-display font-bold text-foreground mb-2">No Clubs Found</h3>
+                <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
+                  {apiTeams.length > 0 
+                    ? `API returned ${apiTeams.length} result(s) but data format was unexpected. Check console for details.`
+                    : "No clubs match your search. The API might be rate-limited."}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try: Barcelona, Manchester, Liverpool, Real Madrid
                 </p>
               </div>
             ) : (
@@ -226,91 +233,83 @@ export default function ExplorePage() {
                       <Sparkles className="h-4 w-4 text-accent" />
                     </div>
                     <h2 className="text-xl font-display font-bold text-foreground">Search Results</h2>
-                    <span className="badge-section">{apiTeams.length}</span>
+                    <span className="badge-section">{apiTeams.filter(t => t && t.name).length}</span>
                   </div>
                   
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {apiTeams.filter(team => team && team.name).map((team) => {
+                    {apiTeams.filter(team => team && team.name && team.id).map((team) => {
                       const community = existingCommunities.get(team.name?.toLowerCase() || '') || 
                                        existingCommunities.get(`api_${team.id}`);
                       
                       return (
-                        <div
+                        <Card
                           key={team.id}
-                          className="group bento-card p-0 overflow-hidden hover-border-glow"
+                          className="rounded-2xl border-border/40 overflow-hidden hover:border-primary/30 transition-all"
                         >
-                          {/* Color banner with logo */}
-                          <div
-                            className="h-24 flex items-center justify-center relative overflow-hidden bg-muted"
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-b from-black/0 to-black/30" />
-                            <div className="absolute inset-0 stadium-pattern opacity-40" />
+                          {/* Logo header */}
+                          <div className="h-24 flex items-center justify-center bg-muted relative">
                             {team.logo ? (
                               <img
                                 src={team.logo}
                                 alt={`${team.name} logo`}
-                                className="h-14 w-14 object-contain relative z-10 drop-shadow-lg group-hover:scale-110 transition-transform duration-500"
+                                className="h-14 w-14 object-contain"
                               />
                             ) : (
-                              <div className="h-14 w-14 rounded-2xl glass-dark flex items-center justify-center relative z-10">
-                                <span className="text-xl font-display font-bold text-white">
+                              <div className="h-14 w-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+                                <span className="text-xl font-bold text-primary">
                                   {team.name.charAt(0)}
                                 </span>
                               </div>
                             )}
                           </div>
 
-                          <div className="p-5">
+                          <CardContent className="p-5">
                             <div className="flex items-start justify-between mb-3">
-                              <h3 className="title-card text-foreground">{team.name}</h3>
+                              <h3 className="font-semibold text-foreground">{team.name}</h3>
                               {community?.is_official ? (
-                                <span className="badge-verified rounded-full text-[11px] px-2.5 py-0.5 inline-flex items-center gap-1">
-                                  <CheckCircle className="h-3 w-3" />
+                                <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px]">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
                                   Verified
-                                </span>
+                                </Badge>
                               ) : (
-                                <span className="badge-warning rounded-full text-[11px] px-2.5 py-0.5 border inline-flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
+                                <Badge variant="outline" className="text-[11px]">
+                                  <Users className="h-3 w-3 mr-1" />
                                   Community
-                                </span>
+                                </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-caption mb-4">
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
                               <MapPin className="h-3.5 w-3.5" />
-                              {team.country}
+                              {team.country || 'Unknown'}
                             </div>
                             
                             {community && (
-                              <div className="flex items-center gap-4 mb-5">
-                                <div className="flex items-center gap-1.5 text-caption">
-                                  <div className="h-5 w-5 rounded-md bg-primary/10 flex items-center justify-center">
-                                    <Users className="h-3 w-3 text-primary" />
-                                  </div>
-                                  <span>{community.member_count} members</span>
-                                </div>
+                              <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3 text-primary" />
+                                  {community.member_count} members
+                                </span>
                               </div>
                             )}
                             
-                            <div className="space-y-2">
+                            <Button
+                              className="w-full rounded-xl gradient-stadium font-semibold h-11"
+                              onClick={() => handleJoinClub(team)}
+                            >
+                              Join Community
+                            </Button>
+                            {!community?.is_official && community && (
                               <Button
-                                className="w-full rounded-xl gradient-stadium font-semibold h-11"
-                                onClick={() => handleJoinClub(team)}
+                                variant="outline"
+                                className="w-full rounded-xl font-semibold h-11 mt-2"
+                                onClick={() => handleClaimCommunity(community.id, community.name)}
                               >
-                                Join Community
+                                <Building2 className="h-4 w-4 mr-2" />
+                                Claim as Your Club
                               </Button>
-                              {!community?.is_official && community && (
-                                <Button
-                                  variant="outline"
-                                  className="w-full rounded-xl font-semibold h-11 border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all"
-                                  onClick={() => handleClaimCommunity(community.id, community.name)}
-                                >
-                                  <Building2 className="h-4 w-4 mr-2" />
-                                  Claim as Your Club
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                            )}
+                          </CardContent>
+                        </Card>
                       );
                     })}
                   </div>

@@ -330,36 +330,52 @@ export async function getTeamForm(teamId: string, lastN = 5): Promise<TeamForm |
 export async function searchTeams(query: string): Promise<Array<{ id: string; name: string; logo: string | null; country: string }>> {
   const cacheKey = `search-teams-${query.toLowerCase()}`;
   const cached = getCached<Array<{ id: string; name: string; logo: string | null; country: string }>>(cacheKey);
-  if (cached) return cached;
-
-  // Try API-Football
-  const teams = await fetchApiFootball<Array<{ id: number; name: string; logo: string; country: string }>>('teams', { search: query });
-  
-  if (teams && teams.length > 0) {
-    const result = teams.map(t => ({
-      id: String(t.id),
-      name: t.name,
-      logo: t.logo,
-      country: t.country,
-    }));
-    setCache(cacheKey, result);
-    return result;
+  if (cached) {
+    console.log('[FootballAPI] Using cached results for:', query);
+    return cached;
   }
 
-  // Fallback to TheSportsDB
-  const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
-  
-  if (result?.teams) {
-    const mapped = result.teams.map(t => ({
-      id: t.idTeam,
-      name: t.strTeam,
-      logo: t.strTeamBadge,
-      country: t.strCountry || '',
-    }));
-    setCache(cacheKey, mapped);
-    return mapped;
+  // Try TheSportsDB first (more CORS-friendly for browser)
+  console.log('[FootballAPI] Searching TheSportsDB for:', query);
+  try {
+    const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
+    
+    if (result?.teams && result.teams.length > 0) {
+      console.log('[FootballAPI] TheSportsDB results:', result.teams.length);
+      const mapped = result.teams.map(t => ({
+        id: t.idTeam || String(Math.random()),
+        name: t.strTeam || 'Unknown',
+        logo: t.strTeamBadge || null,
+        country: t.strCountry || '',
+      })).filter(t => t.name && t.name !== 'Unknown');
+      setCache(cacheKey, mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.error('[FootballAPI] TheSportsDB error:', err);
   }
 
+  // Try API-Football as backup
+  console.log('[FootballAPI] Trying API-Football for:', query);
+  try {
+    const teams = await fetchApiFootball<Array<{ id: number; name: string; logo: string; country: string }>>('teams', { search: query });
+    
+    if (teams && teams.length > 0) {
+      console.log('[FootballAPI] API-Football results:', teams.length);
+      const result = teams.map(t => ({
+        id: String(t.id),
+        name: t.name,
+        logo: t.logo,
+        country: t.country,
+      }));
+      setCache(cacheKey, result);
+      return result;
+    }
+  } catch (err) {
+    console.error('[FootballAPI] API-Football error:', err);
+  }
+
+  console.log('[FootballAPI] No results found for:', query);
   return [];
 }
 
