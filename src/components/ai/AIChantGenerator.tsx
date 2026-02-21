@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { SpotlightCard, AnimatedBorderCard } from '@/components/design-system';
+import { generateChant } from '@/lib/aiService';
 import type { ChantContext, GeneratedChant } from '@/types/football';
 
 interface AIChantGeneratorProps {
@@ -61,30 +62,11 @@ export function AIChantGenerator({
         opponent,
         stadium,
         players: playerName ? [playerName] : undefined,
+        occasion: customContext || undefined,
       };
 
-      // Call the AI API
-      const response = await fetch('/api/ai/generate-chant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: buildPrompt(context, customContext),
-          context,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate chant');
-      }
-
-      const data = await response.json();
-      
-      const chant: GeneratedChant = {
-        content: data.content,
-        mood: data.mood || 'passionate',
-        suggestedHashtags: data.suggestedHashtags || [],
-        createdAt: new Date().toISOString(),
-      };
+      // Use the aiService directly (works in any environment)
+      const chant = await generateChant({ context });
 
       setGeneratedChant(chant);
       onChantCreated?.(chant);
