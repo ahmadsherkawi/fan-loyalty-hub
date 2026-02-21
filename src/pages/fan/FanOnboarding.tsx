@@ -212,8 +212,8 @@ export default function FanOnboarding() {
           // Create new community from API team (function now handles joining automatically)
           const { data, error } = await supabase.rpc("create_fan_community", {
             p_name: team.name,
-            p_country: team.country,
-            p_city: null,
+            p_country: team.country || '',
+            p_city: '',  // City not available from API, use empty string
             p_fan_id: profile.id,
             p_logo_url: team.logo,
             p_api_team_id: team.apiTeamId,

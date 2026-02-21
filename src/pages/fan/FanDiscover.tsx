@@ -216,8 +216,8 @@ export default function FanDiscover() {
           "create_fan_community",
           {
             p_name: team.name,
-            p_country: team.country,
-            p_city: null,
+            p_country: team.country || '',
+            p_city: '',  // City not available from API, use empty string
             p_fan_id: profile.id,
             p_logo_url: team.logo,
             p_api_team_id: team.id,
