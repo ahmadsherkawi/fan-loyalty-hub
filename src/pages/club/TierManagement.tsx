@@ -631,14 +631,14 @@ export default function TierManagement() {
                       </div>
 
                       {/* Add benefit form */}
-                      <div className="mt-5 rounded-2xl glass-dark p-4 space-y-3">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add Benefit</Label>
+                      <div className="mt-5 rounded-2xl hero-gradient p-4 space-y-3 border border-white/10">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-accent">Add Benefit</Label>
 
                         <Select
                           value={draft.type}
                           onValueChange={(v) => updateDraft(tier.id, { type: v as BenefitType, value: "" })}
                         >
-                          <SelectTrigger className="rounded-xl border-border/40 bg-background/50">
+                          <SelectTrigger className="rounded-xl border-white/10 bg-white/5 text-white/90">
                             <SelectValue placeholder="Select benefit type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -652,9 +652,9 @@ export default function TierManagement() {
 
                         {def?.needsValue && (
                           <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">{def.valueLabel}</Label>
+                            <Label className="text-xs text-accent/80">{def.valueLabel}</Label>
                             <Input
-                              className="rounded-xl border-border/40 bg-background/50"
+                              className="rounded-xl border-white/10 bg-white/5 text-white/90 placeholder:text-white/30"
                               placeholder={def.valuePlaceholder}
                               value={draft.value}
                               onChange={(e) => updateDraft(tier.id, { value: e.target.value })}
@@ -662,7 +662,7 @@ export default function TierManagement() {
                           </div>
                         )}
 
-                        {def?.helper && <p className="text-[11px] text-muted-foreground">{def.helper}</p>}
+                        {def?.helper && <p className="text-[11px] text-accent/60">{def.helper}</p>}
 
                         <div className="flex gap-2">
                           <Button className="flex-1 rounded-xl gap-2" onClick={() => handleAddBenefit(tier.id)}>
@@ -671,7 +671,7 @@ export default function TierManagement() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="rounded-xl border-border/40"
+                            className="rounded-xl border-white/10 text-white/70 hover:text-white hover:bg-white/5"
                             onClick={() => updateDraft(tier.id, { type: "", value: "" })}
                           >
                             Clear
