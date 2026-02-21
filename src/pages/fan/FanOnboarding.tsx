@@ -203,10 +203,14 @@ export default function FanOnboarding() {
 
     setSubmitting(true);
     try {
+      console.log("[Onboarding] Starting completion with teams:", selectedTeams);
+      
       for (const team of selectedTeams) {
+        console.log("[Onboarding] Processing team:", team.name, "isNew:", team.isNew, "apiTeamId:", team.apiTeamId);
+        
         if (team.isNew) {
-          // Create new community from API team
-          await supabase.rpc("create_fan_community", {
+          // Create new community from API team (function now handles joining automatically)
+          const { data, error } = await supabase.rpc("create_fan_community", {
             p_name: team.name,
             p_country: team.country,
             p_city: null,
@@ -214,12 +218,24 @@ export default function FanOnboarding() {
             p_logo_url: team.logo,
             p_api_team_id: team.apiTeamId,
           });
+
+          if (error) {
+            console.error("[Onboarding] Error creating community:", error);
+            throw error;
+          }
+          console.log("[Onboarding] Created/joined community:", data);
         } else {
           // Join existing community
-          await supabase.rpc("join_community", {
+          const { error } = await supabase.rpc("join_community", {
             p_club_id: team.id,
             p_fan_id: profile.id,
           });
+
+          if (error) {
+            console.error("[Onboarding] Error joining community:", error);
+            throw error;
+          }
+          console.log("[Onboarding] Joined existing community:", team.id);
         }
       }
 
@@ -228,9 +244,13 @@ export default function FanOnboarding() {
         description: `You've joined ${selectedTeams.length} communities.`,
       });
 
+      // Small delay to ensure DB commits are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       navigate("/fan/profile", { replace: true });
     } catch (err) {
       const error = err as Error;
+      console.error("[Onboarding] Completion error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to complete onboarding.",

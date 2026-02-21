@@ -41,7 +41,10 @@ BEGIN
     LIMIT 1;
     
     IF v_club_id IS NOT NULL THEN
-      -- Club exists, just return the ID (caller will handle joining)
+      -- Club exists, join the fan and return the ID
+      INSERT INTO public.community_memberships (club_id, fan_id)
+      VALUES (v_club_id, p_fan_id)
+      ON CONFLICT (club_id, fan_id) DO NOTHING;
       RETURN v_club_id;
     END IF;
   END IF;
@@ -53,7 +56,10 @@ BEGIN
   LIMIT 1;
   
   IF v_club_id IS NOT NULL THEN
-    -- Club exists, return the ID
+    -- Club exists, join the fan and return the ID
+    INSERT INTO public.community_memberships (club_id, fan_id)
+    VALUES (v_club_id, p_fan_id)
+    ON CONFLICT (club_id, fan_id) DO NOTHING;
     RETURN v_club_id;
   END IF;
   

@@ -200,9 +200,15 @@ export default function FanProfilePage() {
       }
 
       // Fetch communities
-      const { data: myCommunities } = await supabase.rpc("get_my_communities", {
+      console.log("[Profile] Fetching communities for fan:", profile.id);
+      const { data: myCommunities, error: commError } = await supabase.rpc("get_my_communities", {
         p_fan_id: profile.id,
       });
+      
+      if (commError) {
+        console.error("[Profile] Error fetching communities:", commError);
+      }
+      console.log("[Profile] My communities:", myCommunities);
       
       // Get chant counts for each community
       const communitiesWithCounts = await Promise.all(
@@ -215,6 +221,7 @@ export default function FanProfilePage() {
         })
       );
       
+      console.log("[Profile] Communities with counts:", communitiesWithCounts);
       setCommunities(communitiesWithCounts as Community[]);
 
       // Unread notifications
