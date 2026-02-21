@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/Logo";
 import { useToast } from "@/hooks/use-toast";
+import { searchTeams } from "@/lib/footballApi";
 import {
   ArrowLeft,
   Loader2,
@@ -15,20 +16,22 @@ import {
   Users,
   MessageCircle,
   CheckCircle,
-  Plus,
   Globe,
   LogOut,
   AlertCircle,
+  Database,
+  Sparkles,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 
+// API Team type
+interface ApiTeam {
+  id: string;
+  name: string;
+  logo: string | null;
+  country: string;
+}
+
+// Community type from database
 interface Community {
   id: string;
   name: string;
@@ -39,7 +42,7 @@ interface Community {
   is_official: boolean;
   member_count: number;
   chant_count: number;
-  is_joined?: boolean;
+  api_team_id?: string | null;
 }
 
 interface CommunityLimit {
@@ -56,54 +59,55 @@ export default function FanDiscover() {
   const { profile, signOut, loading } = useAuth();
   const { toast } = useToast();
 
-  const [communities, setCommunities] = useState<Community[]>([]);
+  // API search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [apiTeams, setApiTeams] = useState<ApiTeam[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  
+  // Database state
+  const [existingCommunities, setExistingCommunities] = useState<Map<string, Community>>(new Map());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
   const [communityLimit, setCommunityLimit] = useState<CommunityLimit | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Action state
   const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [creating, setCreating] = useState(false);
 
-  // Create community form
-  const [newName, setNewName] = useState("");
-  const [newCountry, setNewCountry] = useState("");
-  const [newCity, setNewCity] = useState("");
+  // Debounce timer
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = useCallback(async () => {
+  // Fetch user's joined communities and limits
+  const fetchUserData = useCallback(async () => {
     if (!profile) return;
     setDataLoading(true);
 
     try {
-      // Fetch all communities
-      console.log("[Discover] Fetching communities...");
-      const { data, error } = await supabase.rpc("get_communities", {
-        p_search: searchQuery || null,
-        p_limit: 100,
-        p_offset: 0,
-      });
+      // Fetch all existing communities to map API team IDs
+      const { data: allCommunities, error: commError } = await supabase
+        .from("clubs")
+        .select("id, name, logo_url, city, country, primary_color, is_official, api_team_id");
 
-      if (error) {
-        console.error("[Discover] Error fetching communities:", error);
-        throw error;
-      }
-      
-      console.log("[Discover] Communities fetched:", data?.length, data);
-      setCommunities((data || []) as Community[]);
+      if (commError) throw commError;
+
+      const commMap = new Map<string, Community>();
+      (allCommunities || []).forEach((c) => {
+        // Map by name (lowercase) for matching
+        commMap.set(c.name.toLowerCase(), c);
+        // Also map by API team ID if available
+        if (c.api_team_id) {
+          commMap.set(`api_${c.api_team_id}`, c);
+        }
+      });
+      setExistingCommunities(commMap);
 
       // Fetch user's joined communities
-      console.log("[Discover] Fetching user's communities...");
       const { data: myCommunities, error: myError } = await supabase.rpc(
         "get_my_communities",
         { p_fan_id: profile.id }
       );
 
-      if (myError) {
-        console.error("[Discover] Error fetching my communities:", myError);
-        throw myError;
-      }
-      
-      console.log("[Discover] My communities:", myCommunities);
+      if (myError) throw myError;
 
       const joined = new Set((myCommunities || []).map((c: { id: string }) => c.id));
       setJoinedIds(joined);
@@ -114,23 +118,65 @@ export default function FanDiscover() {
         { p_fan_id: profile.id }
       );
 
-      if (limitError) {
-        console.error("[Discover] Error fetching community limit:", limitError);
-      } else {
+      if (!limitError && limitData) {
         setCommunityLimit(limitData as CommunityLimit);
       }
     } catch (err) {
       console.error("[Discover] Fetch error:", err);
       toast({
         title: "Error",
-        description: "Failed to load communities.",
+        description: "Failed to load your data.",
         variant: "destructive",
       });
     } finally {
       setDataLoading(false);
     }
-  }, [profile, searchQuery, toast]);
+  }, [profile, toast]);
 
+  // Search API teams with debounce
+  const searchApiTeams = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setApiTeams([]);
+      setSearchPerformed(false);
+      return;
+    }
+
+    setApiLoading(true);
+    setSearchPerformed(true);
+
+    try {
+      const teams = await searchTeams(query);
+      setApiTeams(teams);
+    } catch (err) {
+      console.error("[Discover] API search error:", err);
+      toast({
+        title: "Search Error",
+        description: "Failed to search teams. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
+    }
+  }, [toast]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      searchApiTeams(searchQuery);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [searchQuery, searchApiTeams]);
+
+  // Initial data load
   useEffect(() => {
     if (loading || !profile) {
       if (!loading && !profile) {
@@ -139,10 +185,11 @@ export default function FanDiscover() {
       return;
     }
 
-    fetchData();
-  }, [loading, profile, navigate, fetchData]);
+    fetchUserData();
+  }, [loading, profile, navigate, fetchUserData]);
 
-  const handleJoin = async (clubId: string) => {
+  // Handle joining an API team (creates community if needed)
+  const handleJoinApiTeam = async (team: ApiTeam) => {
     if (!profile) return;
 
     // Check if can join more
@@ -150,6 +197,86 @@ export default function FanDiscover() {
       toast({
         title: "Limit reached",
         description: `You've joined the maximum of ${MAX_COMMUNITIES} communities. Leave one to join another.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setJoiningId(team.id);
+    try {
+      // Check if community already exists for this team
+      const community = existingCommunities.get(team.name.toLowerCase()) || 
+                        existingCommunities.get(`api_${team.id}`);
+
+      if (!community) {
+        // Create community for this API team (function now returns UUID directly and auto-joins)
+        const { data: newClubId, error: createError } = await supabase.rpc(
+          "create_fan_community",
+          {
+            p_name: team.name,
+            p_country: team.country,
+            p_city: null,
+            p_fan_id: profile.id,
+            p_logo_url: team.logo,
+            p_api_team_id: team.id,
+          }
+        );
+
+        if (createError) throw createError;
+
+        setJoinedIds((prev) => new Set([...prev, newClubId as string]));
+        
+        toast({
+          title: "Community Created & Joined!",
+          description: `${team.name} community created and you've joined!`,
+        });
+      } else {
+        // Community exists, just join it
+        const { error } = await supabase.rpc("join_community", {
+          p_club_id: community.id,
+          p_fan_id: profile.id,
+        });
+
+        if (error) throw error;
+
+        setJoinedIds((prev) => new Set([...prev, community.id]));
+        toast({ title: "Joined!", description: `You've joined ${team.name}!` });
+      }
+
+      // Update limit
+      setCommunityLimit((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_count: prev.current_count + 1,
+              slots_remaining: prev.slots_remaining - 1,
+              can_join_more: prev.current_count + 1 < MAX_COMMUNITIES,
+            }
+          : null
+      );
+
+      // Refresh data
+      fetchUserData();
+    } catch (err) {
+      const error = err as Error;
+      toast({
+        title: "Error",
+        description: error.message || "Could not join community.",
+        variant: "destructive",
+      });
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
+  // Handle joining existing community
+  const handleJoinExisting = async (clubId: string, clubName: string) => {
+    if (!profile) return;
+
+    if (communityLimit && !communityLimit.can_join_more) {
+      toast({
+        title: "Limit reached",
+        description: `You've joined the maximum of ${MAX_COMMUNITIES} communities.`,
         variant: "destructive",
       });
       return;
@@ -175,7 +302,7 @@ export default function FanDiscover() {
             }
           : null
       );
-      toast({ title: "Joined!", description: "You've joined the community." });
+      toast({ title: "Joined!", description: `You've joined ${clubName}!` });
     } catch (err) {
       const error = err as Error;
       toast({
@@ -188,58 +315,15 @@ export default function FanDiscover() {
     }
   };
 
-  const handleCreateCommunity = async () => {
-    if (!profile || !newName.trim() || !newCountry.trim()) {
-      toast({
-        title: "Missing info",
-        description: "Please provide club name and country.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const { data, error } = await supabase.rpc("create_fan_community", {
-        p_name: newName.trim(),
-        p_country: newCountry.trim(),
-        p_city: newCity.trim() || null,
-        p_fan_id: profile.id,
-        p_logo_url: null,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Community created!",
-        description: `${newName} has been added as a fan community.`,
-      });
-
-      setShowCreateDialog(false);
-      setNewName("");
-      setNewCountry("");
-      setNewCity("");
-      fetchData();
-    } catch (err) {
-      const error = err as Error;
-      toast({
-        title: "Error",
-        description: error.message || "Could not create community.",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
 
-  // Separate communities into official and fan communities
-  const officialClubs = communities.filter((c) => c.is_official);
-  const fanCommunities = communities.filter((c) => !c.is_official);
+  // Get joined communities for display
+  const joinedCommunities = Array.from(existingCommunities.values()).filter((c) =>
+    joinedIds.has(c.id)
+  );
 
   if (loading || dataLoading) {
     return (
@@ -289,45 +373,43 @@ export default function FanDiscover() {
             Discover Fan Communities
           </h1>
           <p className="text-muted-foreground">
-            Join communities for your favorite clubs, even before they officially join the
-            platform!
+            Search from thousands of clubs worldwide. Names match official football databases!
           </p>
         </div>
 
         {/* Search */}
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search clubs by name, city, or country..."
+              placeholder="Search any club (e.g., Barcelona, Manchester, Real Madrid...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 rounded-xl border-border/40"
+              className="pl-12 h-14 text-lg rounded-2xl border-border/40 focus:border-primary/40"
             />
+            {apiLoading && (
+              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
+            )}
           </div>
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            disabled={communityLimit && !communityLimit.can_join_more}
-            className="rounded-xl gradient-stadium"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Club
-          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            <Sparkles className="h-3 w-3 inline mr-1" />
+            Powered by football database API - minimum 2 characters to search
+          </p>
         </div>
 
-        {/* Stats */}
+        {/* Stats Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30">
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
+              <Database className="h-4 w-4" />
               <span>
-                <strong>{fanCommunities.length}</strong> fan communities
+                <strong>{existingCommunities.size}</strong> communities in database
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle className="h-4 w-4 text-primary" />
               <span>
-                <strong>{officialClubs.length}</strong> official clubs
+                <strong>{joinedIds.size}</strong> joined
               </span>
             </div>
           </div>
@@ -352,307 +434,277 @@ export default function FanDiscover() {
           </div>
         </div>
 
-        {/* Official Clubs Section */}
-        {officialClubs.length > 0 && (
+        {/* Joined Communities Section */}
+        {joinedCommunities.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-primary" />
-              Official Clubs
+              Your Communities
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {officialClubs.map((community) => {
-                const isJoined = joinedIds.has(community.id);
-                const canJoin = communityLimit?.can_join_more ?? true;
-
-                return (
-                  <Card
-                    key={community.id}
-                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Logo */}
-                        <div
-                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
-                          style={{
-                            backgroundColor: community.primary_color || "#16a34a",
-                          }}
-                        >
-                          {community.logo_url ? (
-                            <img
-                              src={community.logo_url}
-                              alt={community.name}
-                              className="h-full w-full rounded-xl object-cover"
-                            />
-                          ) : (
-                            community.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-semibold truncate">{community.name}</h3>
+              {joinedCommunities.map((community) => (
+                <Card
+                  key={community.id}
+                  className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0 overflow-hidden"
+                        style={{
+                          backgroundColor: community.primary_color || "#16a34a",
+                        }}
+                      >
+                        {community.logo_url ? (
+                          <img
+                            src={community.logo_url}
+                            alt={community.name}
+                            className="h-full w-full rounded-xl object-cover"
+                          />
+                        ) : (
+                          community.name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-semibold truncate">{community.name}</h3>
+                          {community.is_official && (
                             <Badge className="h-5 text-[10px] bg-primary/10 text-primary border-primary/20">
                               Official
                             </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {community.city ? `${community.city}, ` : ""}
-                            {community.country}
-                          </p>
-
-                          {/* Stats */}
-                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {community.member_count}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="h-3 w-3" />
-                              {community.chant_count}
-                            </span>
-                          </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {community.city ? `${community.city}, ` : ""}
+                          {community.country}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {community.member_count}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageCircle className="h-3 w-3" />
+                            {community.chant_count}
+                          </span>
                         </div>
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 mt-4">
-                        {isJoined ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/fan/community/${community.id}`)}
-                              className="flex-1 rounded-xl"
-                            >
-                              View
-                            </Button>
-                            <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
-                              Joined
-                            </Badge>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => handleJoin(community.id)}
-                            disabled={joiningId === community.id || !canJoin}
-                            className="flex-1 rounded-xl gradient-stadium"
-                          >
-                            {joiningId === community.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : !canJoin ? (
-                              "Limit reached"
-                            ) : (
-                              "Join Club"
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/fan/community/${community.id}`)}
+                        className="flex-1 rounded-xl"
+                      >
+                        View Community
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Fan Communities Section */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Fan Communities
-          </h2>
-          {fanCommunities.length === 0 ? (
-            <Card className="rounded-2xl border-border/40">
-              <CardContent className="py-12 text-center">
-                <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No fan communities found.</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Try a different search or add a new club!
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {fanCommunities.map((community) => {
-                const isJoined = joinedIds.has(community.id);
-                const canJoin = communityLimit?.can_join_more ?? true;
+        {/* API Search Results */}
+        {searchPerformed && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Search Results
+              {apiTeams.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {apiTeams.length} found
+                </Badge>
+              )}
+            </h2>
 
-                return (
-                  <Card
-                    key={community.id}
-                    className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Logo */}
-                        <div
-                          className="h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
-                          style={{
-                            backgroundColor: community.primary_color || "#16a34a",
-                          }}
-                        >
-                          {community.logo_url ? (
-                            <img
-                              src={community.logo_url}
-                              alt={community.name}
-                              className="h-full w-full rounded-xl object-cover"
-                            />
+            {apiLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : apiTeams.length === 0 ? (
+              <Card className="rounded-2xl border-border/40">
+                <CardContent className="py-12 text-center">
+                  <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground font-medium">No clubs found</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Try a different search term or check spelling
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {apiTeams.map((team) => {
+                  const existingCommunity = existingCommunities.get(team.name.toLowerCase()) ||
+                                           existingCommunities.get(`api_${team.id}`);
+                  const isJoined = existingCommunity ? joinedIds.has(existingCommunity.id) : false;
+                  const canJoin = communityLimit?.can_join_more ?? true;
+
+                  return (
+                    <Card
+                      key={team.id}
+                      className="rounded-2xl border-border/40 hover:border-primary/30 transition-all group"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          {/* Logo */}
+                          <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                            {team.logo ? (
+                              <img
+                                src={team.logo}
+                                alt={team.name}
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-lg font-bold text-muted-foreground">
+                                {team.name.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="font-semibold truncate">{team.name}</h3>
+                              {existingCommunity?.is_official && (
+                                <Badge className="h-5 text-[10px] bg-primary/10 text-primary border-primary/20">
+                                  Official
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{team.country}</p>
+                            
+                            {existingCommunity && (
+                              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {existingCommunity.member_count} members
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 mt-4">
+                          {isJoined ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/fan/community/${existingCommunity!.id}`)}
+                                className="flex-1 rounded-xl"
+                              >
+                                View Community
+                              </Button>
+                              <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
+                                Joined
+                              </Badge>
+                            </>
+                          ) : existingCommunity ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleJoinExisting(existingCommunity.id, existingCommunity.name)}
+                              disabled={joiningId === existingCommunity.id || !canJoin}
+                              className="flex-1 rounded-xl gradient-stadium"
+                            >
+                              {joiningId === existingCommunity.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : !canJoin ? (
+                                "Limit reached"
+                              ) : (
+                                "Join Community"
+                              )}
+                            </Button>
                           ) : (
-                            community.name.charAt(0).toUpperCase()
+                            <Button
+                              size="sm"
+                              onClick={() => handleJoinApiTeam(team)}
+                              disabled={joiningId === team.id || !canJoin}
+                              className="flex-1 rounded-xl gradient-stadium"
+                            >
+                              {joiningId === team.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : !canJoin ? (
+                                "Limit reached"
+                              ) : (
+                                <>
+                                  <Sparkles className="h-4 w-4 mr-1.5" />
+                                  Create & Join
+                                </>
+                              )}
+                            </Button>
                           )}
                         </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-semibold truncate">{community.name}</h3>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {community.city ? `${community.city}, ` : ""}
-                            {community.country}
-                          </p>
-
-                          {/* Stats */}
-                          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {community.member_count}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="h-3 w-3" />
-                              {community.chant_count}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 mt-4">
-                        {isJoined ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/fan/community/${community.id}`)}
-                              className="flex-1 rounded-xl"
-                            >
-                              View
-                            </Button>
-                            <Badge className="bg-primary/10 text-primary border-primary/20 rounded-xl px-3">
-                              Joined
-                            </Badge>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => handleJoin(community.id)}
-                            disabled={joiningId === community.id || !canJoin}
-                            className="flex-1 rounded-xl gradient-stadium"
-                          >
-                            {joiningId === community.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : !canJoin ? (
-                              "Limit reached"
-                            ) : (
-                              "Join Community"
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Create Community Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="rounded-2xl max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add a New Club</DialogTitle>
-          </DialogHeader>
-          {communityLimit && !communityLimit.can_join_more ? (
-            <div className="py-6 text-center">
-              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-              <p className="font-semibold">Community Limit Reached</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                You've joined the maximum of {MAX_COMMUNITIES} communities. Leave a community to create a new one.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateDialog(false)}
-                className="mt-4 rounded-xl"
-              >
-                Close
-              </Button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Can't find your club? Add it as a fan community. Once the official club joins,
-                they can claim it!
-              </p>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Club Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., FC Barcelona"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="rounded-xl border-border/40"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country *</Label>
-                  <Input
-                    id="country"
-                    placeholder="e.g., Spain"
-                    value={newCountry}
-                    onChange={(e) => setNewCountry(e.target.value)}
-                    className="rounded-xl border-border/40"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    placeholder="e.g., Barcelona"
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    className="rounded-xl border-border/40"
-                  />
-                </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCreateDialog(false)}
-                  className="rounded-xl"
+            )}
+          </div>
+        )}
+
+        {/* Empty State - Before Search */}
+        {!searchPerformed && (
+          <Card className="rounded-2xl border-border/40">
+            <CardContent className="py-16 text-center">
+              <Globe className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Search for Any Club</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Type at least 2 characters to search from our football database. 
+                All official club names from around the world are available!
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mt-6">
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Barcelona")}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateCommunity}
-                  disabled={creating || !newName.trim() || !newCountry.trim()}
-                  className="rounded-xl gradient-stadium"
+                  Barcelona
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Manchester")}
                 >
-                  {creating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Create Community"
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+                  Manchester
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Real Madrid")}
+                >
+                  Real Madrid
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Liverpool")}
+                >
+                  Liverpool
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Bayern")}
+                >
+                  Bayern
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => setSearchQuery("Juventus")}
+                >
+                  Juventus
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </main>
     </div>
   );
 }
