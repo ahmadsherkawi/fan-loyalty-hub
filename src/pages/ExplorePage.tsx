@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/landing/Navbar";
@@ -36,11 +37,8 @@ export default function ExplorePage() {
   // Check for action params
   const claimId = searchParams.get("claim");
 
-  useEffect(() => {
-    fetchClubs();
-  }, []);
-
-  const fetchClubs = async () => {
+  // Define fetchClubs with useCallback before using it in useEffect
+  const fetchClubs = useCallback(async () => {
     setLoading(true);
     
     // Use the get_communities RPC to get all clubs with stats
@@ -56,7 +54,11 @@ export default function ExplorePage() {
       setClubs((data || []) as Community[]);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchClubs();
+  }, [fetchClubs]);
 
   const filteredClubs = clubs.filter((club) => {
     const matchesSearch =

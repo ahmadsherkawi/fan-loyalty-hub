@@ -29,10 +29,14 @@ import {
   Target,
   ArrowLeft,
   TrendingUp,
+  Radio,
+  Brain,
 } from "lucide-react";
 
 import { Club, LoyaltyProgram, FanMembership, Activity, Reward } from "@/types/database";
 import { SpotlightCard, AnimatedBorderCard } from "@/components/design-system";
+import { LiveMatchCenter, PersonalizedFeed } from "@/components/ai";
+import type { FootballMatch } from "@/types/football";
 
 interface Tier {
   id: string;
@@ -75,6 +79,9 @@ export default function FanHome() {
   // Ranking state
   const [fanRank, setFanRank] = useState<number | null>(null);
   const [totalFans, setTotalFans] = useState<number>(0);
+  
+  // AI Features state
+  const [recentActivityTypes, setRecentActivityTypes] = useState<string[]>([]);
 
   const effectivePointsBalance = isPreviewMode ? previewPointsBalance : (membership?.points_balance ?? 0);
 
@@ -213,6 +220,19 @@ export default function FanHome() {
         .eq("is_read", false);
 
       setUnreadCount(count ?? 0);
+      
+      // Fetch recent activity types for AI recommendations
+      const { data: recentCompletions } = await supabase
+        .from("activity_completions")
+        .select("activity_id, activities!inner(name)")
+        .eq("fan_id", profile.id)
+        .order("completed_at", { ascending: false })
+        .limit(5);
+      
+      if (recentCompletions) {
+        const types = [...new Set(recentCompletions.map((c: { activities: { name: string } }) => c.activities?.name).filter(Boolean))];
+        setRecentActivityTypes(types as string[]);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -426,6 +446,65 @@ export default function FanHome() {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* ===================== AI-POWERED FEATURES ===================== */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Live Match Center */}
+              <div className="lg:col-span-2">
+                <LiveMatchCenter 
+                  clubId={club.id}
+                  clubName={club.name}
+                  onMatchSelect={(match) => {
+                    // Navigate to match detail or show prediction
+                    console.log('Match selected:', match);
+                  }}
+                />
+              </div>
+              
+              {/* Personalized Recommendations */}
+              <div>
+                <PersonalizedFeed
+                  fanId={profile?.id || ''}
+                  clubId={club.id}
+                  clubName={club.name}
+                  pointsBalance={effectivePointsBalance}
+                  tierName={currentTier?.name || null}
+                  upcomingMatches={[]}
+                  recentActivityTypes={recentActivityTypes}
+                  unreadNotifications={unreadCount}
+                />
+              </div>
+              
+              {/* AI Chant Generator CTA */}
+              <div>
+                <SpotlightCard className="p-5 h-full" spotlightColor="hsl(var(--accent) / 0.08)">
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                        <Brain className="h-5 w-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">AI Chant Generator</h3>
+                        <p className="text-xs text-muted-foreground">Create unique chants for your club</p>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-muted-foreground flex-1">
+                      Generate personalized, passionate football chants powered by AI. 
+                      Perfect for match days, player tributes, or showing your club spirit!
+                    </p>
+                    
+                    <Button 
+                      onClick={() => navigate('/fan/chants')}
+                      className="mt-4 w-full rounded-xl gradient-stadium"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate a Chant
+                    </Button>
+                  </div>
+                </SpotlightCard>
               </div>
             </div>
 

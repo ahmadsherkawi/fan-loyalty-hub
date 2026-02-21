@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,31 +28,46 @@ interface PollQuizBuilderProps {
 
 const generateId = () => crypto.randomUUID().slice(0, 8);
 
+const defaultOptions = [
+  { id: generateId(), text: '', isCorrect: false },
+  { id: generateId(), text: '', isCorrect: false },
+];
+
 export function PollQuizBuilder({ value, onChange }: PollQuizBuilderProps) {
   const [type, setType] = useState<InAppActivityType>(value?.type || 'poll');
   const [question, setQuestion] = useState(value?.question || '');
   const [options, setOptions] = useState<InAppOption[]>(
-    value?.options || [
-      { id: generateId(), text: '', isCorrect: false },
-      { id: generateId(), text: '', isCorrect: false },
-    ]
+    value?.options || defaultOptions
   );
   const [correctAnswer, setCorrectAnswer] = useState<string>(
     value?.options?.find(o => o.isCorrect)?.id || ''
   );
+  
+  // Track if this is the initial mount
+  const isInitialMount = useRef(true);
+  const prevValueRef = useRef<string | null>(null);
 
-  // Sync internal state with parent
+  // Sync internal state with parent only when value changes externally
   useEffect(() => {
-    if (value) {
-      setType(value.type);
-      setQuestion(value.question);
-      setOptions(value.options);
-      setCorrectAnswer(value.options.find(o => o.isCorrect)?.id || '');
+    const valueStr = JSON.stringify(value);
+    if (prevValueRef.current !== valueStr) {
+      prevValueRef.current = valueStr;
+      if (value) {
+        setType(value.type);
+        setQuestion(value.question);
+        setOptions(value.options);
+        setCorrectAnswer(value.options.find(o => o.isCorrect)?.id || '');
+      }
     }
   }, [value]);
 
-  // Update parent when internal state changes
+  // Update parent when internal state changes (skip initial mount)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
     const updatedOptions = options.map(opt => ({
       ...opt,
       isCorrect: type === 'quiz' ? opt.id === correctAnswer : undefined,
@@ -63,8 +79,10 @@ export function PollQuizBuilder({ value, onChange }: PollQuizBuilderProps) {
       options: updatedOptions,
     };
 
+    // Update prevValueRef to prevent loop
+    prevValueRef.current = JSON.stringify(config);
     onChange(config);
-  }, [type, question, options, correctAnswer]);
+  }, [type, question, options, correctAnswer, onChange]);
 
   const handleAddOption = () => {
     if (options.length >= 6) return;

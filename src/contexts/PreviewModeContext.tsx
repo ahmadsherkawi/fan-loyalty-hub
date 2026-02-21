@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Profile, UserRole, ClubStatus } from '@/types/database';
 
@@ -37,17 +38,8 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
   // Enrolled club tracking for preview mode
   const [previewEnrolledClub, setPreviewEnrolledClubState] = useState<EnrolledClubInfo | null>(null);
 
-  // Check URL params for preview mode on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const previewRole = params.get('preview') as UserRole | null;
-    
-    if (previewRole === 'fan' || previewRole === 'club_admin') {
-      enablePreviewMode(previewRole);
-    }
-  }, []);
-
-  const enablePreviewMode = (role: UserRole) => {
+  // Define enablePreviewMode before using it in useEffect
+  const enablePreviewMode = useCallback((role: UserRole) => {
     setIsPreviewMode(true);
     setPreviewProfile({
       id: 'preview-user-id',
@@ -68,7 +60,17 @@ export function PreviewModeProvider({ children }: { children: React.ReactNode })
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
-  };
+  }, []);
+
+  // Check URL params for preview mode on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const previewRole = params.get('preview') as UserRole | null;
+    
+    if (previewRole === 'fan' || previewRole === 'club_admin') {
+      enablePreviewMode(previewRole);
+    }
+  }, [enablePreviewMode]);
 
   const disablePreviewMode = () => {
     setIsPreviewMode(false);

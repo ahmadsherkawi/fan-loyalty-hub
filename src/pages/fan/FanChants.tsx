@@ -20,7 +20,9 @@ import {
   ImagePlus,
   X,
   SortAsc,
+  Brain,
 } from "lucide-react";
+import { AIChantGenerator } from "@/components/ai";
 import { toast as sonnerToast } from "sonner";
 
 interface Chant {
@@ -83,6 +85,7 @@ export default function FanChants() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("cheers");
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const effectivePoints = membership?.points_balance || 0;
   const currency = program?.points_currency_name || "Points";
@@ -469,6 +472,49 @@ export default function FanChants() {
             </div>
           </div>
         </div>
+
+        {/* AI Chant Generator */}
+        {showAIGenerator && club && (
+          <Card className="rounded-2xl border-purple-500/30 bg-purple-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-400" />
+                  <span className="text-sm font-semibold text-purple-400">AI Chant Generator</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAIGenerator(false)}
+                  className="h-7 rounded-full text-xs"
+                >
+                  Hide
+                </Button>
+              </div>
+              <AIChantGenerator
+                clubName={club.name}
+                stadium={club.name}
+                onChantCreated={(chant) => {
+                  setContent(chant.content);
+                  setShowAIGenerator(false);
+                  sonnerToast.success("AI chant generated! Edit it or post as-is.");
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Generator Toggle */}
+        {!showAIGenerator && (
+          <Button
+            variant="outline"
+            onClick={() => setShowAIGenerator(true)}
+            className="w-full rounded-xl border-dashed border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            Generate AI Chant
+          </Button>
+        )}
 
         {/* Compose Card */}
         <Card className="rounded-2xl border-border/50">

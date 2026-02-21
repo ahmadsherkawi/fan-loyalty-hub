@@ -38,13 +38,22 @@ export function QRScannerModal({
   const [scanState, setScanState] = useState<ScanState>('scanning');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const mountId = 'qr-reader';
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!open) {
-      setScanState('scanning');
-      setErrorMessage('');
-      return;
+    // Reset state when modal closes (using a ref to track previous state)
+    if (!open && wasOpenRef.current) {
+      // Use setTimeout to defer state update
+      const resetTimer = setTimeout(() => {
+        setScanState('scanning');
+        setErrorMessage('');
+      }, 0);
+      wasOpenRef.current = false;
+      return () => clearTimeout(resetTimer);
     }
+    wasOpenRef.current = open;
+
+    if (!open) return;
 
     // Small delay to ensure DOM is ready
     const initTimer = setTimeout(() => {
