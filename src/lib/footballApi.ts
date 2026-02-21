@@ -338,18 +338,22 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
   // Try API-Football first (better fuzzy search)
   console.log('[FootballAPI] Searching API-Football for:', query);
   try {
-    const teams = await fetchApiFootball<Array<{ id: number; name: string; logo: string; country: string }>>('teams', { search: query });
+    // API-Football returns { response: [{ team: {...} }, ...] }
+    const response = await fetchApiFootball<Array<{ team: { id: number; name: string; logo: string; country: string } }>>('teams', { search: query });
     
-    if (teams && teams.length > 0) {
-      console.log('[FootballAPI] API-Football results:', teams.length, teams.slice(0, 3));
-      const result = teams
-        .filter(t => t && t.name)
-        .map(t => ({
-          id: String(t.id),
-          name: t.name,
-          logo: t.logo || null,
-          country: t.country || '',
+    console.log('[FootballAPI] API-Football raw response:', response);
+    
+    if (response && response.length > 0) {
+      console.log('[FootballAPI] API-Football results:', response.length);
+      const result = response
+        .filter(item => item && item.team && item.team.name)
+        .map(item => ({
+          id: String(item.team.id),
+          name: item.team.name,
+          logo: item.team.logo || null,
+          country: item.team.country || '',
         }));
+      console.log('[FootballAPI] Mapped results:', result.length, result.slice(0, 3));
       setCache(cacheKey, result);
       return result;
     }
@@ -360,8 +364,9 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
   // Fallback to TheSportsDB (requires more exact matching)
   console.log('[FootballAPI] Trying TheSportsDB for:', query);
   try {
-    // TheSportsDB search - try the search endpoint
     const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
+    
+    console.log('[FootballAPI] TheSportsDB raw response:', result);
     
     if (result?.teams && result.teams.length > 0) {
       console.log('[FootballAPI] TheSportsDB results:', result.teams.length);
@@ -381,16 +386,10 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
   }
 
   // If both fail, return some popular teams as suggestions for partial matches
-  if (query.length >= 2) {
-    const popularTeams = getPopularTeamSuggestions(query);
-    if (popularTeams.length > 0) {
-      console.log('[FootballAPI] Using popular team suggestions for:', query);
-      return popularTeams;
-    }
-  }
-
-  console.log('[FootballAPI] No results found for:', query);
-  return [];
+  console.log('[FootballAPI] Using fallback popular teams for:', query);
+  const popularTeams = getPopularTeamSuggestions(query);
+  console.log('[FootballAPI] Fallback results:', popularTeams.length);
+  return popularTeams;
 }
 
 // Fallback popular teams for when API fails or rate-limited
