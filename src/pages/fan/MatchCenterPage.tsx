@@ -118,14 +118,34 @@ export default function MatchCenterPage() {
       const live = await footballApi.getLiveMatches();
       setAllLiveMatches(live);
 
-      // Get today's upcoming matches
-      const today = new Date().toISOString().split('T')[0];
-      const todayMatches = await footballApi.getFixturesByDate(today);
+      // Get upcoming matches for next 7 days
+      const upcomingFixtures: FootballMatch[] = [];
       const liveIds = new Set(live.map(m => m.id));
-      const upcoming = todayMatches.filter(m => 
-        m.status === 'scheduled' && !liveIds.has(m.id)
+      
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        const dayMatches = await footballApi.getFixturesByDate(dateStr);
+        
+        for (const match of dayMatches) {
+          // Only add scheduled matches that aren't live
+          if (match.status === 'scheduled' && !liveIds.has(match.id)) {
+            // Avoid duplicates
+            if (!upcomingFixtures.find(m => m.id === match.id)) {
+              upcomingFixtures.push(match);
+            }
+          }
+        }
+      }
+      
+      // Sort by datetime
+      upcomingFixtures.sort((a, b) => 
+        new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
       );
-      setAllUpcomingMatches(upcoming);
+      
+      setAllUpcomingMatches(upcomingFixtures);
 
       // Filter for fan's club if available
       if (club && !showAllMatches) {
@@ -137,7 +157,7 @@ export default function MatchCenterPage() {
             m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
           )
         );
-        const clubUpcoming = upcoming.filter(m =>
+        const clubUpcoming = upcomingFixtures.filter(m =>
           clubNameVariants.some(name =>
             m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
             m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
@@ -148,7 +168,7 @@ export default function MatchCenterPage() {
         setUpcomingMatches(clubUpcoming);
       } else {
         setLiveMatches(live);
-        setUpcomingMatches(upcoming);
+        setUpcomingMatches(upcomingFixtures);
       }
     } catch (error) {
       console.error('Failed to fetch match data:', error);
@@ -371,7 +391,7 @@ export default function MatchCenterPage() {
             {filteredUpcoming.length === 0 ? (
               <div className="text-center py-12">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-muted-foreground">No upcoming matches today</p>
+                <p className="text-muted-foreground">No upcoming matches in the next 7 days</p>
               </div>
             ) : (
               filteredUpcoming.map((match) => (
@@ -498,29 +518,116 @@ function MatchCard({ match, onSelect, isLive = false }: { match: FootballMatch; 
 function getClubNameVariants(clubName: string): string[] {
   const variants = [clubName];
   
-  // Common name mappings
+  // Comprehensive name mappings - API name variations
   const mappings: Record<string, string[]> = {
-    'Manchester United': ['Man United', 'Man Utd', 'Manchester Utd'],
-    'Manchester City': ['Man City', 'Manchester City'],
+    // Premier League
     'Arsenal': ['Arsenal FC'],
+    'Aston Villa': ['Aston Villa FC'],
     'Chelsea': ['Chelsea FC'],
     'Liverpool': ['Liverpool FC'],
-    'Tottenham': ['Spurs', 'Tottenham Hotspur'],
+    'Manchester City': ['Man City', 'Manchester City FC'],
+    'Manchester United': ['Man United', 'Man Utd', 'Manchester United FC'],
+    'Tottenham': ['Spurs', 'Tottenham Hotspur', 'Tottenham FC'],
+    'Newcastle': ['Newcastle United', 'Newcastle United FC'],
+    'Everton': ['Everton FC'],
+    'West Ham': ['West Ham United', 'West Ham United FC'],
+    'Leicester': ['Leicester City', 'Leicester City FC'],
+    'Wolves': ['Wolverhampton', 'Wolverhampton Wanderers', 'Wolves FC'],
+    'Brighton': ['Brighton and Hove Albion', 'Brighton & Hove Albion', 'Brighton FC'],
+    'Crystal Palace': ['Crystal Palace FC'],
+    'Fulham': ['Fulham FC'],
+    'Brentford': ['Brentford FC'],
+    'Bournemouth': ['Bournemouth FC', 'AFC Bournemouth'],
+    'Nottingham Forest': ['Nottingham Forest FC', 'Nottm Forest'],
+    
+    // La Liga
     'Real Madrid': ['Real Madrid CF'],
     'Barcelona': ['FC Barcelona', 'Barca'],
-    'Bayern Munich': ['Bayern', 'FC Bayern'],
-    'PSG': ['Paris Saint-Germain', 'Paris SG'],
-    'Juventus': ['Juventus FC'],
+    'Atletico Madrid': ['Atletico', 'Atletico de Madrid'],
+    'Sevilla': ['Sevilla FC'],
+    'Real Sociedad': ['Real Sociedad de Futbol'],
+    'Athletic Bilbao': ['Athletic Club', 'Athletic'],
+    'Villarreal': ['Villarreal CF'],
+    'Real Betis': ['Real Betis Balompie'],
+    'Valencia': ['Valencia CF'],
+    'Girona': ['Girona FC'],
+    
+    // Serie A
+    'Juventus': ['Juventus FC', 'Juventus Turin'],
     'AC Milan': ['Milan'],
-    'Inter Milan': ['Inter', 'FC Internazionale'],
+    'Inter': ['Inter Milan', 'FC Internazionale', 'Internazionale'],
+    'Roma': ['AS Roma', 'Roma FC'],
+    'Napoli': ['SSC Napoli', 'Naples'],
+    'Lazio': ['SS Lazio'],
+    'Fiorentina': ['ACF Fiorentina', 'AC Fiorentina'],
+    'Atalanta': ['Atalanta BC', 'Atalanta Bergamo'],
+    'Bologna': ['Bologna FC'],
+    
+    // Bundesliga
+    'Bayern Munich': ['Bayern', 'FC Bayern', 'FC Bayern Munchen'],
+    'Dortmund': ['Borussia Dortmund', 'BVB', 'Borussia Dortmund FC'],
+    'RB Leipzig': ['RasenBallsport Leipzig'],
+    'Leverkusen': ['Bayer Leverkusen', 'Bayer 04 Leverkusen'],
+    'Monchengladbach': ['Borussia Monchengladbach', 'Gladbach'],
+    'Stuttgart': ['VfB Stuttgart'],
+    'Frankfurt': ['Eintracht Frankfurt'],
+    'Wolfsburg': ['VfL Wolfsburg'],
+    
+    // Ligue 1
+    'Paris Saint Germain': ['PSG', 'Paris Saint-Germain', 'Paris SG'],
+    'Marseille': ['Olympique de Marseille', 'OM'],
+    'Monaco': ['AS Monaco'],
+    'Lyon': ['Olympique Lyonnais', 'OL'],
+    'Lille': ['LOSC Lille', 'LOSC'],
+    'Rennes': ['Stade Rennais', 'Stade Rennais FC'],
+    'Nice': ['OGC Nice'],
+    'Lens': ['RC Lens', 'Racing Club de Lens'],
+    
+    // Primeira Liga
+    'Benfica': ['SL Benfica'],
+    'Porto': ['FC Porto'],
+    'Sporting CP': ['Sporting Lisbon', 'Sporting'],
+    
+    // Eredivisie
+    'Ajax': ['AFC Ajax'],
+    'PSV': ['PSV Eindhoven'],
+    'Feyenoord': ['Feyenoord Rotterdam'],
+    
+    // Scottish Premiership
+    'Celtic': ['Celtic FC', 'Celtic Glasgow'],
+    'Rangers': ['Rangers FC', 'Rangers Glasgow'],
+    
+    // MLS
+    'LA Galaxy': ['Los Angeles Galaxy'],
+    'Inter Miami': ['Inter Miami CF', 'Internacional Miami'],
+    'New York City FC': ['NYCFC'],
+    'Seattle Sounders': ['Seattle Sounders FC'],
+    'Atlanta United': ['Atlanta United FC'],
+    
+    // Saudi Pro League
+    'Al Hilal': ['Al-Hilal FC', 'Al-Hilal'],
+    'Al Nassr': ['Al-Nassr FC', 'Al-Nassr'],
+    'Al Ittihad': ['Al-Ittihad FC', 'Al-Ittihad'],
+    'Al Ahli': ['Al-Ahli FC', 'Al-Ahli'],
   };
   
   // Add known variants
   Object.entries(mappings).forEach(([key, values]) => {
-    if (clubName.toLowerCase().includes(key.toLowerCase())) {
-      variants.push(...values);
+    // Check both directions - if club name matches key or vice versa
+    if (clubName.toLowerCase().includes(key.toLowerCase()) || 
+        key.toLowerCase().includes(clubName.toLowerCase())) {
+      variants.push(...values, key);
     }
   });
   
-  return variants;
+  // Also try removing common suffixes
+  const suffixes = [' FC', ' CF', ' AFC', ' SC', ' FC', ' CF', ' AC', ' SS', ' AS', ' USC'];
+  for (const suffix of suffixes) {
+    if (clubName.endsWith(suffix)) {
+      variants.push(clubName.slice(0, -suffix.length));
+    }
+  }
+  
+  // Remove duplicates
+  return [...new Set(variants)];
 }
