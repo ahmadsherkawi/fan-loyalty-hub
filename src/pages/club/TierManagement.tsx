@@ -13,7 +13,7 @@ import { Logo } from "@/components/ui/Logo";
 import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy, LogOut, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, Trash2, Edit, Trophy, LogOut, Sparkles, Crown, Star, Zap, Gift } from "lucide-react";
 
 interface Tier {
   id: string;
@@ -440,72 +440,146 @@ export default function TierManagement() {
         </div>
 
         {orderedTiers.length === 0 ? (
-          <Card className="rounded-2xl border-border/40 overflow-hidden">
-            <CardContent className="py-16 text-center">
-              <div className="mx-auto h-14 w-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-                <Trophy className="h-6 w-6 text-muted-foreground" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 p-16 text-center">
+            <div className="absolute inset-0 stadium-pattern opacity-30" />
+            <div className="absolute inset-0 gradient-mesh opacity-20" />
+            <div className="relative z-10">
+              <div className="mx-auto h-20 w-20 rounded-3xl glass-dark flex items-center justify-center mb-6 animate-float">
+                <Trophy className="h-9 w-9 text-accent" />
               </div>
-              <h3 className="font-display font-bold text-lg">No Tiers Yet</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">Create tiers to structure your loyalty program with escalating rewards.</p>
-            </CardContent>
-          </Card>
+              <h3 className="font-display font-bold text-xl text-foreground">No Tiers Yet</h3>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">Create tiers to structure your loyalty program with escalating rewards.</p>
+            </div>
+          </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orderedTiers.map((tier) => {
+          <div className="space-y-5">
+            {/* Visual loyalty ladder connector */}
+            {orderedTiers.map((tier, index) => {
               const tierBenefits = benefitsByTier[tier.id] || [];
               const draft = benefitDrafts[tier.id] || { type: "", value: "" };
               const def = draft.type ? BENEFIT_DEFS[draft.type] : null;
 
+              // Tier-specific styling based on rank
+              const tierIcon = index === 0 ? Crown : index === 1 ? Star : index === 2 ? Zap : Gift;
+              const TierIcon = tierIcon;
+              const tierGradients = [
+                "from-accent/20 via-amber-500/10 to-transparent",
+                "from-primary/20 via-emerald-500/10 to-transparent",
+                "from-blue-500/20 via-indigo-500/10 to-transparent",
+                "from-purple-500/20 via-pink-500/10 to-transparent",
+              ];
+              const tierAccentColors = [
+                "text-accent",
+                "text-primary",
+                "text-blue-400",
+                "text-purple-400",
+              ];
+              const tierBorderColors = [
+                "border-accent/30 hover:border-accent/50",
+                "border-primary/30 hover:border-primary/50",
+                "border-blue-500/30 hover:border-blue-500/50",
+                "border-purple-500/30 hover:border-purple-500/50",
+              ];
+              const tierBgAccents = [
+                "bg-accent/10",
+                "bg-primary/10",
+                "bg-blue-500/10",
+                "bg-purple-500/10",
+              ];
+              const gradientClass = tierGradients[index % tierGradients.length];
+              const accentColor = tierAccentColors[index % tierAccentColors.length];
+              const borderColor = tierBorderColors[index % tierBorderColors.length];
+              const bgAccent = tierBgAccents[index % tierBgAccents.length];
+
               return (
-                <Card key={tier.id} className="rounded-2xl border-border/40 group hover:border-primary/20 transition-all duration-300">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between font-display">
-                      <span>{tier.name}</span>
-                      <Badge className="rounded-full bg-primary/10 text-primary border-primary/20 text-[10px]">
-                        Rank {tier.rank}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Unlock at</span>
-                      <span className="font-display font-semibold">{tier.points_threshold} pts</span>
-                    </div>
+                <div key={tier.id} className="relative">
+                  {/* Ladder connector line */}
+                  {index < orderedTiers.length - 1 && (
+                    <div className="absolute left-10 top-full w-px h-5 bg-gradient-to-b from-border/60 to-transparent z-10" />
+                  )}
 
-                    {/* BENEFITS LIST */}
-                    <div className="space-y-2">
-                      {tierBenefits.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">No benefits yet.</div>
-                      ) : (
-                        tierBenefits.map((b) => (
-                          <div
-                            key={b.id}
-                            className="flex items-center justify-between rounded-xl border border-border/40 bg-card/50 px-3 py-2"
-                          >
-                            <div className="text-sm font-medium">{formatBenefit(b)}</div>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="rounded-full text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteBenefit(b.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                  <div className={`group relative overflow-hidden rounded-3xl border ${borderColor} bg-card transition-all duration-500 hover:shadow-lg`}>
+                    {/* Top gradient banner */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-60 pointer-events-none`} />
+                    <div className="absolute inset-0 stadium-pattern opacity-20 pointer-events-none" />
+
+                    <div className="relative z-10 p-6 md:p-8">
+                      {/* Tier header row */}
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className={`h-14 w-14 rounded-2xl ${bgAccent} backdrop-blur-sm border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                            <TierIcon className={`h-7 w-7 ${accentColor}`} />
                           </div>
-                        ))
-                      )}
-                    </div>
+                          <div>
+                            <h3 className="font-display font-bold text-xl text-foreground tracking-tight">{tier.name}</h3>
+                            <div className="flex items-center gap-3 mt-1">
+                              <Badge className={`rounded-full ${bgAccent} ${accentColor} border-transparent text-[10px] font-bold`}>
+                                Rank {tier.rank}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Unlock at <span className="font-display font-bold text-foreground">{tier.points_threshold.toLocaleString()}</span> pts
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-                    {/* ADD BENEFIT FORM */}
-                    <div className="rounded-2xl border border-border/40 p-3 space-y-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Add Benefit</Label>
+                        {/* Quick actions */}
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl hover:bg-card/80" onClick={() => openEditTier(tier)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteTier(tier.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Benefits section */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-px flex-1 bg-border/40" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Benefits</span>
+                          <div className="h-px flex-1 bg-border/40" />
+                        </div>
+
+                        {tierBenefits.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-border/40 p-4 text-center">
+                            <p className="text-xs text-muted-foreground">No benefits configured yet</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {tierBenefits.map((b) => (
+                              <div
+                                key={b.id}
+                                className={`flex items-center justify-between rounded-xl ${bgAccent} backdrop-blur-sm border border-white/5 px-4 py-2.5 group/benefit`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Sparkles className={`h-3.5 w-3.5 ${accentColor} flex-shrink-0`} />
+                                  <span className="text-sm font-medium">{formatBenefit(b)}</span>
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 rounded-lg text-destructive/60 hover:text-destructive opacity-0 group-hover/benefit:opacity-100 transition-opacity"
+                                  onClick={() => handleDeleteBenefit(b.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Add benefit form */}
+                      <div className="mt-5 rounded-2xl glass-dark p-4 space-y-3">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add Benefit</Label>
 
                         <Select
                           value={draft.type}
                           onValueChange={(v) => updateDraft(tier.id, { type: v as BenefitType, value: "" })}
                         >
-                          <SelectTrigger className="rounded-xl border-border/40">
+                          <SelectTrigger className="rounded-xl border-border/40 bg-background/50">
                             <SelectValue placeholder="Select benefit type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -521,7 +595,7 @@ export default function TierManagement() {
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">{def.valueLabel}</Label>
                             <Input
-                              className="rounded-xl border-border/40"
+                              className="rounded-xl border-border/40 bg-background/50"
                               placeholder={def.valuePlaceholder}
                               value={draft.value}
                               onChange={(e) => updateDraft(tier.id, { value: e.target.value })}
@@ -529,43 +603,25 @@ export default function TierManagement() {
                           </div>
                         )}
 
-                        {def?.helper && <p className="text-xs text-muted-foreground">{def.helper}</p>}
-                      </div>
+                        {def?.helper && <p className="text-[11px] text-muted-foreground">{def.helper}</p>}
 
-                      <div className="flex gap-2">
-                        <Button className="flex-1 rounded-xl" onClick={() => handleAddBenefit(tier.id)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          className="rounded-xl border-border/40"
-                          onClick={() => updateDraft(tier.id, { type: "", value: "" })}
-                        >
-                          Clear
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button className="flex-1 rounded-xl gap-2" onClick={() => handleAddBenefit(tier.id)}>
+                            <Plus className="h-4 w-4" />
+                            Add Benefit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl border-border/40"
+                            onClick={() => updateDraft(tier.id, { type: "", value: "" })}
+                          >
+                            Clear
+                          </Button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* TIER ACTIONS */}
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="rounded-full border-border/40" onClick={() => openEditTier(tier)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="rounded-full"
-                        onClick={() => handleDeleteTier(tier.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
