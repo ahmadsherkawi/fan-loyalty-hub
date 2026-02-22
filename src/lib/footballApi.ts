@@ -17,7 +17,7 @@ import type {
 
 // ================= CONFIGURATION =================
 
-const API_FOOTBALL_KEY = '2a6e0fcd209780c4e8c0ba090272e5dd';
+const API_FOOTBALL_KEY = '672305dea78293ca7730c83ba160f799';
 const API_FOOTBALL_BASE = 'https://v3.football.api-sports.io';
 const THESPORTSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/3'; // Free public API key
 
@@ -260,14 +260,6 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
   console.log('[FootballAPI] ========== Getting fixtures for team:', teamId, '==========');
 
   const teamNameLower = teamId.toLowerCase().trim();
-  
-  // Check if we have mock data for this team
-  const mockFixtures = getMockFixturesForTeam(teamNameLower);
-  if (mockFixtures.length > 0) {
-    console.log(`[FootballAPI] Using mock fixtures for ${teamId}: ${mockFixtures.length} matches`);
-    setCache(cacheKey, mockFixtures);
-    return mockFixtures;
-  }
 
   const today = new Date();
   const to = new Date(today);
@@ -291,7 +283,7 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     console.log(`[FootballAPI] Found hardcoded API-Football ID: ${teamId} -> ${apiFootballTeamId}`);
   }
 
-  // Try API-Football fixtures
+  // Try API-Football fixtures FIRST (real data)
   if (apiFootballTeamId) {
     console.log('[FootballAPI] Fetching fixtures from API-Football for team ID:', apiFootballTeamId);
     try {
@@ -312,6 +304,14 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     } catch (err) {
       console.warn('[FootballAPI] API-Football fixtures failed:', err);
     }
+  }
+
+  // Fallback to mock data only if API fails or returns no data
+  const mockFixtures = getMockFixturesForTeam(teamNameLower);
+  if (mockFixtures.length > 0) {
+    console.log(`[FootballAPI] Using mock fixtures as fallback for ${teamId}: ${mockFixtures.length} matches`);
+    setCache(cacheKey, mockFixtures);
+    return mockFixtures;
   }
 
   console.warn('[FootballAPI] ========== No fixtures found for team:', teamId, '==========');
@@ -468,14 +468,6 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
   console.log('[FootballAPI] Getting past matches for team:', teamId);
 
   const teamNameLower = teamId.toLowerCase().trim();
-  
-  // Check if we have mock data for this team
-  const mockPast = getMockPastMatchesForTeam(teamNameLower);
-  if (mockPast.length > 0) {
-    console.log(`[FootballAPI] Using mock past matches for ${teamId}: ${mockPast.length} matches`);
-    setCache(cacheKey, mockPast);
-    return mockPast;
-  }
 
   const today = new Date();
   const from = new Date(today);
@@ -495,7 +487,7 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
     }
   }
 
-  // Try API-Football
+  // Try API-Football FIRST (real data)
   if (apiFootballTeamId) {
     console.log('[FootballAPI] Fetching past matches from API-Football for team ID:', apiFootballTeamId);
     try {
@@ -514,6 +506,14 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
     } catch (err) {
       console.warn('[FootballAPI] API-Football past fixtures failed:', err);
     }
+  }
+
+  // Fallback to mock data only if API fails or returns no data
+  const mockPast = getMockPastMatchesForTeam(teamNameLower);
+  if (mockPast.length > 0) {
+    console.log(`[FootballAPI] Using mock past matches as fallback for ${teamId}: ${mockPast.length} matches`);
+    setCache(cacheKey, mockPast);
+    return mockPast;
   }
 
   console.warn('[FootballAPI] No past matches found for team:', teamId);
