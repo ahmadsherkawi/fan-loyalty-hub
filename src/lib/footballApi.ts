@@ -51,9 +51,10 @@ const THESPORTSDB_LEAGUE_IDS: Record<string, string> = {
   'copa_del_rey': '4354',
 };
 
-// Cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const CACHE_DURATION_LIVE = 60 * 1000; // 1 minute for live matches
+// Cache configuration - Extended to save API requests
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (extended from 5)
+const CACHE_DURATION_LIVE = 2 * 60 * 1000; // 2 minutes for live matches
+const CACHE_DURATION_TEAM = 60 * 60 * 1000; // 1 hour for team-specific data
 
 interface CacheEntry<T> {
   data: T;
@@ -210,6 +211,7 @@ export async function getLiveMatches(): Promise<FootballMatch[]> {
 
 /**
  * Get upcoming fixtures for a specific team
+ * Uses API-Football as primary (real data), TheSportsDB as backup
  */
 export async function getTeamFixtures(teamId: string, days = 7): Promise<FootballMatch[]> {
   const cacheKey = `team-fixtures-${teamId}-${days}`;
@@ -218,88 +220,87 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
 
   console.log('[FootballAPI] Getting fixtures for team:', teamId);
 
-  // Try multiple lookup strategies
-  const teamNameLower = teamId.toLowerCase().trim();
-  let tsdbTeamId: string | null = null;
+  // First, search for the team in API-Football to get their numeric ID
+  let apiFootballTeamId: string | null = null;
   
-  // 1. Direct match in our known teams
-  tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
-  if (tsdbTeamId) {
-    console.log(`[FootballAPI] Found team via direct match: ${teamId} -> ${tsdbTeamId}`);
-  }
-  
-  // 2. Partial matching
-  if (!tsdbTeamId) {
-    for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
-      if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
-        tsdbTeamId = id;
-        console.log(`[FootballAPI] Found team ID via partial match: ${name} -> ${id}`);
-        break;
-      }
+  // Try to find team by name in API-Football
+  const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
+  if (searchResult && searchResult.length > 0) {
+    // Find best match
+    const teamLower = teamId.toLowerCase();
+    const match = searchResult.find(t => 
+      t.team.name.toLowerCase().includes(teamLower) || 
+      teamLower.includes(t.team.name.toLowerCase())
+    );
+    if (match) {
+      apiFootballTeamId = String(match.team.id);
+      console.log(`[FootballAPI] Found API-Football team ID: ${match.team.name} -> ${apiFootballTeamId}`);
     }
   }
-  
-  // 3. Word matching (e.g., "Real Madrid FC" matches "real madrid")
-  if (!tsdbTeamId) {
-    const words = teamNameLower.split(/\s+/);
-    for (const word of words) {
-      if (word.length >= 4) { // Only match words with 4+ chars
-        for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
-          if (name.includes(word) || word.includes(name)) {
-            tsdbTeamId = id;
-            console.log(`[FootballAPI] Found team ID via word match: ${word} -> ${name} -> ${id}`);
-            break;
-          }
-        }
-        if (tsdbTeamId) break;
-      }
-    }
-  }
-  
-  // 4. Search API for the team
-  if (!tsdbTeamId) {
+
+  const today = new Date();
+  const to = new Date(today);
+  to.setDate(to.getDate() + days);
+  const fromStr = today.toISOString().split('T')[0];
+  const toStr = to.toISOString().split('T')[0];
+
+  // Try API-Football first (REAL data)
+  if (apiFootballTeamId) {
     try {
-      const searchResult = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(
-        `searchteams.php?t=${encodeURIComponent(teamId)}`
-      );
-      console.log('[FootballAPI] Search result for', teamId, ':', searchResult);
-      if (searchResult?.teams?.[0]?.idTeam) {
-        tsdbTeamId = searchResult.teams[0].idTeam;
-        console.log(`[FootballAPI] Found team via API search: ${teamId} -> ${tsdbTeamId}`);
+      const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
+        team: apiFootballTeamId,
+        from: fromStr,
+        to: toStr,
+      });
+
+      if (fixtures && fixtures.length > 0) {
+        console.log(`[FootballAPI] API-Football found ${fixtures.length} fixtures for team ${teamId}`);
+        const matches = fixtures.map(transformApiFootballFixture);
+        setCache(cacheKey, matches);
+        return matches;
       }
     } catch (err) {
-      console.warn('[FootballAPI] Team search failed:', err);
+      console.warn('[FootballAPI] API-Football fixtures failed:', err);
     }
   }
 
-  if (!tsdbTeamId) {
-    console.warn('[FootballAPI] Could not find team ID for:', teamId);
-    return [];
-  }
-
-  // Try TheSportsDB eventsnext (ALL competitions for this team)
-  try {
-    const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
-      `eventsnext.php?id=${tsdbTeamId}`
-    );
-    
-    console.log('[FootballAPI] eventsnext.php response for', tsdbTeamId, ':', nextEvents);
-    
-    if (nextEvents?.events && nextEvents.events.length > 0) {
-      console.log(`[FootballAPI] Found ${nextEvents.events.length} upcoming events for team ${teamId}`);
-      const matches = nextEvents.events.map(transformTheSportsDBEvent);
-      setCache(cacheKey, matches);
-      return matches;
+  // Fallback to TheSportsDB (may return incorrect data on free tier)
+  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamId.toLowerCase()];
+  if (tsdbTeamId) {
+    try {
+      const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
+        `eventsnext.php?id=${tsdbTeamId}`
+      );
+      
+      if (nextEvents?.events && nextEvents.events.length > 0) {
+        // Filter events that actually involve this team
+        const teamLower = teamId.toLowerCase();
+        const relevantEvents = nextEvents.events.filter(e => 
+          e.strHomeTeam?.toLowerCase().includes(teamLower) ||
+          e.strAwayTeam?.toLowerCase().includes(teamLower)
+        );
+        
+        if (relevantEvents.length > 0) {
+          console.log(`[FootballAPI] TheSportsDB found ${relevantEvents.length} relevant events for ${teamId}`);
+          const matches = relevantEvents.map(transformTheSportsDBEvent);
+          setCache(cacheKey, matches);
+          return matches;
+        } else {
+          console.warn('[FootballAPI] TheSportsDB returned events but none match team:', teamId);
+        }
+      }
+    } catch (err) {
+      console.warn('[FootballAPI] TheSportsDB failed:', err);
     }
-  } catch (err) {
-    console.warn('[FootballAPI] TheSportsDB eventsnext failed:', err);
   }
 
+  console.warn('[FootballAPI] No fixtures found for team:', teamId);
   return [];
 }
 
 /**
  * Get past matches for a team (last N days)
+ * Uses API-Football as primary (real data)
  */
 export async function getTeamPastMatches(teamId: string, days = 7): Promise<FootballMatch[]> {
   const cacheKey = `team-past-${teamId}-${days}`;
@@ -308,67 +309,49 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
   console.log('[FootballAPI] Getting past matches for team:', teamId);
 
-  // Try multiple lookup strategies
-  const teamNameLower = teamId.toLowerCase().trim();
-  let tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
+  // First, search for the team in API-Football to get their numeric ID
+  let apiFootballTeamId: string | null = null;
   
-  // If not found, try partial matching
-  if (!tsdbTeamId) {
-    for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
-      if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
-        tsdbTeamId = id;
-        break;
-      }
-    }
-  }
-  
-  // Try searching for the team if still not found
-  if (!tsdbTeamId) {
-    try {
-      const searchResult = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(
-        `searchteams.php?t=${encodeURIComponent(teamId)}`
-      );
-      if (searchResult?.teams?.[0]?.idTeam) {
-        tsdbTeamId = searchResult.teams[0].idTeam;
-      }
-    } catch (err) {
-      console.warn('[FootballAPI] Team search failed:', err);
+  const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
+  if (searchResult && searchResult.length > 0) {
+    const teamLower = teamId.toLowerCase();
+    const match = searchResult.find(t => 
+      t.team.name.toLowerCase().includes(teamLower) || 
+      teamLower.includes(t.team.name.toLowerCase())
+    );
+    if (match) {
+      apiFootballTeamId = String(match.team.id);
+      console.log(`[FootballAPI] Found API-Football team ID for past: ${match.team.name} -> ${apiFootballTeamId}`);
     }
   }
 
-  // Try TheSportsDB eventslast (past matches)
-  if (tsdbTeamId) {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - days);
+  const fromStr = from.toISOString().split('T')[0];
+  const toStr = today.toISOString().split('T')[0];
+
+  // Try API-Football
+  if (apiFootballTeamId) {
     try {
-      const lastEvents = await fetchTheSportsDB<{ results: TheSportsDBEvent[] }>(
-        `eventslast.php?id=${tsdbTeamId}`
-      );
-      
-      console.log('[FootballAPI] TheSportsDB eventslast response:', lastEvents);
-      
-      if (lastEvents?.results && lastEvents.results.length > 0) {
-        console.log(`[FootballAPI] Found ${lastEvents.results.length} past events for team ${teamId}`);
-        
-        // Filter by date range
-        const now = new Date();
-        const minDate = new Date();
-        minDate.setDate(minDate.getDate() - days);
-        
-        const filteredEvents = lastEvents.results.filter(e => {
-          const eventDate = new Date(e.strTimestamp || e.dateEvent || '');
-          const inRange = eventDate >= minDate && eventDate <= now;
-          console.log(`[FootballAPI] Past Event: ${e.strHomeTeam} vs ${e.strAwayTeam} - ${e.strLeague} - Score: ${e.intHomeScore}-${e.intAwayScore}`);
-          return inRange;
-        });
-        
-        const matches = filteredEvents.map(transformTheSportsDBEvent);
+      const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
+        team: apiFootballTeamId,
+        from: fromStr,
+        to: toStr,
+      });
+
+      if (fixtures && fixtures.length > 0) {
+        console.log(`[FootballAPI] API-Football found ${fixtures.length} past matches for team ${teamId}`);
+        const matches = fixtures.map(transformApiFootballFixture);
         setCache(cacheKey, matches);
         return matches;
       }
     } catch (err) {
-      console.warn('[FootballAPI] TheSportsDB eventslast failed:', err);
+      console.warn('[FootballAPI] API-Football past fixtures failed:', err);
     }
   }
 
+  console.warn('[FootballAPI] No past matches found for team:', teamId);
   return [];
 }
 
