@@ -99,9 +99,10 @@ Respond with ONLY valid JSON:
     });
 
   } catch (error) {
-    console.error('[AI Chant] Error:', error);
-    return new Response(JSON.stringify({ error: 'Chant generation failed' }), {
-      status: 500,
+    console.error('[AI Chant] Error:', error?.message || error);
+    // Return fallback chant instead of 500
+    const fallback = generateFallbackChant(data);
+    return new Response(JSON.stringify(fallback), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
