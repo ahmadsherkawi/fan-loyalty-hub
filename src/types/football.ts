@@ -1,5 +1,5 @@
 // Football API Types for Phase 2 AI Features
-// Supports API-Football (primary) and TheSportsDB (backup)
+// Uses API-Football ONLY
 
 // ================= API-FOOTBALL TYPES =================
 
@@ -210,128 +210,6 @@ export interface ApiFootballTeamStatistics {
   }[];
 }
 
-// ================= THESPORTSDB TYPES =================
-
-export interface TheSportsDBTeam {
-  idTeam: string;
-  idSoccerXML: string | null;
-  idAPIfootball: string | null;
-  intLoved: string | null;
-  strTeam: string;
-  strTeamShort: string | null;
-  strAlternate: string | null;
-  intFormedYear: string | null;
-  strSport: string;
-  strLeague: string;
-  idLeague: string | null;
-  strLeague2: string | null;
-  idLeague2: string | null;
-  strLeague3: string | null;
-  idLeague3: string | null;
-  strLeague4: string | null;
-  idLeague4: string | null;
-  strLeague5: string | null;
-  idLeague5: string | null;
-  strLeague6: string | null;
-  idLeague6: string | null;
-  strLeague7: string | null;
-  idLeague7: string | null;
-  strDivision: string | null;
-  strManager: string | null;
-  strStadium: string | null;
-  strKeywords: string | null;
-  strRSS: string | null;
-  strStadiumThumb: string | null;
-  strStadiumDescription: string | null;
-  strStadiumLocation: string | null;
-  intStadiumCapacity: string | null;
-  strWebsite: string | null;
-  strFacebook: string | null;
-  strTwitter: string | null;
-  strInstagram: string | null;
-  strDescriptionEN: string | null;
-  strDescriptionDE: string | null;
-  strDescriptionFR: string | null;
-  strDescriptionCN: string | null;
-  strDescriptionIT: string | null;
-  strDescriptionJP: string | null;
-  strDescriptionRU: string | null;
-  strDescriptionES: string | null;
-  strDescriptionPT: string | null;
-  strDescriptionSE: string | null;
-  strDescriptionNL: string | null;
-  strDescriptionHU: string | null;
-  strDescriptionNO: string | null;
-  strDescriptionIL: string | null;
-  strDescriptionPL: string | null;
-  strGender: string | null;
-  strCountry: string | null;
-  strTeamBadge: string | null;
-  strTeamJersey: string | null;
-  strTeamLogo: string | null;
-  strTeamFanart1: string | null;
-  strTeamFanart2: string | null;
-  strTeamFanart3: string | null;
-  strTeamFanart4: string | null;
-  strTeamBanner: string | null;
-  strYoutube: string | null;
-  strLocked: string | null;
-}
-
-export interface TheSportsDBEvent {
-  idEvent: string;
-  idSoccerXML: string | null;
-  strEvent: string;
-  strEventAlternate: string | null;
-  strFilename: string | null;
-  strSport: string;
-  idLeague: string;
-  strLeague: string;
-  strSeason: string | null;
-  strDescriptionEN: string | null;
-  strHomeTeam: string;
-  strAwayTeam: string;
-  intHomeScore: string | null;
-  intAwayScore: string | null;
-  intRound: string | null;
-  intSpectators: string | null;
-  strOfficial: string | null;
-  strHomeGoalDetails: string | null;
-  strHomeLineupGoalkeeper: string | null;
-  strHomeLineupDefense: string | null;
-  strHomeLineupMidfield: string | null;
-  strHomeLineupForward: string | null;
-  strHomeLineupSubstitutes: string | null;
-  strHomeFormation: string | null;
-  strAwayGoalDetails: string | null;
-  strAwayLineupGoalkeeper: string | null;
-  strAwayLineupDefense: string | null;
-  strAwayLineupMidfield: string | null;
-  strAwayLineupForward: string | null;
-  strAwayLineupSubstitutes: string | null;
-  strAwayFormation: string | null;
-  intHomeShots: string | null;
-  intAwayShots: string | null;
-  strTimestamp: string | null;
-  dateEvent: string | null;
-  dateEventLocal: string | null;
-  strDate: string | null;
-  strTime: string | null;
-  strTimeLocal: string | null;
-  strTVStation: string | null;
-  idHomeTeam: string | null;
-  idAwayTeam: string | null;
-  strCountry: string | null;
-  strCity: string | null;
-  strVenue: string | null;
-  strPoster: string | null;
-  strSquare: string | null;
-  strThumb: string | null;
-  strResult: string | null;
-  strStatus: string | null;
-  locked: string | null;
-}
-
 // ================= UNIFIED INTERNAL TYPES =================
 
 export type MatchStatus = 
@@ -343,7 +221,7 @@ export type MatchStatus =
 
 export interface FootballMatch {
   id: string;
-  source: 'api-football' | 'thesportsdb';
+  source: 'api-football';
   homeTeam: {
     id: string;
     name: string;
@@ -375,7 +253,7 @@ export interface FootballMatch {
 }
 
 export interface MatchEvent {
-  type: 'goal' | 'card' | 'substitution' | 'penalty' | 'var';
+  type: 'goal' | 'card' | 'substitution' | 'var' | 'other';
   minute: number;
   team: 'home' | 'away';
   player: string;
