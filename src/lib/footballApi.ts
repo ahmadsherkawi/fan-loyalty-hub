@@ -44,15 +44,21 @@ const TEAM_IDS: Record<string, number> = {
   'rangers': 255,
 };
 
-// Competition codes
+// Competition codes - ALL 12 competitions available on free tier
+// Free tier includes: PL, PD, BL1, SA, FL1, CL, DED, PPL, ELC, WC, EC, CDR
 const COMPETITION_CODES: Record<string, string> = {
-  'premier_league': 'PL',
-  'la_liga': 'PD',
-  'bundesliga': 'BL1',
-  'serie_a': 'SA',
-  'ligue_1': 'FL1',
-  'champions_league': 'CL',
-  'europa_league': 'EL',
+  'premier_league': 'PL',        // England - Premier League
+  'la_liga': 'PD',               // Spain - La Liga
+  'bundesliga': 'BL1',           // Germany - Bundesliga
+  'serie_a': 'SA',               // Italy - Serie A
+  'ligue_1': 'FL1',              // France - Ligue 1
+  'champions_league': 'CL',      // Europe - Champions League
+  'eredivisie': 'DED',           // Netherlands - Eredivisie
+  'primeira_liga': 'PPL',        // Portugal - Primeira Liga
+  'championship': 'ELC',         // England - Championship
+  'world_cup': 'WC',             // International - World Cup
+  'euro_championship': 'EC',     // International - European Championship
+  'copa_del_rey': 'CDR',         // Spain - Copa del Rey
 };
 
 // Cache configuration
@@ -658,6 +664,12 @@ export const MAJOR_LEAGUES = [
   { id: 'SA', name: 'Serie A', country: 'Italy', logo: null },
   { id: 'FL1', name: 'Ligue 1', country: 'France', logo: null },
   { id: 'CL', name: 'Champions League', country: 'Europe', logo: null },
+  { id: 'DED', name: 'Eredivisie', country: 'Netherlands', logo: null },
+  { id: 'PPL', name: 'Primeira Liga', country: 'Portugal', logo: null },
+  { id: 'ELC', name: 'Championship', country: 'England', logo: null },
+  { id: 'WC', name: 'World Cup', country: 'International', logo: null },
+  { id: 'EC', name: 'European Championship', country: 'International', logo: null },
+  { id: 'CDR', name: 'Copa del Rey', country: 'Spain', logo: null },
 ];
 
 export const footballApi = {
