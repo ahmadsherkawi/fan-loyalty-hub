@@ -119,11 +119,22 @@ export default function MatchCenterPage() {
       const live = await footballApi.getLiveMatches();
       setAllLiveMatches(live);
 
-      // Get upcoming matches for next 7 days
+      // Get upcoming matches for next 7 days using multiple approaches
       const upcomingFixtures: FootballMatch[] = [];
       const liveIds = new Set(live.map(m => m.id));
+      const upcomingIds = new Set<string>();
       
-      // Get today and the next 6 days (total 7 days)
+      // Approach 1: Get from major leagues (better coverage)
+      console.log('[MatchCenter] Fetching from major leagues...');
+      const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
+      for (const match of leagueMatches) {
+        if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+          upcomingIds.add(match.id);
+          upcomingFixtures.push(match);
+        }
+      }
+      
+      // Approach 2: Get by date for additional coverage
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -138,7 +149,8 @@ export default function MatchCenterPage() {
         
         for (const match of dayMatches) {
           // Add scheduled, postponed matches that aren't live or already added
-          if (!liveIds.has(match.id) && !upcomingFixtures.find(m => m.id === match.id)) {
+          if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+            upcomingIds.add(match.id);
             upcomingFixtures.push(match);
           }
         }

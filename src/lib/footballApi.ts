@@ -35,6 +35,19 @@ const THESPORTSDB_TEAM_IDS: Record<string, string> = {
   'galatasaray': '53453', 'fenerbahce': '53454', 'besiktas': '53455',
 };
 
+// TheSportsDB League IDs for major leagues
+const THESPORTSDB_LEAGUE_IDS: Record<string, string> = {
+  'premier_league': '4328',
+  'la_liga': '4335', 
+  'bundesliga': '4331',
+  'serie_a': '4332',
+  'ligue_1': '4334',
+  'champions_league': '4346',
+  'europa_league': '4347',
+  'fa_cup': '4344',
+  'copa_del_rey': '4354',
+};
+
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const CACHE_DURATION_LIVE = 60 * 1000; // 1 minute for live matches
@@ -263,6 +276,58 @@ export async function getFixturesByDate(date: string): Promise<FootballMatch[]> 
   }
 
   return [];
+}
+
+/**
+ * Get upcoming matches for next N days from major leagues
+ * Uses TheSportsDB league endpoints for better coverage
+ */
+export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballMatch[]> {
+  const cacheKey = `upcoming-leagues-${days}`;
+  const cached = getCached<FootballMatch[]>(cacheKey);
+  if (cached) return cached;
+
+  console.log('[FootballAPI] Getting upcoming matches from major leagues');
+  
+  const allMatches: FootballMatch[] = [];
+  const matchIds = new Set<string>();
+  
+  // Get next events from each major league
+  for (const [leagueName, leagueId] of Object.entries(THESPORTSDB_LEAGUE_IDS)) {
+    try {
+      const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
+        `eventsnextleague.php?id=${leagueId}`
+      );
+      
+      if (nextEvents?.events && nextEvents.events.length > 0) {
+        console.log(`[FootballAPI] ${leagueName}: ${nextEvents.events.length} upcoming events`);
+        
+        for (const event of nextEvents.events) {
+          // Check if within date range
+          const eventDate = new Date(event.strTimestamp || event.dateEvent || '');
+          const now = new Date();
+          const maxDate = new Date();
+          maxDate.setDate(maxDate.getDate() + days);
+          
+          if (eventDate >= now && eventDate <= maxDate && !matchIds.has(event.idEvent)) {
+            matchIds.add(event.idEvent);
+            allMatches.push(transformTheSportsDBEvent(event));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[FootballAPI] Failed to get events for ${leagueName}:`, err);
+    }
+  }
+  
+  // Sort by datetime
+  allMatches.sort((a, b) => 
+    new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+  );
+  
+  console.log(`[FootballAPI] Total upcoming matches from leagues: ${allMatches.length}`);
+  setCache(cacheKey, allMatches);
+  return allMatches;
 }
 
 /**
@@ -728,6 +793,7 @@ export const footballApi = {
   getLiveMatches,
   getTeamFixtures,
   getFixturesByDate,
+  getUpcomingMatchesFromLeagues,
   getStandings,
   getTeamForm,
   searchTeams,
