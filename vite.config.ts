@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => ({
       ".trycloudflare.com",
       ".loca.lt",
     ],
+    proxy: {
+      "/api/ai": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

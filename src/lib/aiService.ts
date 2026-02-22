@@ -1,6 +1,5 @@
 // AI Service for Fan Loyalty Hub
-// Uses fallback generation since we're in a Vite app (no Next.js API routes)
-// For production, implement Supabase Edge Functions for AI calls
+// Calls backend API that uses z-ai-web-dev-sdk for AI-powered predictions and chants
 
 import type {
   ChantContext,
@@ -13,6 +12,9 @@ import type {
   FanInsights,
 } from '@/types/football';
 
+// API base URL - uses Vite proxy in development
+const AI_API_BASE = '/api/ai';
+
 // ================= CHANT GENERATION =================
 
 interface ChantGenerationParams {
@@ -22,18 +24,44 @@ interface ChantGenerationParams {
 }
 
 export async function generateChant(params: ChantGenerationParams): Promise<GeneratedChant> {
-  const { context } = params;
+  const { context, fanName, style } = params;
   
-  // Use fallback chant generation directly
-  // For production: Implement Supabase Edge Function for AI-powered generation
-  return generateFallbackChant(context);
+  try {
+    const response = await fetch(`${AI_API_BASE}/generate-chant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clubName: context.clubName,
+        context: context.type,
+        opponent: context.opponent,
+        players: context.players,
+        stadium: context.stadium,
+        fanName,
+        style: style || 'passionate',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('AI API request failed');
+    }
+
+    const data = await response.json();
+    return {
+      content: data.content,
+      mood: data.mood,
+      suggestedHashtags: data.suggestedHashtags,
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.warn('AI chant generation failed, using fallback:', error);
+    return generateFallbackChant(context);
+  }
 }
 
 function generateFallbackChant(context: ChantContext): GeneratedChant {
   const clubName = context.clubName || 'Our Team';
   const opponent = context.opponent || 'the opposition';
   const player = context.players?.[0] || 'Our Hero';
-  const stadium = context.stadium || 'our stadium';
   
   const chants: Record<string, GeneratedChant> = {
     'match_day': {
@@ -95,48 +123,81 @@ interface PredictionParams {
 export async function generatePrediction(params: PredictionParams): Promise<MatchPrediction> {
   const { match, homeForm, awayForm, standings } = params;
   
-  // Try AI-powered prediction first, fallback to algorithmic
   try {
-    const aiPrediction = await generateAIPrediction(match, homeForm, awayForm, standings);
-    if (aiPrediction) return aiPrediction;
+    // Call AI API for prediction
+    const response = await fetch(`${AI_API_BASE}/predict-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        homeTeam: match.homeTeam.name,
+        awayTeam: match.awayTeam.name,
+        league: match.league.name,
+        homeForm: homeForm ? {
+          formScore: homeForm.formScore,
+          lastMatches: homeForm.lastMatches,
+          winStreak: homeForm.winStreak,
+          unbeatenStreak: homeForm.unbeatenStreak,
+        } : undefined,
+        awayForm: awayForm ? {
+          formScore: awayForm.formScore,
+          lastMatches: awayForm.lastMatches,
+          winStreak: awayForm.winStreak,
+          unbeatenStreak: awayForm.unbeatenStreak,
+        } : undefined,
+        standings: {
+          homeRank: standings?.find(s => 
+            s.teamName.toLowerCase().includes(match.homeTeam.name.toLowerCase()) ||
+            match.homeTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
+          )?.rank,
+          awayRank: standings?.find(s => 
+            s.teamName.toLowerCase().includes(match.awayTeam.name.toLowerCase()) ||
+            match.awayTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
+          )?.rank,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('AI API request failed');
+    }
+
+    const data = await response.json();
+    
+    // Convert API response to MatchPrediction format
+    const prediction: MatchPrediction = {
+      matchId: match.id,
+      homeTeam: match.homeTeam.name,
+      awayTeam: match.awayTeam.name,
+      prediction: {
+        homeWin: data.homeWin,
+        draw: data.draw,
+        awayWin: data.awayWin,
+      },
+      predictedScore: data.predictedScore,
+      confidence: data.confidence,
+      factors: data.keyFactors.map((f: string) => ({
+        type: 'analysis',
+        description: f,
+        impact: 'neutral' as const,
+      })),
+      keyPlayers: { home: [], away: [] },
+      generatedAt: new Date().toISOString(),
+    };
+    
+    // Add analysis as a factor
+    if (data.analysis) {
+      prediction.factors.unshift({
+        type: 'analysis',
+        description: data.analysis,
+        impact: 'neutral',
+      });
+    }
+    
+    return prediction;
   } catch (error) {
-    console.warn('AI prediction failed, using fallback:', error);
+    console.warn('AI prediction failed, using algorithmic fallback:', error);
+    return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
   }
-  
-  return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
-}
-
-// AI-powered prediction using z-ai-web-dev-sdk
-async function generateAIPrediction(
-  match: FootballMatch,
-  homeForm?: TeamForm | null,
-  awayForm?: TeamForm | null,
-  standings?: TeamStanding[]
-): Promise<MatchPrediction | null> {
-  // Build context for AI
-  const homeFormDesc = homeForm 
-    ? `Form: ${homeForm.lastMatches.map(m => m.result).join('')} (W${homeForm.lastMatches.filter(m => m.result === 'W').length}, D${homeForm.lastMatches.filter(m => m.result === 'D').length}, L${homeForm.lastMatches.filter(m => m.result === 'L').length})`
-    : 'Form: Unknown';
-  
-  const awayFormDesc = awayForm
-    ? `Form: ${awayForm.lastMatches.map(m => m.result).join('')} (W${awayForm.lastMatches.filter(m => m.result === 'W').length}, D${awayForm.lastMatches.filter(m => m.result === 'D').length}, L${awayForm.lastMatches.filter(m => m.result === 'L').length})`
-    : 'Form: Unknown';
-
-  const homeStanding = standings?.find(s => s.teamName === match.homeTeam.name);
-  const awayStanding = standings?.find(s => s.teamName === match.awayTeam.name);
-
-  // For now, use algorithmic prediction enhanced with form data
-  // In production, this would call an AI API endpoint
-  const prediction = generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
-  
-  // Enhance with AI-style analysis
-  prediction.factors.push({
-    type: 'analysis',
-    description: `Based on recent form and home advantage, ${match.homeTeam.name} has a slight edge`,
-    impact: homeForm && homeForm.formScore > 60 ? 'positive' : 'neutral'
-  });
-
-  return prediction;
 }
 
 // Algorithmic prediction with detailed analysis
