@@ -111,146 +111,132 @@ export default function MatchCenterPage() {
     loadClub();
   }, [profile, urlClubId]);
 
-  // Fetch matches
-  const fetchData = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  // Fetch matches - runs when club changes
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        // Get live matches
+        const live = await footballApi.getLiveMatches();
+        setAllLiveMatches(live);
 
-    try {
-      // Get live matches
-      const live = await footballApi.getLiveMatches();
-      setAllLiveMatches(live);
-
-      // Get upcoming matches for next 7 days
-      const upcomingFixtures: FootballMatch[] = [];
-      const liveIds = new Set(live.map(m => m.id));
-      const upcomingIds = new Set<string>();
-      
-      // Get past matches for last 7 days
-      const pastFixtures: FootballMatch[] = [];
-      const pastIds = new Set<string>();
-      
-      // Approach 1: Get SPECIFIC club fixtures (upcoming AND past) first!
-      if (club?.name) {
-        console.log(`[MatchCenter] Fetching fixtures for club: ${club.name}`);
+        // Get upcoming matches for next 7 days
+        const upcomingFixtures: FootballMatch[] = [];
+        const liveIds = new Set(live.map(m => m.id));
+        const upcomingIds = new Set<string>();
         
-        // Upcoming
-        const clubUpcoming = await footballApi.getTeamFixtures(club.name, 7);
-        console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming fixtures for ${club.name}`);
-        for (const match of clubUpcoming) {
+        // Get past matches for last 7 days
+        const pastFixtures: FootballMatch[] = [];
+        const pastIds = new Set<string>();
+        
+        // Get SPECIFIC club fixtures (upcoming AND past) first!
+        const clubName = club?.name;
+        if (clubName) {
+          console.log(`[MatchCenter] Fetching fixtures for club: ${clubName}`);
+          
+          // Upcoming
+          const clubUpcoming = await footballApi.getTeamFixtures(clubName, 7);
+          console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming fixtures for ${clubName}`);
+          for (const match of clubUpcoming) {
+            if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+              upcomingIds.add(match.id);
+              upcomingFixtures.push(match);
+            }
+          }
+          
+          // Past
+          const clubPast = await footballApi.getTeamPastMatches(clubName, 7);
+          console.log(`[MatchCenter] Found ${clubPast.length} past matches for ${clubName}`);
+          for (const match of clubPast) {
+            if (!pastIds.has(match.id)) {
+              pastIds.add(match.id);
+              pastFixtures.push(match);
+            }
+          }
+        }
+        
+        // Get from major leagues (additional coverage)
+        console.log('[MatchCenter] Fetching from major leagues...');
+        const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
+        for (const match of leagueMatches) {
           if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
             upcomingIds.add(match.id);
             upcomingFixtures.push(match);
           }
         }
         
-        // Past
-        const clubPast = await footballApi.getTeamPastMatches(club.name, 7);
-        console.log(`[MatchCenter] Found ${clubPast.length} past matches for ${club.name}`);
-        for (const match of clubPast) {
-          if (!pastIds.has(match.id)) {
-            pastIds.add(match.id);
-            pastFixtures.push(match);
+        // Get by date for additional coverage
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(today);
+          date.setDate(date.getDate() + i);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          const dayMatches = await footballApi.getFixturesByDate(dateStr);
+          
+          for (const match of dayMatches) {
+            if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+              upcomingIds.add(match.id);
+              upcomingFixtures.push(match);
+            }
           }
         }
-      }
-      
-      // Approach 2: Get from major leagues (additional coverage)
-      console.log('[MatchCenter] Fetching from major leagues...');
-      const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
-      for (const match of leagueMatches) {
-        if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
-          upcomingIds.add(match.id);
-          upcomingFixtures.push(match);
-        }
-      }
-      
-      // Approach 3: Get by date for additional coverage
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
         
-        const dayMatches = await footballApi.getFixturesByDate(dateStr);
+        console.log(`[MatchCenter] Total upcoming: ${upcomingFixtures.length}, past: ${pastFixtures.length}`);
         
-        for (const match of dayMatches) {
-          // Add scheduled, postponed matches that aren't live or already added
-          if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
-            upcomingIds.add(match.id);
-            upcomingFixtures.push(match);
-          }
-        }
-      }
-      
-      console.log(`[MatchCenter] Total upcoming: ${upcomingFixtures.length}, past: ${pastFixtures.length}`);
-      
-      // Sort by datetime
-      upcomingFixtures.sort((a, b) => 
-        new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-      );
-      pastFixtures.sort((a, b) => 
-        new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
-      );
-      
-      setAllUpcomingMatches(upcomingFixtures);
-      setAllPastMatches(pastFixtures);
+        // Sort by datetime
+        upcomingFixtures.sort((a, b) => 
+          new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+        );
+        pastFixtures.sort((a, b) => 
+          new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+        );
+        
+        setAllUpcomingMatches(upcomingFixtures);
+        setAllPastMatches(pastFixtures);
 
-      // Filter for fan's club if available
-      if (club && !showAllMatches) {
-        const clubNameVariants = getClubNameVariants(club.name);
-        
-        const clubLive = live.filter(m => 
-          clubNameVariants.some(name => 
-            m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-            m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-          )
-        );
-        const clubUpcoming = upcomingFixtures.filter(m =>
-          clubNameVariants.some(name =>
-            m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-            m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-          )
-        );
-        const clubPast = pastFixtures.filter(m =>
-          clubNameVariants.some(name =>
-            m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-            m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-          )
-        );
-        
-        setLiveMatches(clubLive);
-        setUpcomingMatches(clubUpcoming);
-        setPastMatches(clubPast);
-      } else {
-        setLiveMatches(live);
-        setUpcomingMatches(upcomingFixtures);
-        setPastMatches(pastFixtures);
+        // Filter for fan's club if available
+        if (club && !showAllMatches) {
+          const clubNameVariants = getClubNameVariants(club.name);
+          
+          const clubLive = live.filter(m => 
+            clubNameVariants.some(name => 
+              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
+              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
+            )
+          );
+          const clubUpcoming = upcomingFixtures.filter(m =>
+            clubNameVariants.some(name =>
+              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
+              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
+            )
+          );
+          const clubPast = pastFixtures.filter(m =>
+            clubNameVariants.some(name =>
+              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
+              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
+            )
+          );
+          
+          setLiveMatches(clubLive);
+          setUpcomingMatches(clubUpcoming);
+          setPastMatches(clubPast);
+        } else {
+          setLiveMatches(live);
+          setUpcomingMatches(upcomingFixtures);
+          setPastMatches(pastFixtures);
+        }
+      } catch (error) {
+        console.error('Failed to fetch match data:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch match data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    };
+
+    fetchAllData();
   }, [club, showAllMatches]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Auto-refresh for live matches
-  useEffect(() => {
-    if (!autoRefresh || allLiveMatches.length === 0) return;
-    
-    const interval = setInterval(() => {
-      fetchData(true);
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [autoRefresh, allLiveMatches.length, fetchData]);
 
   // Filter matches by search and league
   const filterMatches = (matches: FootballMatch[]) => {
