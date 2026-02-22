@@ -124,7 +124,20 @@ export default function MatchCenterPage() {
       const liveIds = new Set(live.map(m => m.id));
       const upcomingIds = new Set<string>();
       
-      // Approach 1: Get from major leagues (better coverage)
+      // Approach 1: Get SPECIFIC club fixtures first (most important!)
+      if (club?.name) {
+        console.log(`[MatchCenter] Fetching specific fixtures for club: ${club.name}`);
+        const clubMatches = await footballApi.getTeamFixtures(club.name, 7);
+        console.log(`[MatchCenter] Found ${clubMatches.length} fixtures for ${club.name}`);
+        for (const match of clubMatches) {
+          if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+            upcomingIds.add(match.id);
+            upcomingFixtures.push(match);
+          }
+        }
+      }
+      
+      // Approach 2: Get from major leagues (additional coverage)
       console.log('[MatchCenter] Fetching from major leagues...');
       const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
       for (const match of leagueMatches) {
@@ -134,7 +147,7 @@ export default function MatchCenterPage() {
         }
       }
       
-      // Approach 2: Get by date for additional coverage
+      // Approach 3: Get by date for additional coverage
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
