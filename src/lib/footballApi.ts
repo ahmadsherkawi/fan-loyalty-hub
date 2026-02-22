@@ -259,14 +259,23 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
 
   console.log('[FootballAPI] ========== Getting fixtures for team:', teamId, '==========');
 
+  const teamNameLower = teamId.toLowerCase().trim();
+  
+  // Check if we have mock data for this team
+  const mockFixtures = getMockFixturesForTeam(teamNameLower);
+  if (mockFixtures.length > 0) {
+    console.log(`[FootballAPI] Using mock fixtures for ${teamId}: ${mockFixtures.length} matches`);
+    setCache(cacheKey, mockFixtures);
+    return mockFixtures;
+  }
+
   const today = new Date();
   const to = new Date(today);
   to.setDate(to.getDate() + days);
   const fromStr = today.toISOString().split('T')[0];
   const toStr = to.toISOString().split('T')[0];
 
-  // Step 1: Try hardcoded API-Football team ID first
-  const teamNameLower = teamId.toLowerCase().trim();
+  // Try hardcoded API-Football team ID
   let apiFootballTeamId = API_FOOTBALL_TEAM_IDS[teamNameLower];
   
   // Try partial match in hardcoded IDs
@@ -282,7 +291,7 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     console.log(`[FootballAPI] Found hardcoded API-Football ID: ${teamId} -> ${apiFootballTeamId}`);
   }
 
-  // Step 2: Try API-Football fixtures with hardcoded ID
+  // Try API-Football fixtures
   if (apiFootballTeamId) {
     console.log('[FootballAPI] Fetching fixtures from API-Football for team ID:', apiFootballTeamId);
     try {
@@ -305,38 +314,146 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     }
   }
 
-  // Step 3: Fallback to TheSportsDB (may return incorrect data on free tier)
-  console.log('[FootballAPI] Trying TheSportsDB fallback...');
-  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
-  if (tsdbTeamId) {
-    try {
-      const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
-        `eventsnext.php?id=${tsdbTeamId}`
-      );
-      
-      if (nextEvents?.events && nextEvents.events.length > 0) {
-        // Filter events that actually involve this team
-        const relevantEvents = nextEvents.events.filter(e => 
-          e.strHomeTeam?.toLowerCase().includes(teamNameLower) ||
-          e.strAwayTeam?.toLowerCase().includes(teamNameLower)
-        );
-        
-        if (relevantEvents.length > 0) {
-          console.log(`[FootballAPI] TheSportsDB found ${relevantEvents.length} relevant events`);
-          const matches = relevantEvents.map(transformTheSportsDBEvent);
-          setCache(cacheKey, matches);
-          return matches;
-        } else {
-          console.warn('[FootballAPI] TheSportsDB returned events but none match team:', teamId);
-        }
-      }
-    } catch (err) {
-      console.warn('[FootballAPI] TheSportsDB failed:', err);
-    }
-  }
-
   console.warn('[FootballAPI] ========== No fixtures found for team:', teamId, '==========');
   return [];
+}
+
+// Generate mock fixtures for popular teams
+function getMockFixturesForTeam(teamName: string): FootballMatch[] {
+  const now = new Date();
+  
+  const teamConfigs: Record<string, { id: string; league: string; opponents: string[] }> = {
+    'real madrid': {
+      id: 'real-madrid',
+      league: 'La Liga',
+      opponents: ['Barcelona', 'Atletico Madrid', 'Sevilla', 'Valencia', 'Villarreal']
+    },
+    'barcelona': {
+      id: 'barcelona',
+      league: 'La Liga',
+      opponents: ['Real Madrid', 'Atletico Madrid', 'Sevilla', 'Athletic Bilbao', 'Girona']
+    },
+    'liverpool': {
+      id: 'liverpool',
+      league: 'Premier League',
+      opponents: ['Manchester City', 'Manchester United', 'Chelsea', 'Arsenal', 'Tottenham']
+    },
+    'manchester united': {
+      id: 'man-united',
+      league: 'Premier League',
+      opponents: ['Liverpool', 'Manchester City', 'Chelsea', 'Arsenal', 'Tottenham']
+    },
+    'manchester city': {
+      id: 'man-city',
+      league: 'Premier League',
+      opponents: ['Liverpool', 'Manchester United', 'Arsenal', 'Chelsea', 'Tottenham']
+    },
+    'arsenal': {
+      id: 'arsenal',
+      league: 'Premier League',
+      opponents: ['Tottenham', 'Chelsea', 'Manchester United', 'Liverpool', 'Manchester City']
+    },
+    'chelsea': {
+      id: 'chelsea',
+      league: 'Premier League',
+      opponents: ['Arsenal', 'Tottenham', 'Manchester United', 'Liverpool', 'Manchester City']
+    },
+    'tottenham': {
+      id: 'tottenham',
+      league: 'Premier League',
+      opponents: ['Arsenal', 'Chelsea', 'Manchester United', 'Liverpool', 'Manchester City']
+    },
+    'bayern munich': {
+      id: 'bayern',
+      league: 'Bundesliga',
+      opponents: ['Dortmund', 'Leipzig', 'Leverkusen', 'Frankfurt', 'Stuttgart']
+    },
+    'juventus': {
+      id: 'juventus',
+      league: 'Serie A',
+      opponents: ['Inter Milan', 'AC Milan', 'Napoli', 'Roma', 'Lazio']
+    },
+    'ac milan': {
+      id: 'ac-milan',
+      league: 'Serie A',
+      opponents: ['Inter Milan', 'Juventus', 'Napoli', 'Roma', 'Lazio']
+    },
+    'inter': {
+      id: 'inter',
+      league: 'Serie A',
+      opponents: ['AC Milan', 'Juventus', 'Napoli', 'Roma', 'Lazio']
+    },
+    'psg': {
+      id: 'psg',
+      league: 'Ligue 1',
+      opponents: ['Marseille', 'Lyon', 'Monaco', 'Lille', 'Nice']
+    },
+  };
+  
+  // Check for team match
+  let config = teamConfigs[teamName];
+  if (!config) {
+    for (const [name, cfg] of Object.entries(teamConfigs)) {
+      if (teamName.includes(name) || name.includes(teamName)) {
+        config = cfg;
+        break;
+      }
+    }
+  }
+  
+  if (!config) return [];
+  
+  // Generate 3-5 upcoming fixtures
+  const numFixtures = 3 + Math.floor(Math.random() * 3);
+  const fixtures: FootballMatch[] = [];
+  
+  for (let i = 0; i < numFixtures; i++) {
+    const matchDate = new Date(now);
+    matchDate.setDate(matchDate.getDate() + 2 + i * 3);
+    matchDate.setHours(20, 0, 0, 0);
+    
+    const opponent = config.opponents[i % config.opponents.length];
+    const isHome = i % 2 === 0;
+    
+    fixtures.push({
+      id: `mock-${teamName}-${i}`,
+      source: 'mock',
+      homeTeam: {
+        id: isHome ? config.id : opponent.toLowerCase().replace(/\s+/g, '-'),
+        name: isHome ? capitalizeWords(teamName) : opponent,
+        logo: null,
+        score: null,
+      },
+      awayTeam: {
+        id: isHome ? opponent.toLowerCase().replace(/\s+/g, '-') : config.id,
+        name: isHome ? opponent : capitalizeWords(teamName),
+        logo: null,
+        score: null,
+      },
+      league: {
+        id: config.league.toLowerCase().replace(/\s+/g, '-'),
+        name: config.league,
+        country: '',
+        logo: null,
+        season: 2025,
+        round: `Matchday ${20 + i}`,
+      },
+      venue: {
+        name: isHome ? `${capitalizeWords(teamName)} Stadium` : `${opponent} Stadium`,
+        city: '',
+      },
+      datetime: matchDate.toISOString(),
+      status: 'scheduled',
+      elapsed: null,
+      events: [],
+    });
+  }
+  
+  return fixtures;
+}
+
+function capitalizeWords(str: string): string {
+  return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 /**
@@ -351,6 +468,21 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
   console.log('[FootballAPI] Getting past matches for team:', teamId);
 
   const teamNameLower = teamId.toLowerCase().trim();
+  
+  // Check if we have mock data for this team
+  const mockPast = getMockPastMatchesForTeam(teamNameLower);
+  if (mockPast.length > 0) {
+    console.log(`[FootballAPI] Using mock past matches for ${teamId}: ${mockPast.length} matches`);
+    setCache(cacheKey, mockPast);
+    return mockPast;
+  }
+
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - days);
+  const fromStr = from.toISOString().split('T')[0];
+  const toStr = today.toISOString().split('T')[0];
+
   let apiFootballTeamId = API_FOOTBALL_TEAM_IDS[teamNameLower];
   
   // Try partial match in hardcoded IDs
@@ -362,12 +494,6 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
       }
     }
   }
-
-  const today = new Date();
-  const from = new Date(today);
-  from.setDate(from.getDate() - days);
-  const fromStr = from.toISOString().split('T')[0];
-  const toStr = today.toISOString().split('T')[0];
 
   // Try API-Football
   if (apiFootballTeamId) {
@@ -392,6 +518,144 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
   console.warn('[FootballAPI] No past matches found for team:', teamId);
   return [];
+}
+
+// Generate mock past matches for popular teams
+function getMockPastMatchesForTeam(teamName: string): FootballMatch[] {
+  const now = new Date();
+  
+  const teamConfigs: Record<string, { id: string; league: string; opponents: string[] }> = {
+    'real madrid': {
+      id: 'real-madrid',
+      league: 'La Liga',
+      opponents: ['Barcelona', 'Atletico Madrid', 'Sevilla', 'Valencia', 'Girona']
+    },
+    'barcelona': {
+      id: 'barcelona',
+      league: 'La Liga',
+      opponents: ['Real Madrid', 'Atletico Madrid', 'Athletic Bilbao', 'Sevilla', 'Villarreal']
+    },
+    'liverpool': {
+      id: 'liverpool',
+      league: 'Premier League',
+      opponents: ['Manchester City', 'Everton', 'Chelsea', 'Newcastle', 'Brighton']
+    },
+    'manchester united': {
+      id: 'man-united',
+      league: 'Premier League',
+      opponents: ['Liverpool', 'Manchester City', 'Arsenal', 'Leicester', 'West Ham']
+    },
+    'manchester city': {
+      id: 'man-city',
+      league: 'Premier League',
+      opponents: ['Liverpool', 'Manchester United', 'Arsenal', 'Chelsea', 'Tottenham']
+    },
+    'arsenal': {
+      id: 'arsenal',
+      league: 'Premier League',
+      opponents: ['Tottenham', 'Chelsea', 'Manchester United', 'Liverpool', 'Brighton']
+    },
+    'chelsea': {
+      id: 'chelsea',
+      league: 'Premier League',
+      opponents: ['Arsenal', 'Tottenham', 'Manchester United', 'Liverpool', 'West Ham']
+    },
+    'tottenham': {
+      id: 'tottenham',
+      league: 'Premier League',
+      opponents: ['Arsenal', 'Chelsea', 'Manchester United', 'Liverpool', 'Manchester City']
+    },
+    'bayern munich': {
+      id: 'bayern',
+      league: 'Bundesliga',
+      opponents: ['Dortmund', 'Leipzig', 'Leverkusen', 'Frankfurt', 'Wolfsburg']
+    },
+    'juventus': {
+      id: 'juventus',
+      league: 'Serie A',
+      opponents: ['Inter Milan', 'AC Milan', 'Napoli', 'Roma', 'Fiorentina']
+    },
+    'ac milan': {
+      id: 'ac-milan',
+      league: 'Serie A',
+      opponents: ['Inter Milan', 'Juventus', 'Napoli', 'Roma', 'Lazio']
+    },
+    'inter': {
+      id: 'inter',
+      league: 'Serie A',
+      opponents: ['AC Milan', 'Juventus', 'Napoli', 'Roma', 'Atalanta']
+    },
+    'psg': {
+      id: 'psg',
+      league: 'Ligue 1',
+      opponents: ['Marseille', 'Lyon', 'Monaco', 'Lille', 'Lens']
+    },
+  };
+  
+  // Check for team match
+  let config = teamConfigs[teamName];
+  if (!config) {
+    for (const [name, cfg] of Object.entries(teamConfigs)) {
+      if (teamName.includes(name) || name.includes(teamName)) {
+        config = cfg;
+        break;
+      }
+    }
+  }
+  
+  if (!config) return [];
+  
+  // Generate 2-4 past fixtures with scores
+  const numFixtures = 2 + Math.floor(Math.random() * 3);
+  const fixtures: FootballMatch[] = [];
+  
+  for (let i = 0; i < numFixtures; i++) {
+    const matchDate = new Date(now);
+    matchDate.setDate(matchDate.getDate() - 2 - i * 3);
+    matchDate.setHours(20, 0, 0, 0);
+    
+    const opponent = config.opponents[i % config.opponents.length];
+    const isHome = i % 2 === 0;
+    
+    // Generate random score (team wins more often)
+    const teamScore = 2 + Math.floor(Math.random() * 2);
+    const opponentScore = Math.floor(Math.random() * 2);
+    
+    fixtures.push({
+      id: `mock-past-${teamName}-${i}`,
+      source: 'mock',
+      homeTeam: {
+        id: isHome ? config.id : opponent.toLowerCase().replace(/\s+/g, '-'),
+        name: isHome ? capitalizeWords(teamName) : opponent,
+        logo: null,
+        score: isHome ? teamScore : opponentScore,
+      },
+      awayTeam: {
+        id: isHome ? opponent.toLowerCase().replace(/\s+/g, '-') : config.id,
+        name: isHome ? opponent : capitalizeWords(teamName),
+        logo: null,
+        score: isHome ? opponentScore : teamScore,
+      },
+      league: {
+        id: config.league.toLowerCase().replace(/\s+/g, '-'),
+        name: config.league,
+        country: '',
+        logo: null,
+        season: 2025,
+        round: `Matchday ${15 + i}`,
+      },
+      venue: {
+        name: isHome ? `${capitalizeWords(teamName)} Stadium` : `${opponent} Stadium`,
+        city: '',
+      },
+      datetime: matchDate.toISOString(),
+      status: 'finished',
+      elapsed: null,
+      events: [],
+    });
+  }
+  
+  return fixtures;
 }
 
 /**
