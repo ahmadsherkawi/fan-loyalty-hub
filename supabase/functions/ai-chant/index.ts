@@ -24,13 +24,25 @@ serve(async (req) => {
   }
 
   console.log('[AI Chant] Received request');
+  console.log('[AI Chant] Method:', req.method);
+  console.log('[AI Chant] Content-Type:', req.headers.get('content-type'));
 
   try {
-    const data: ChantRequest = await req.json();
-    console.log('[AI Chant] Club:', data.clubName, 'Context:', data.context);
+    const rawBody = await req.text();
+    console.log('[AI Chant] Raw body:', rawBody);
+    
+    let data: ChantRequest;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = {} as ChantRequest;
+    }
+    console.log('[AI Chant] Parsed data:', JSON.stringify(data));
 
     // Get OpenAI API key from environment
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('[AI Chant] OPENAI_API_KEY exists:', !!openaiKey);
+    console.log('[AI Chant] OPENAI_API_KEY length:', openaiKey?.length || 0);
     
     if (!openaiKey) {
       console.warn('[AI Chant] No OPENAI_API_KEY, using fallback');
@@ -84,7 +96,7 @@ JSON only:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

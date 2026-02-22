@@ -1,6 +1,7 @@
 // Football API Service Layer
-// Unified interface for API-Football (primary) and TheSportsDB (backup)
-// Implements caching and rate limiting for optimal API usage
+// Uses TheSportsDB as PRIMARY (free, generous limits)
+// API-Football as backup (limited 100 req/day)
+// Implements caching for optimal API usage
 
 import type {
   FootballMatch,
@@ -18,7 +19,21 @@ import type {
 
 const API_FOOTBALL_KEY = '2a6e0fcd209780c4e8c0ba090272e5dd';
 const API_FOOTBALL_BASE = 'https://v3.football.api-sports.io';
-const THESPORTSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
+const THESPORTSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/3'; // Free public API key
+
+// TheSportsDB Team IDs for popular teams
+const THESPORTSDB_TEAM_IDS: Record<string, string> = {
+  'barcelona': '52927', 'real madrid': '53258', 'atletico madrid': '53260',
+  'manchester united': '53340', 'manchester city': '53341', 'liverpool': '53342',
+  'chelsea': '53343', 'arsenal': '53344', 'tottenham': '53345',
+  'bayern munich': '53369', 'dortmund': '53371', 'leipzig': '53377',
+  'juventus': '53384', 'ac milan': '53382', 'inter': '53383', 'napoli': '53386',
+  'psg': '53394', 'lyon': '53398', 'marseille': '53396',
+  'benfica': '53409', 'porto': '53410', 'sporting': '53411',
+  'ajax': '53419', 'psv': '53420', 'feyenoord': '53421',
+  'celtic': '53435', 'rangers': '53436',
+  'galatasaray': '53453', 'fenerbahce': '53454', 'besiktas': '53455',
+};
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -126,23 +141,39 @@ export async function getLiveMatches(): Promise<FootballMatch[]> {
   const cached = getCached<FootballMatch[]>(cacheKey);
   if (cached) return cached;
 
-  // Try API-Football first
+  console.log('[FootballAPI] Getting live matches');
+
+  // Get today's events from TheSportsDB first (free, unlimited)
+  const today = new Date().toISOString().split('T')[0];
+  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${today}&s=Soccer`);
+  
+  if (events?.events && events.events.length > 0) {
+    // Filter for live/in-progress matches
+    const liveMatches = events.events
+      .filter(e => {
+        const status = (e.strStatus || '').toLowerCase();
+        return status.includes('progress') || status === '1h' || status === '2h' || status === 'ht' || status.includes('live');
+      })
+      .map(transformTheSportsDBEvent);
+    
+    if (liveMatches.length > 0) {
+      console.log('[FootballAPI] TheSportsDB live matches:', liveMatches.length);
+      setCache(cacheKey, liveMatches, true);
+      return liveMatches;
+    }
+    
+    // If no live matches, return today's scheduled matches
+    const todayMatches = events.events.map(transformTheSportsDBEvent);
+    console.log('[FootballAPI] TheSportsDB today matches:', todayMatches.length);
+    setCache(cacheKey, todayMatches, true);
+    return todayMatches;
+  }
+
+  // Fallback to API-Football (limited)
   const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', { live: 'all' });
   
   if (fixtures && fixtures.length > 0) {
     const matches = fixtures.map(transformApiFootballFixture);
-    setCache(cacheKey, matches, true);
-    return matches;
-  }
-
-  // Fallback to TheSportsDB (they don't have true live data, but we can get today's events)
-  const today = new Date().toISOString().split('T')[0];
-  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${today}&s=Soccer`);
-  
-  if (events?.events) {
-    const matches = events.events
-      .filter(e => e.strStatus === 'In Progress' || e.strStatus === '1H' || e.strStatus === '2H' || e.strStatus === 'HT')
-      .map(transformTheSportsDBEvent);
     setCache(cacheKey, matches, true);
     return matches;
   }
@@ -158,6 +189,28 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
   const cached = getCached<FootballMatch[]>(cacheKey);
   if (cached) return cached;
 
+  console.log('[FootballAPI] Getting fixtures for team:', teamId);
+
+  // Try TheSportsDB first (free, unlimited)
+  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamId.toLowerCase()] || teamId;
+  
+  try {
+    // Get next 5 events for team
+    const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsnext.php?id=${tsdbTeamId}`);
+    
+    if (nextEvents?.events && nextEvents.events.length > 0) {
+      console.log('[FootballAPI] TheSportsDB next events:', nextEvents.events.length);
+      const matches = nextEvents.events
+        .slice(0, days) // Limit to requested days
+        .map(transformTheSportsDBEvent);
+      setCache(cacheKey, matches);
+      return matches;
+    }
+  } catch (err) {
+    console.warn('[FootballAPI] TheSportsDB failed for team fixtures:', err);
+  }
+
+  // Fallback to API-Football (limited)
   const today = new Date();
   const to = new Date(today);
   to.setDate(to.getDate() + days);
@@ -165,7 +218,6 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
   const fromStr = today.toISOString().split('T')[0];
   const toStr = to.toISOString().split('T')[0];
 
-  // API-Football
   const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
     team: teamId,
     from: fromStr,
@@ -189,20 +241,23 @@ export async function getFixturesByDate(date: string): Promise<FootballMatch[]> 
   const cached = getCached<FootballMatch[]>(cacheKey);
   if (cached) return cached;
 
-  // Try API-Football
-  const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', { date });
+  console.log('[FootballAPI] Getting fixtures for date:', date);
+
+  // Try TheSportsDB first (free, unlimited)
+  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${date}&s=Soccer`);
   
-  if (fixtures && fixtures.length > 0) {
-    const matches = fixtures.map(transformApiFootballFixture);
+  if (events?.events && events.events.length > 0) {
+    console.log('[FootballAPI] TheSportsDB events:', events.events.length);
+    const matches = events.events.map(transformTheSportsDBEvent);
     setCache(cacheKey, matches);
     return matches;
   }
 
-  // Fallback to TheSportsDB
-  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${date}&s=Soccer`);
+  // Fallback to API-Football (limited)
+  const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', { date });
   
-  if (events?.events) {
-    const matches = events.events.map(transformTheSportsDBEvent);
+  if (fixtures && fixtures.length > 0) {
+    const matches = fixtures.map(transformApiFootballFixture);
     setCache(cacheKey, matches);
     return matches;
   }
@@ -254,6 +309,80 @@ export async function getTeamForm(teamId: string, lastN = 5): Promise<TeamForm |
   const cached = getCached<TeamForm>(cacheKey);
   if (cached) return cached;
 
+  console.log('[FootballAPI] Getting form for team:', teamId);
+
+  // Try TheSportsDB first (free, unlimited)
+  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamId.toLowerCase()] || teamId;
+  
+  try {
+    const lastEvents = await fetchTheSportsDB<{ results: TheSportsDBEvent[] }>(`eventslast.php?id=${tsdbTeamId}`);
+    
+    if (lastEvents?.results && lastEvents.results.length > 0) {
+      console.log('[FootballAPI] TheSportsDB last events:', lastEvents.results.length);
+      
+      const lastMatches = lastEvents.results.slice(0, lastN).map((e) => {
+        const isHome = e.strHomeTeam?.toLowerCase().includes(teamId.toLowerCase()) || 
+                       e.idHomeTeam === tsdbTeamId;
+        const homeScore = e.intHomeScore ? parseInt(e.intHomeScore) : 0;
+        const awayScore = e.intAwayScore ? parseInt(e.intAwayScore) : 0;
+        const teamScore = isHome ? homeScore : awayScore;
+        const opponentScore = isHome ? awayScore : homeScore;
+        
+        let result: 'W' | 'D' | 'L';
+        if (teamScore > opponentScore) result = 'W';
+        else if (teamScore < opponentScore) result = 'L';
+        else result = 'D';
+
+        return {
+          opponent: isHome ? e.strAwayTeam : e.strHomeTeam,
+          home: isHome,
+          result,
+          goalsFor: teamScore,
+          goalsAgainst: opponentScore,
+        };
+      });
+
+      let winStreak = 0;
+      let unbeatenStreak = 0;
+      for (const match of lastMatches) {
+        if (match.result === 'W') {
+          winStreak++;
+          unbeatenStreak++;
+        } else if (match.result === 'D') {
+          unbeatenStreak++;
+          winStreak = 0;
+        } else {
+          winStreak = 0;
+          unbeatenStreak = 0;
+          break;
+        }
+      }
+
+      const formScore = Math.min(100, Math.round(
+        lastMatches.reduce((acc, m) => {
+          if (m.result === 'W') return acc + 20;
+          if (m.result === 'D') return acc + 10;
+          return acc;
+        }, 0)
+      ));
+
+      const result: TeamForm = {
+        teamId,
+        teamName: lastEvents.results[0].strHomeTeam || 'Team',
+        lastMatches,
+        winStreak,
+        unbeatenStreak,
+        formScore,
+      };
+
+      setCache(cacheKey, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn('[FootballAPI] TheSportsDB failed for team form:', err);
+  }
+
+  // Fallback to API-Football (limited)
   const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
     team: teamId,
     last: lastN,
@@ -335,34 +464,13 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
     return cached;
   }
 
-  // Try API-Football first (better fuzzy search)
-  console.log('[FootballAPI] Searching API-Football for:', query);
-  try {
-    // API-Football returns { response: [{ team: {...} }, ...] }
-    const response = await fetchApiFootball<Array<{ team: { id: number; name: string; logo: string; country: string } }>>('teams', { search: query });
-    
-    console.log('[FootballAPI] API-Football raw response:', response);
-    
-    if (response && response.length > 0) {
-      console.log('[FootballAPI] API-Football results:', response.length);
-      const result = response
-        .filter(item => item && item.team && item.team.name)
-        .map(item => ({
-          id: String(item.team.id),
-          name: item.team.name,
-          logo: item.team.logo || null,
-          country: item.team.country || '',
-        }));
-      console.log('[FootballAPI] Mapped results:', result.length, result.slice(0, 3));
-      setCache(cacheKey, result);
-      return result;
-    }
-  } catch (err) {
-    console.error('[FootballAPI] API-Football error:', err);
-  }
+  console.log('[FootballAPI] Searching for team:', query);
 
-  // Fallback to TheSportsDB (requires more exact matching)
-  console.log('[FootballAPI] Trying TheSportsDB for:', query);
+  // Check if we have a known TheSportsDB ID for this team
+  const lowerQuery = query.toLowerCase();
+  const knownId = THESPORTSDB_TEAM_IDS[lowerQuery];
+  
+  // Try TheSportsDB first (free, unlimited)
   try {
     const result = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
     
@@ -385,7 +493,28 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
     console.error('[FootballAPI] TheSportsDB error:', err);
   }
 
-  // If both fail, return some popular teams as suggestions for partial matches
+  // Fallback to API-Football (limited)
+  try {
+    const response = await fetchApiFootball<Array<{ team: { id: number; name: string; logo: string; country: string } }>>('teams', { search: query });
+    
+    if (response && response.length > 0) {
+      console.log('[FootballAPI] API-Football results:', response.length);
+      const result = response
+        .filter(item => item && item.team && item.team.name)
+        .map(item => ({
+          id: String(item.team.id),
+          name: item.team.name,
+          logo: item.team.logo || null,
+          country: item.team.country || '',
+        }));
+      setCache(cacheKey, result);
+      return result;
+    }
+  } catch (err) {
+    console.error('[FootballAPI] API-Football error:', err);
+  }
+
+  // Final fallback to popular teams
   console.log('[FootballAPI] Using fallback popular teams for:', query);
   const popularTeams = getPopularTeamSuggestions(query);
   console.log('[FootballAPI] Fallback results:', popularTeams.length);
