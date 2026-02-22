@@ -15,6 +15,9 @@ import type {
 const FOOTBALL_DATA_API_KEY = '68c061d5ee694555966ea266bea15d46';
 const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
 
+// Use Supabase Edge Function as proxy to bypass CORS
+const SUPABASE_FUNCTIONS_URL = 'https://ohjhzmqcbprcybjlsusp.supabase.co/functions/v1/football-api';
+
 // Team IDs for football-data.org
 const TEAM_IDS: Record<string, number> = {
   'real madrid': 86,
