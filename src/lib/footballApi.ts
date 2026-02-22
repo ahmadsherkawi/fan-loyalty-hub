@@ -216,8 +216,13 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
 
   console.log('[FootballAPI] Fetching fixtures from API-Football for team ID:', apiFootballTeamId);
   
+  // Determine current season (2025 for 2025-2026 season)
+  const currentYear = new Date().getFullYear();
+  const season = currentYear >= 2025 ? 2025 : 2024;
+  
   const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
     team: apiFootballTeamId,
+    season: season,
     from: fromStr,
     to: toStr,
   });
@@ -272,8 +277,13 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
   console.log('[FootballAPI] Fetching past matches from API-Football for team ID:', apiFootballTeamId);
   
+  // Determine current season
+  const currentYear = new Date().getFullYear();
+  const season = currentYear >= 2025 ? 2025 : 2024;
+  
   const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
     team: apiFootballTeamId,
+    season: season,
     from: fromStr,
     to: toStr,
   });
@@ -333,9 +343,13 @@ export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballM
   // Get fixtures from each major league
   for (const [leagueName, leagueId] of Object.entries(API_FOOTBALL_LEAGUE_IDS)) {
     try {
+      // Determine current season
+      const currentYear = new Date().getFullYear();
+      const season = currentYear >= 2025 ? 2025 : 2024;
+      
       const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
         league: leagueId,
-        season: 2024, // Current season
+        season: season,
         from: fromStr,
         to: toStr,
       });
