@@ -102,8 +102,10 @@ function setCache<T>(key: string, data: T, isLive = false) {
 // ================= API-FOOTBALL CLIENT =================
 
 async function fetchApiFootball<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T | null> {
+  console.log('[API-Football] Checking rate limit. Used:', dailyRequestsUsed, '/', dailyRequestLimit);
+  
   if (!checkRateLimit()) {
-    console.warn('API-Football daily limit reached, falling back to TheSportsDB');
+    console.warn('[API-Football] Daily limit reached, skipping request');
     return null;
   }
 
@@ -112,6 +114,7 @@ async function fetchApiFootball<T>(endpoint: string, params: Record<string, stri
   ).toString();
   
   const url = `${API_FOOTBALL_BASE}/${endpoint}${queryString ? `?${queryString}` : ''}`;
+  console.log('[API-Football] Fetching:', url);
   
   try {
     const response = await fetch(url, {
@@ -120,16 +123,19 @@ async function fetchApiFootball<T>(endpoint: string, params: Record<string, stri
       },
     });
     
+    console.log('[API-Football] Response status:', response.status);
+    
     if (!response.ok) {
-      console.error(`API-Football error: ${response.status}`);
+      console.error('[API-Football] Error response:', response.status, response.statusText);
       return null;
     }
     
     incrementRequestCount();
     const data = await response.json();
+    console.log('[API-Football] Response has data:', !!data.response);
     return data.response as T;
   } catch (error) {
-    console.error('API-Football fetch error:', error);
+    console.error('[API-Football] Fetch error:', error);
     return null;
   }
 }
@@ -216,26 +222,38 @@ export async function getLiveMatches(): Promise<FootballMatch[]> {
 export async function getTeamFixtures(teamId: string, days = 7): Promise<FootballMatch[]> {
   const cacheKey = `team-fixtures-${teamId}-${days}`;
   const cached = getCached<FootballMatch[]>(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    console.log(`[FootballAPI] Using cached fixtures for ${teamId}`);
+    return cached;
+  }
 
-  console.log('[FootballAPI] Getting fixtures for team:', teamId);
+  console.log('[FootballAPI] ========== Getting fixtures for team:', teamId, '==========');
+  console.log('[FootballAPI] API Usage:', getApiUsageStats());
 
   // First, search for the team in API-Football to get their numeric ID
   let apiFootballTeamId: string | null = null;
   
+  console.log('[FootballAPI] Step 1: Searching API-Football for team...');
+  
   // Try to find team by name in API-Football
-  const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
-  if (searchResult && searchResult.length > 0) {
-    // Find best match
-    const teamLower = teamId.toLowerCase();
-    const match = searchResult.find(t => 
-      t.team.name.toLowerCase().includes(teamLower) || 
-      teamLower.includes(t.team.name.toLowerCase())
-    );
-    if (match) {
-      apiFootballTeamId = String(match.team.id);
-      console.log(`[FootballAPI] Found API-Football team ID: ${match.team.name} -> ${apiFootballTeamId}`);
+  try {
+    const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
+    console.log('[FootballAPI] API-Football search result:', searchResult);
+    
+    if (searchResult && searchResult.length > 0) {
+      // Find best match
+      const teamLower = teamId.toLowerCase();
+      const match = searchResult.find(t => 
+        t.team.name.toLowerCase().includes(teamLower) || 
+        teamLower.includes(t.team.name.toLowerCase())
+      );
+      if (match) {
+        apiFootballTeamId = String(match.team.id);
+        console.log(`[FootballAPI] Found API-Football team ID: ${match.team.name} -> ${apiFootballTeamId}`);
+      }
     }
+  } catch (err) {
+    console.error('[FootballAPI] API-Football search error:', err);
   }
 
   const today = new Date();
@@ -246,6 +264,7 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
 
   // Try API-Football first (REAL data)
   if (apiFootballTeamId) {
+    console.log('[FootballAPI] Step 2: Fetching fixtures from API-Football...');
     try {
       const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
         team: apiFootballTeamId,
@@ -253,18 +272,23 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
         to: toStr,
       });
 
+      console.log('[FootballAPI] API-Football fixtures result:', fixtures?.length || 0, 'matches');
+      
       if (fixtures && fixtures.length > 0) {
-        console.log(`[FootballAPI] API-Football found ${fixtures.length} fixtures for team ${teamId}`);
         const matches = fixtures.map(transformApiFootballFixture);
         setCache(cacheKey, matches);
+        console.log(`[FootballAPI] ========== Found ${matches.length} fixtures via API-Football ==========`);
         return matches;
       }
     } catch (err) {
       console.warn('[FootballAPI] API-Football fixtures failed:', err);
     }
+  } else {
+    console.log('[FootballAPI] No API-Football team ID found, trying TheSportsDB...');
   }
 
-  // Fallback to TheSportsDB (may return incorrect data on free tier)
+  // Fallback to TheSportsDB
+  console.log('[FootballAPI] Step 3: Trying TheSportsDB fallback...');
   const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamId.toLowerCase()];
   if (tsdbTeamId) {
     try {
@@ -281,7 +305,6 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
         );
         
         if (relevantEvents.length > 0) {
-          console.log(`[FootballAPI] TheSportsDB found ${relevantEvents.length} relevant events for ${teamId}`);
           const matches = relevantEvents.map(transformTheSportsDBEvent);
           setCache(cacheKey, matches);
           return matches;
@@ -294,7 +317,7 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     }
   }
 
-  console.warn('[FootballAPI] No fixtures found for team:', teamId);
+  console.warn('[FootballAPI] ========== No fixtures found for team:', teamId, '==========');
   return [];
 }
 
