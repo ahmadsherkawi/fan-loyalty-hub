@@ -20,7 +20,9 @@ import type {
 const API_FOOTBALL_KEY = '2a6e0fcd209780c4e8c0ba090272e5dd';
 const API_FOOTBALL_BASE = 'https://v3.football.api-sports.io';
 const THESPORTSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/3'; // Free public API key
-const CORS_PROXY = 'https://corsproxy.io/?'; // CORS proxy for browser requests
+
+// Use Supabase Edge Function as proxy to bypass CORS
+const SUPABASE_FUNCTIONS_URL = 'https://ohjhzmqcbprcybjlsusp.supabase.co/functions/v1/football-api';
 
 // TheSportsDB Team IDs for popular teams
 const THESPORTSDB_TEAM_IDS: Record<string, string> = {
@@ -135,12 +137,11 @@ async function fetchApiFootball<T>(endpoint: string, params: Record<string, stri
 
 async function fetchTheSportsDB<T>(endpoint: string): Promise<T | null> {
   try {
-    // Use CORS proxy for browser requests - different format
-    const fullUrl = `${THESPORTSDB_BASE}/${endpoint}`;
-    const proxyUrl = `${CORS_PROXY}${fullUrl}`;
-    console.log('[TheSportsDB] Fetching:', proxyUrl);
+    // Use Supabase Edge Function as proxy to bypass CORS
+    const url = `${SUPABASE_FUNCTIONS_URL}?endpoint=${encodeURIComponent(endpoint)}`;
+    console.log('[TheSportsDB] Fetching via Edge Function:', endpoint);
     
-    const response = await fetch(proxyUrl);
+    const response = await fetch(url);
     console.log('[TheSportsDB] Response status:', response.status);
     
     if (!response.ok) {
