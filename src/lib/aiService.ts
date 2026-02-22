@@ -1,5 +1,6 @@
 // AI Service for Fan Loyalty Hub
-// Uses z-ai-web-dev-sdk directly in browser for AI-powered predictions and chants
+// Uses Supabase Edge Functions for AI-powered predictions and chants
+// Falls back to algorithmic/template generation if Edge Functions not deployed
 
 import type {
   ChantContext,
@@ -11,26 +12,7 @@ import type {
   PersonalizedRecommendation,
   FanInsights,
 } from '@/types/football';
-
-// Lazy-loaded ZAI instance
-let zaiInstance: Awaited<ReturnType<typeof initZAI>> | null = null;
-
-async function initZAI() {
-  try {
-    const ZAI = (await import('z-ai-web-dev-sdk')).default;
-    return await ZAI.create();
-  } catch (error) {
-    console.error('[AI] Failed to initialize ZAI:', error);
-    return null;
-  }
-}
-
-async function getZAI() {
-  if (!zaiInstance) {
-    zaiInstance = await initZAI();
-  }
-  return zaiInstance;
-}
+import { supabase } from '@/integrations/supabase/client';
 
 // ================= CHANT GENERATION =================
 
@@ -46,98 +28,37 @@ export async function generateChant(params: ChantGenerationParams): Promise<Gene
   console.log('[AI Service] Generating chant for:', context.clubName, '- Type:', context.type);
   
   try {
-    const zai = await getZAI();
-    if (!zai) {
-      console.warn('[AI Service] ZAI not available, using fallback');
+    // Try Supabase Edge Function first
+    const { data, error } = await supabase.functions.invoke('ai-chant', {
+      body: {
+        clubName: context.clubName,
+        context: context.type,
+        opponent: context.opponent,
+        players: context.players,
+        stadium: context.stadium,
+        fanName,
+        style: style || 'passionate',
+      },
+    });
+
+    if (error) {
+      console.warn('[AI Service] Edge function error, using fallback:', error.message);
       return generateFallbackChant(context);
     }
 
-    const styleGuides = {
-      traditional: 'Classic terrace-style: simple, repetitive, call-and-response patterns.',
-      modern: 'Contemporary: current slang, viral-style, TikTok-friendly.',
-      funny: 'Humorous: clever puns, witty observations, light-hearted.',
-      passionate: 'Deep emotional: intense devotion, pride, spine-tingling energy.'
-    };
-
-    const contextGuides = {
-      match_day: 'Building anticipation for an upcoming match. Confident, ready for battle.',
-      victory: 'Celebrating a win! Pure joy, three points, euphoric.',
-      defeat: 'Unwavering loyalty despite losing. Defiant, proud, unshakeable.',
-      player_praise: 'Honoring a specific player. Highlight their skills and impact.',
-      derby: 'Intense rivalry. Local pride, bragging rights. Passionate.',
-      team_spirit: 'Core club identity and loyalty. History, community, belonging.',
-      celebration: 'Special occasion - trophy, anniversary, milestone. Festive.'
-    };
-
-    const systemPrompt = `You are a passionate football ultra and creative chant writer. Create ORIGINAL chants that real fans would sing in stadiums.
-
-Requirements:
-- 100% ORIGINAL - never copy existing chants verbatim
-- Rhythmic with clear beat for crowd singing
-- Easy to sing (not too wordy)
-- 4-8 lines maximum
-- Passionate but respectful
-- Include some repetition for crowd participation
-
-AVOID generic phrases or copying famous chants. Be creative!
-
-Always respond with ONLY valid JSON, no markdown.`;
-
-    const userPrompt = `Create an ORIGINAL football chant:
-
-CLUB: ${context.clubName}
-CONTEXT: ${contextGuides[context.type] || context.type}
-${context.opponent ? `OPPONENT: ${context.opponent}` : ''}
-${context.players?.length ? `PLAYERS TO FEATURE: ${context.players.join(', ')}` : ''}
-${context.stadium ? `STADIUM: ${context.stadium}` : ''}
-${fanName ? `FAN NAME (optional): ${fanName}` : ''}
-STYLE: ${styleGuides[style || 'passionate']}
-
-Make it specific to ${context.clubName}. Be creative and unique!
-
-JSON only:
-{
-  "content": "<chant with \\n for line breaks>",
-  "mood": "<passionate|celebratory|defiant|supportive|humorous>",
-  "suggestedHashtags": ["#Unique1", "#Unique2", "#Unique3"]
-}`;
-
-    console.log('[AI Service] Calling AI for chant generation...');
-    
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 1.0,
-      max_tokens: 400,
-    });
-
-    const responseText = completion.choices[0]?.message?.content || '';
-    console.log('[AI Service] AI response received');
-    
-    // Parse JSON
-    let chant;
-    try {
-      let jsonStr = responseText.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim();
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) jsonStr = jsonMatch[0];
-      chant = JSON.parse(jsonStr);
-      console.log('[AI Service] Chant generated:', chant.content?.substring(0, 50) + '...');
-    } catch (e) {
-      console.warn('[AI Service] Failed to parse chant response:', e);
-      chant = generateFallbackChant(context);
+    if (data?.content) {
+      console.log('[AI Service] AI chant generated:', data.content.substring(0, 50) + '...');
+      return {
+        content: data.content,
+        mood: data.mood,
+        suggestedHashtags: data.suggestedHashtags,
+        createdAt: new Date().toISOString(),
+      };
     }
-
-    return {
-      content: chant.content,
-      mood: chant.mood,
-      suggestedHashtags: chant.suggestedHashtags,
-      createdAt: new Date().toISOString(),
-    };
     
+    return generateFallbackChant(context);
   } catch (error) {
-    console.error('[AI Service] Chant generation failed:', error);
+    console.warn('[AI Service] Chant generation failed, using fallback:', error);
     return generateFallbackChant(context);
   }
 }
@@ -202,138 +123,67 @@ export async function generatePrediction(params: PredictionParams): Promise<Matc
   console.log('[AI Service] Generating prediction for:', match.homeTeam.name, 'vs', match.awayTeam.name);
   
   try {
-    const zai = await getZAI();
-    if (!zai) {
-      console.warn('[AI Service] ZAI not available, using algorithmic fallback');
-      return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
-    }
-
-    const systemPrompt = `You are an expert football/soccer analyst AI with deep knowledge of:
-- Team tactics and playing styles
-- Player psychology and momentum
-- Home/away performance dynamics
-- League context and pressure situations
-
-Your predictions should be nuanced and VARIED. Consider:
-- A team in great form may still struggle against certain styles
-- Home advantage varies by team (typically 10-15%)
-- Recent high-scoring games may indicate defensive issues
-- Win streaks eventually face regression pressure
-
-CRITICAL: Vary your predictions significantly! Not every match is 2-1. 
-Realistic scores include: 0-0, 1-0, 1-1, 2-0, 2-1, 3-0, 3-1, 3-2, 4-0, 4-1, etc.
-Base predictions on the ACTUAL data provided.
-
-Always respond with ONLY valid JSON, no markdown.`;
-
-    const homeFormString = homeForm 
-      ? `Form Score: ${homeForm.formScore}%
-Recent Results: ${homeForm.lastMatches.map(m => `${m.result}(${m.goalsFor}-${m.goalsAgainst})`).join(', ')}
-${homeForm.winStreak ? `Win Streak: ${homeForm.winStreak} games` : ''}
-${homeForm.unbeatenStreak ? `Unbeaten: ${homeForm.unbeatenStreak} games` : ''}`
-      : 'Form: Unknown - assume average form';
-
-    const awayFormString = awayForm
-      ? `Form Score: ${awayForm.formScore}%
-Recent Results: ${awayForm.lastMatches.map(m => `${m.result}(${m.goalsFor}-${m.goalsAgainst})`).join(', ')}
-${awayForm.winStreak ? `Win Streak: ${awayForm.winStreak} games` : ''}
-${awayForm.unbeatenStreak ? `Unbeaten: ${awayForm.unbeatenStreak} games` : ''}`
-      : 'Form: Unknown - assume average form';
-
-    const userPrompt = `Predict this football match:
-
-MATCH: ${match.homeTeam.name} (Home) vs ${match.awayTeam.name} (Away)
-${match.league?.name ? `LEAGUE: ${match.league.name}` : ''}
-
-HOME TEAM (${match.homeTeam.name}):
-${homeFormString}
-${standings?.find(s => s.teamName.toLowerCase().includes(match.homeTeam.name.toLowerCase()))?.rank ? `League Position: ${standings.find(s => s.teamName.toLowerCase().includes(match.homeTeam.name.toLowerCase()))?.rank}` : ''}
-
-AWAY TEAM (${match.awayTeam.name}):
-${awayFormString}
-${standings?.find(s => s.teamName.toLowerCase().includes(match.awayTeam.name.toLowerCase()))?.rank ? `League Position: ${standings.find(s => s.teamName.toLowerCase().includes(match.awayTeam.name.toLowerCase()))?.rank}` : ''}
-
-Based on ALL this data, provide your expert prediction. Vary the scoreline based on the actual data!
-
-JSON only:
-{
-  "homeWin": <0-100>,
-  "draw": <0-100>,
-  "awayWin": <0-100>,
-  "predictedScore": { "home": <realistic goals>, "away": <realistic goals> },
-  "confidence": <55-85>,
-  "analysis": "<2-3 sentence specific analysis for THIS match>",
-  "keyFactors": ["factor1", "factor2", "factor3", "factor4"]
-}`;
-
-    console.log('[AI Service] Calling AI for match prediction...');
-    
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.8,
-      max_tokens: 500,
+    // Try Supabase Edge Function first
+    const { data, error } = await supabase.functions.invoke('ai-predict', {
+      body: {
+        homeTeam: match.homeTeam.name,
+        awayTeam: match.awayTeam.name,
+        league: match.league.name,
+        homeForm: homeForm ? {
+          formScore: homeForm.formScore,
+          lastMatches: homeForm.lastMatches,
+          winStreak: homeForm.winStreak,
+          unbeatenStreak: homeForm.unbeatenStreak,
+        } : undefined,
+        awayForm: awayForm ? {
+          formScore: awayForm.formScore,
+          lastMatches: awayForm.lastMatches,
+          winStreak: awayForm.winStreak,
+          unbeatenStreak: awayForm.unbeatenStreak,
+        } : undefined,
+        standings: {
+          homeRank: standings?.find(s => 
+            s.teamName.toLowerCase().includes(match.homeTeam.name.toLowerCase()) ||
+            match.homeTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
+          )?.rank,
+          awayRank: standings?.find(s => 
+            s.teamName.toLowerCase().includes(match.awayTeam.name.toLowerCase()) ||
+            match.awayTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
+          )?.rank,
+        },
+      },
     });
 
-    const responseText = completion.choices[0]?.message?.content || '';
-    console.log('[AI Service] AI response received');
-    
-    // Parse JSON
-    let prediction;
-    try {
-      let jsonStr = responseText.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim();
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) jsonStr = jsonMatch[0];
-      prediction = JSON.parse(jsonStr);
-      console.log('[AI Service] Prediction:', prediction.homeWin + '%', '-', prediction.draw + '%', '-', prediction.awayWin + '%', 'Score:', prediction.predictedScore.home + '-' + prediction.predictedScore.away);
-    } catch (e) {
-      console.warn('[AI Service] Failed to parse prediction response:', e);
+    if (error) {
+      console.warn('[AI Service] Edge function error, using fallback:', error.message);
       return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
     }
 
-    // Normalize percentages
-    const total = prediction.homeWin + prediction.draw + prediction.awayWin;
-    if (Math.abs(total - 100) > 5) {
-      prediction.homeWin = Math.round((prediction.homeWin / total) * 100);
-      prediction.draw = Math.round((prediction.draw / total) * 100);
-      prediction.awayWin = 100 - prediction.homeWin - prediction.draw;
+    if (data?.homeWin !== undefined) {
+      console.log('[AI Service] AI prediction:', data.homeWin + '%', '-', data.draw + '%', '-', data.awayWin + '%');
+      return {
+        matchId: match.id,
+        homeTeam: match.homeTeam.name,
+        awayTeam: match.awayTeam.name,
+        prediction: {
+          homeWin: data.homeWin,
+          draw: data.draw,
+          awayWin: data.awayWin,
+        },
+        predictedScore: data.predictedScore,
+        confidence: data.confidence,
+        factors: [
+          { type: 'analysis', description: data.analysis, impact: 'neutral' },
+          ...data.keyFactors.map((f: string) => ({ type: 'analysis', description: f, impact: 'neutral' as const }))
+        ],
+        keyPlayers: { home: [], away: [] },
+        generatedAt: new Date().toISOString(),
+      };
     }
-
-    // Build MatchPrediction
-    const result: MatchPrediction = {
-      matchId: match.id,
-      homeTeam: match.homeTeam.name,
-      awayTeam: match.awayTeam.name,
-      prediction: {
-        homeWin: prediction.homeWin,
-        draw: prediction.draw,
-        awayWin: prediction.awayWin,
-      },
-      predictedScore: prediction.predictedScore,
-      confidence: prediction.confidence,
-      factors: prediction.keyFactors.map((f: string) => ({
-        type: 'analysis',
-        description: f,
-        impact: 'neutral' as const,
-      })),
-      keyPlayers: { home: [], away: [] },
-      generatedAt: new Date().toISOString(),
-    };
-
-    if (prediction.analysis) {
-      result.factors.unshift({
-        type: 'analysis',
-        description: prediction.analysis,
-        impact: 'neutral',
-      });
-    }
-
-    return result;
     
+    return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
   } catch (error) {
-    console.error('[AI Service] Prediction failed:', error);
+    console.warn('[AI Service] Prediction failed, using fallback:', error);
     return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
   }
 }
@@ -350,16 +200,14 @@ function generateAlgorithmicPrediction(
   const homeFormScore = homeForm?.formScore || 50;
   const awayFormScore = awayForm?.formScore || 50;
   
-  let homeStrength = homeFormScore + 10; // Home advantage
+  let homeStrength = homeFormScore + 10;
   let awayStrength = awayFormScore;
   
-  // Form bonuses
   if (homeForm?.winStreak && homeForm.winStreak >= 3) homeStrength += 8;
   if (awayForm?.winStreak && awayForm.winStreak >= 3) awayStrength += 8;
   if (homeForm?.unbeatenStreak && homeForm.unbeatenStreak >= 5) homeStrength += 5;
   if (awayForm?.unbeatenStreak && awayForm.unbeatenStreak >= 5) awayStrength += 5;
   
-  // Standing factor
   const homeRank = standings?.find(s => 
     s.teamName.toLowerCase().includes(match.homeTeam.name.toLowerCase()) ||
     match.homeTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
@@ -373,7 +221,6 @@ function generateAlgorithmicPrediction(
     homeStrength += (awayRank - homeRank) * 1.5;
   }
   
-  // Calculate probabilities with some randomness
   const randomFactor = Math.random() * 10 - 5;
   const total = homeStrength + awayStrength + 35;
   
@@ -381,25 +228,18 @@ function generateAlgorithmicPrediction(
   const awayWin = Math.max(10, Math.min(60, Math.round(((awayStrength - randomFactor) / total) * 100)));
   const draw = 100 - homeWin - awayWin;
   
-  // Varied score prediction
   const homeGoals = Math.max(0, Math.min(5, Math.round((homeWin / 100) * 3 + Math.random() * 1.5)));
   const awayGoals = Math.max(0, Math.min(4, Math.round((awayWin / 100) * 2.5 + Math.random())));
   
   const factors: MatchPrediction['factors'] = [
-    { type: 'home_advantage', description: `${match.homeTeam.name} has home advantage (+10%)`, impact: 'positive' },
+    { type: 'home_advantage', description: `${match.homeTeam.name} has home advantage`, impact: 'positive' },
   ];
   
   if (homeForm && homeForm.formScore >= 70) {
-    factors.push({ type: 'form', description: `${match.homeTeam.name} in excellent form (${homeForm.formScore}%)`, impact: 'positive' });
+    factors.push({ type: 'form', description: `${match.homeTeam.name} in good form (${homeForm.formScore}%)`, impact: 'positive' });
   }
   if (awayForm && awayForm.formScore >= 70) {
-    factors.push({ type: 'form', description: `${match.awayTeam.name} in excellent form (${awayForm.formScore}%)`, impact: 'positive' });
-  }
-  if (homeForm?.winStreak && homeForm.winStreak >= 3) {
-    factors.push({ type: 'momentum', description: `${match.homeTeam.name} on ${homeForm.winStreak}-match win streak`, impact: 'positive' });
-  }
-  if (awayForm?.winStreak && awayForm.winStreak >= 3) {
-    factors.push({ type: 'momentum', description: `${match.awayTeam.name} on ${awayForm.winStreak}-match win streak`, impact: 'positive' });
+    factors.push({ type: 'form', description: `${match.awayTeam.name} in good form (${awayForm.formScore}%)`, impact: 'positive' });
   }
   
   return {
