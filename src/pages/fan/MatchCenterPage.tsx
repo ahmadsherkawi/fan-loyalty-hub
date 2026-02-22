@@ -58,8 +58,10 @@ export default function MatchCenterPage() {
   const [club, setClub] = useState<Club | null>(null);
   const [liveMatches, setLiveMatches] = useState<FootballMatch[]>([]);
   const [upcomingMatches, setUpcomingMatches] = useState<FootballMatch[]>([]);
+  const [pastMatches, setPastMatches] = useState<FootballMatch[]>([]);
   const [allLiveMatches, setAllLiveMatches] = useState<FootballMatch[]>([]);
   const [allUpcomingMatches, setAllUpcomingMatches] = useState<FootballMatch[]>([]);
+  const [allPastMatches, setAllPastMatches] = useState<FootballMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -119,20 +121,36 @@ export default function MatchCenterPage() {
       const live = await footballApi.getLiveMatches();
       setAllLiveMatches(live);
 
-      // Get upcoming matches for next 7 days using multiple approaches
+      // Get upcoming matches for next 7 days
       const upcomingFixtures: FootballMatch[] = [];
       const liveIds = new Set(live.map(m => m.id));
       const upcomingIds = new Set<string>();
       
-      // Approach 1: Get SPECIFIC club fixtures first (most important!)
+      // Get past matches for last 7 days
+      const pastFixtures: FootballMatch[] = [];
+      const pastIds = new Set<string>();
+      
+      // Approach 1: Get SPECIFIC club fixtures (upcoming AND past) first!
       if (club?.name) {
-        console.log(`[MatchCenter] Fetching specific fixtures for club: ${club.name}`);
-        const clubMatches = await footballApi.getTeamFixtures(club.name, 7);
-        console.log(`[MatchCenter] Found ${clubMatches.length} fixtures for ${club.name}`);
-        for (const match of clubMatches) {
+        console.log(`[MatchCenter] Fetching fixtures for club: ${club.name}`);
+        
+        // Upcoming
+        const clubUpcoming = await footballApi.getTeamFixtures(club.name, 7);
+        console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming fixtures for ${club.name}`);
+        for (const match of clubUpcoming) {
           if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
             upcomingIds.add(match.id);
             upcomingFixtures.push(match);
+          }
+        }
+        
+        // Past
+        const clubPast = await footballApi.getTeamPastMatches(club.name, 7);
+        console.log(`[MatchCenter] Found ${clubPast.length} past matches for ${club.name}`);
+        for (const match of clubPast) {
+          if (!pastIds.has(match.id)) {
+            pastIds.add(match.id);
+            pastFixtures.push(match);
           }
         }
       }
@@ -156,9 +174,7 @@ export default function MatchCenterPage() {
         date.setDate(date.getDate() + i);
         const dateStr = date.toISOString().split('T')[0];
         
-        console.log(`[MatchCenter] Fetching fixtures for ${dateStr}`);
         const dayMatches = await footballApi.getFixturesByDate(dateStr);
-        console.log(`[MatchCenter] Found ${dayMatches.length} matches for ${dateStr}`);
         
         for (const match of dayMatches) {
           // Add scheduled, postponed matches that aren't live or already added
@@ -169,14 +185,18 @@ export default function MatchCenterPage() {
         }
       }
       
-      console.log(`[MatchCenter] Total upcoming fixtures: ${upcomingFixtures.length}`);
+      console.log(`[MatchCenter] Total upcoming: ${upcomingFixtures.length}, past: ${pastFixtures.length}`);
       
       // Sort by datetime
       upcomingFixtures.sort((a, b) => 
         new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
       );
+      pastFixtures.sort((a, b) => 
+        new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      );
       
       setAllUpcomingMatches(upcomingFixtures);
+      setAllPastMatches(pastFixtures);
 
       // Filter for fan's club if available
       if (club && !showAllMatches) {
@@ -194,12 +214,20 @@ export default function MatchCenterPage() {
             m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
           )
         );
+        const clubPast = pastFixtures.filter(m =>
+          clubNameVariants.some(name =>
+            m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
+            m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
+          )
+        );
         
         setLiveMatches(clubLive);
         setUpcomingMatches(clubUpcoming);
+        setPastMatches(clubPast);
       } else {
         setLiveMatches(live);
         setUpcomingMatches(upcomingFixtures);
+        setPastMatches(pastFixtures);
       }
     } catch (error) {
       console.error('Failed to fetch match data:', error);
@@ -272,7 +300,8 @@ export default function MatchCenterPage() {
 
   const filteredLive = filterMatches(showAllMatches ? allLiveMatches : liveMatches);
   const filteredUpcoming = filterMatches(showAllMatches ? allUpcomingMatches : upcomingMatches);
-  const allMatches = [...allLiveMatches, ...allUpcomingMatches];
+  const filteredPast = filterMatches(showAllMatches ? allPastMatches : pastMatches);
+  const allMatches = [...allLiveMatches, ...allUpcomingMatches, ...allPastMatches];
   const leagues = getLeagues(allMatches);
 
   return (
@@ -377,17 +406,39 @@ export default function MatchCenterPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="live" className="w-full">
-          <TabsList className="w-full h-10 bg-muted/30">
-            <TabsTrigger value="live" className="flex-1 h-8 text-xs data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400">
+          <TabsList className="w-full h-10 bg-muted/30 grid grid-cols-3">
+            <TabsTrigger value="past" className="h-8 text-xs">
+              Past ({filteredPast.length})
+            </TabsTrigger>
+            <TabsTrigger value="live" className="h-8 text-xs data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400">
               <span className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full bg-red-500 ${filteredLive.length > 0 ? 'animate-pulse' : ''}`} />
                 Live ({filteredLive.length})
               </span>
             </TabsTrigger>
-            <TabsTrigger value="upcoming" className="flex-1 h-8 text-xs">
+            <TabsTrigger value="upcoming" className="h-8 text-xs">
               Upcoming ({filteredUpcoming.length})
             </TabsTrigger>
           </TabsList>
+
+          {/* Past Matches */}
+          <TabsContent value="past" className="mt-4 space-y-3">
+            {filteredPast.length === 0 ? (
+              <div className="text-center py-12">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <p className="text-muted-foreground">No past matches in the last 7 days</p>
+              </div>
+            ) : (
+              filteredPast.map((match) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  onSelect={() => setSelectedMatch(match)}
+                  isFinished
+                />
+              ))
+            )}
+          </TabsContent>
 
           {/* Live Matches */}
           <TabsContent value="live" className="mt-4 space-y-3">
@@ -465,7 +516,7 @@ export default function MatchCenterPage() {
 }
 
 // Match Card Component
-function MatchCard({ match, onSelect, isLive = false }: { match: FootballMatch; onSelect: () => void; isLive?: boolean }) {
+function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { match: FootballMatch; onSelect: () => void; isLive?: boolean; isFinished?: boolean }) {
   const getElapsedTime = (m: FootballMatch) => {
     if (!m.elapsed) return null;
     if (m.elapsed > 45 && m.elapsed < 60) return 'HT';
@@ -485,6 +536,11 @@ function MatchCard({ match, onSelect, isLive = false }: { match: FootballMatch; 
           {isLive && (
             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse text-[10px]">
               LIVE {getElapsedTime(match)}
+            </Badge>
+          )}
+          {isFinished && (
+            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-[10px]">
+              FT
             </Badge>
           )}
           <span className="text-[10px] text-muted-foreground">{match.league.name}</span>
@@ -513,9 +569,9 @@ function MatchCard({ match, onSelect, isLive = false }: { match: FootballMatch; 
         </div>
 
         {/* Score / VS */}
-        <div className={`text-xl font-display font-bold px-4 ${isLive ? '' : 'text-muted-foreground text-base'}`}>
-          {isLive || match.status === 'finished' ? (
-            `${match.homeTeam.score} - ${match.awayTeam.score}`
+        <div className={`text-xl font-display font-bold px-4 ${isLive || isFinished ? '' : 'text-muted-foreground text-base'}`}>
+          {isLive || isFinished || match.status === 'finished' ? (
+            `${match.homeTeam.score ?? 0} - ${match.awayTeam.score ?? 0}`
           ) : (
             'vs'
           )}
