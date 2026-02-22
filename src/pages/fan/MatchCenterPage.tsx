@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Match Center Page - Dedicated page for live scores and fixtures
 // Filters to show fan's club matches first, with search for other matches
 

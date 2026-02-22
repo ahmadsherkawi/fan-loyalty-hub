@@ -23,8 +23,8 @@ export const pageVariants = {
     scale: 1,
     transition: {
       duration: 0.35,
-      ease: [0.25, 0.1, 0.25, 1],
-      when: "beforeChildren",
+      ease: [0.25, 0.1, 0.25, 1] as const,
+      when: "beforeChildren" as const,
     },
   },
   exit: {
@@ -33,7 +33,7 @@ export const pageVariants = {
     scale: 0.995,
     transition: {
       duration: 0.25,
-      ease: [0.25, 0.1, 0.25, 1],
+      ease: [0.25, 0.1, 0.25, 1] as const,
     },
   },
 };
@@ -46,14 +46,14 @@ export const fadeVariants = {
     opacity: 1,
     transition: {
       duration: 0.3,
-      ease: "easeOut",
+      ease: "easeOut" as const,
     },
   },
   exit: {
     opacity: 0,
     transition: {
       duration: 0.2,
-      ease: "easeIn",
+      ease: "easeIn" as const,
     },
   },
 };
@@ -68,7 +68,7 @@ export const slideVariants = {
     x: 0,
     transition: {
       duration: 0.35,
-      ease: [0.25, 0.1, 0.25, 1],
+      ease: [0.25, 0.1, 0.25, 1] as const,
     },
   },
   exit: {
@@ -76,7 +76,7 @@ export const slideVariants = {
     x: -20,
     transition: {
       duration: 0.25,
-      ease: [0.25, 0.1, 0.25, 1],
+      ease: [0.25, 0.1, 0.25, 1] as const,
     },
   },
 };
@@ -91,7 +91,7 @@ export const scaleVariants = {
     scale: 1,
     transition: {
       duration: 0.35,
-      ease: [0.34, 1.56, 0.64, 1], // Spring-like bounce
+      ease: [0.34, 1.56, 0.64, 1] as const,
     },
   },
   exit: {
@@ -99,7 +99,7 @@ export const scaleVariants = {
     scale: 0.95,
     transition: {
       duration: 0.2,
-      ease: "easeIn",
+      ease: "easeIn" as const,
     },
   },
 };
@@ -128,7 +128,7 @@ export const staggerItemVariants = {
     y: 0,
     transition: {
       duration: 0.35,
-      ease: [0.25, 0.1, 0.25, 1],
+      ease: [0.25, 0.1, 0.25, 1] as const,
     },
   },
 };
