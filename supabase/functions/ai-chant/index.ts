@@ -1,95 +1,107 @@
+// Supabase Edge Function: AI Chant Generation
+// Uses OpenAI API directly via fetch (works in Deno)
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface ChantRequest {
   clubName: string;
-  context: string;
+  context: 'match_day' | 'victory' | 'defeat' | 'player_praise' | 'derby' | 'team_spirit' | 'celebration';
   opponent?: string;
   players?: string[];
   stadium?: string;
   fanName?: string;
-  style?: string;
+  style?: 'traditional' | 'modern' | 'funny' | 'passionate';
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
+
+  console.log('[AI Chant] Received request');
 
   try {
     const data: ChantRequest = await req.json();
     console.log('[AI Chant] Club:', data.clubName, 'Context:', data.context);
 
-    const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!apiKey) {
-      console.error('[AI Chant] LOVABLE_API_KEY not set');
+    // Get OpenAI API key from environment
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (!openaiKey) {
+      console.warn('[AI Chant] No OPENAI_API_KEY, using fallback');
       return new Response(JSON.stringify(generateFallbackChant(data)), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const styleGuides: Record<string, string> = {
+    const styleGuides = {
       traditional: 'Classic terrace-style: simple, repetitive, call-and-response.',
-      modern: 'Contemporary: current slang, viral-style, TikTok-friendly.',
-      funny: 'Humorous: clever puns, witty observations, light-hearted.',
-      passionate: 'Deep emotional: intense devotion, pride, spine-tingling.',
+      modern: 'Contemporary: current slang, viral-style.',
+      funny: 'Humorous: clever puns, witty.',
+      passionate: 'Deep emotional: intense devotion, pride.'
     };
 
-    const contextGuides: Record<string, string> = {
-      match_day: 'Building anticipation for an upcoming match.',
-      victory: 'Celebrating a win! Pure joy.',
+    const contextGuides = {
+      match_day: 'Building anticipation for a match.',
+      victory: 'Celebrating a win!',
       defeat: 'Unwavering loyalty despite losing.',
       player_praise: 'Honoring a specific player.',
-      derby: 'Intense rivalry. Local pride.',
+      derby: 'Intense rivalry match.',
       team_spirit: 'Core club identity and loyalty.',
-      celebration: 'Special occasion - trophy, anniversary.',
+      celebration: 'Special occasion celebration.'
     };
 
-    const userPrompt = `Create an ORIGINAL football chant for ${data.clubName}.
-Context: ${contextGuides[data.context] || data.context}
-${data.opponent ? `Opponent: ${data.opponent}` : ''}
-${data.players?.length ? `Players: ${data.players.join(', ')}` : ''}
-Style: ${styleGuides[data.style || 'passionate']}
+    const systemPrompt = `You are a passionate football ultra and creative chant writer. Create ORIGINAL chants that real fans would sing.
 
-Respond with ONLY valid JSON:
-{"content":"<chant with \\n for line breaks>","mood":"<passionate|celebratory|defiant|supportive|humorous>","suggestedHashtags":["#Tag1","#Tag2","#Tag3"]}`;
+Requirements:
+- 100% ORIGINAL
+- Rhythmic with clear beat
+- 4-8 lines max
+- Passionate but respectful
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+Respond with ONLY valid JSON.`;
+
+    const userPrompt = `Create an ORIGINAL football chant:
+
+CLUB: ${data.clubName}
+CONTEXT: ${contextGuides[data.context] || data.context}
+${data.opponent ? `OPPONENT: ${data.opponent}` : ''}
+${data.players?.length ? `PLAYERS: ${data.players.join(', ')}` : ''}
+STYLE: ${styleGuides[data.style || 'passionate']}
+
+JSON only:
+{"content":"chant with \\n for breaks","mood":"passionate|celebratory|defiant|supportive|humorous","suggestedHashtags":["#tag1","#tag2","#tag3"]}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a passionate football chant writer. Create ORIGINAL chants. 4-8 lines, rhythmic, easy to sing. Respond with ONLY valid JSON.' },
-          { role: 'user', content: userPrompt },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
         temperature: 1.0,
-        max_tokens: 400,
+        max_tokens: 300,
       }),
     });
 
-    if (!response.ok) {
-      console.error('[AI Chant] AI gateway error:', response.status);
-      return new Response(JSON.stringify(generateFallbackChant(data)), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const completion = await response.json();
-    const responseText = completion.choices?.[0]?.message?.content || '';
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || '';
+    console.log('[AI Chant] OpenAI response received');
 
     let chant;
     try {
-      const jsonStr = responseText.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim();
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      chant = JSON.parse(jsonMatch ? jsonMatch[0] : jsonStr);
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      chant = jsonMatch ? JSON.parse(jsonMatch[0]) : generateFallbackChant(data);
     } catch {
       chant = generateFallbackChant(data);
     }
@@ -99,10 +111,8 @@ Respond with ONLY valid JSON:
     });
 
   } catch (error) {
-    console.error('[AI Chant] Error:', error?.message || error);
-    // Return fallback chant instead of 500
-    const fallback = generateFallbackChant(data);
-    return new Response(JSON.stringify(fallback), {
+    console.error('[AI Chant] Error:', error);
+    return new Response(JSON.stringify(generateFallbackChant({ clubName: 'Our Team', context: 'match_day' })), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -110,11 +120,45 @@ Respond with ONLY valid JSON:
 
 function generateFallbackChant(data: ChantRequest) {
   const clubName = data.clubName || 'Our Team';
-  const chants: Record<string, any> = {
-    match_day: { content: `Here we go, ${clubName}'s on fire!\nWe'll never stop, we'll never tire!\nFrom the first whistle to the last,\nWe're the team that's built to last!`, mood: 'passionate', suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}FC`, '#MatchDay', '#TerraceAnthem'] },
-    victory: { content: `What a night for ${clubName}!\nThree points secured, the job is done!\nThe fans are singing, voices raised,\nThis is why we're football crazed!`, mood: 'celebratory', suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Win`, '#ThreePoints', '#Victory'] },
-    defeat: { content: `We stand tall, we don't give in,\n${clubName} through thick and thin!\nOne result won't break our will,\nWe'll be back stronger still!`, mood: 'defiant', suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Always`, '#Unconditional', '#TrueFans'] },
-    team_spirit: { content: `Through the years, through the tears,\n${clubName} is why we're here!\nIn the stands or on the pitch,\nLove for club will never switch!`, mood: 'supportive', suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Family`, '#Forever', '#Loyalty'] },
+  const player = data.players?.[0] || '';
+  
+  const chants: Record<string, { content: string; mood: string; suggestedHashtags: string[] }> = {
+    match_day: {
+      content: `Here we go, ${clubName}'s on fire!\nWe'll never stop, we'll never tire!\nFrom the first whistle to the last,\nWe're the team that's built to last!`,
+      mood: 'passionate',
+      suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}FC`, '#MatchDay', '#TerraceAnthem']
+    },
+    victory: {
+      content: `What a night for ${clubName}!\nThree points secured, the job is done!\nThe fans are singing, voices raised,\nThis is why we're football crazed!`,
+      mood: 'celebratory',
+      suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Win`, '#ThreePoints', '#Victory']
+    },
+    defeat: {
+      content: `We stand tall, we don't give in,\n${clubName} through thick and thin!\nOne result won't break our will,\nWe'll be back stronger still!`,
+      mood: 'defiant',
+      suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Always`, '#Unconditional', '#TrueFans']
+    },
+    player_praise: {
+      content: `${player} on the ball, watch them glide!\nEvery touch is filled with pride!\n${clubName}'s star, shining bright,\nLighting up the pitch tonight!`,
+      mood: 'celebratory',
+      suggestedHashtags: [`#${(player || 'Hero').replace(/\s+/g, '')}`, '#StarPlayer', '#MatchWinner']
+    },
+    derby: {
+      content: `This is our city, this is our ground!\n${clubName} fans make every sound!\nAgainst ${data.opponent || 'our rivals'}, we'll show our might,\nThis derby is ours tonight!`,
+      mood: 'passionate',
+      suggestedHashtags: ['#DerbyDay', `#${clubName.replace(/\s+/g, '')}Derby`, '#OurCity']
+    },
+    team_spirit: {
+      content: `Through the years, through the tears,\n${clubName} is why we're here!\nIn the stands or on the pitch,\nLove for club will never switch!`,
+      mood: 'supportive',
+      suggestedHashtags: [`#${clubName.replace(/\s+/g, '')}Family`, '#Forever', '#Loyalty']
+    },
+    celebration: {
+      content: `Raise the flags, sound the horn!\n${clubName} fans were proudly born!\nCelebrate this special day,\nIn our hearts you'll always stay!`,
+      mood: 'celebratory',
+      suggestedHashtags: ['#Celebration', `#${clubName.replace(/\s+/g, '')}Forever`, '#SpecialDay']
+    }
   };
+
   return chants[data.context] || chants.match_day;
 }
