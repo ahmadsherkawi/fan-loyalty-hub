@@ -197,28 +197,36 @@ export default function MatchCenterPage() {
         setAllUpcomingMatches(upcomingFixtures);
         setAllPastMatches(pastFixtures);
 
+        // Log what we have for debugging
+        console.log('[MatchCenter] Sample upcoming match:', upcomingFixtures[0]);
+        console.log('[MatchCenter] Club name for filtering:', club?.name);
+        console.log('[MatchCenter] Club name variants:', getClubNameVariants(club?.name || ''));
+
         // Filter for fan's club if available
         if (club && !showAllMatches) {
           const clubNameVariants = getClubNameVariants(club.name);
           
+          // More flexible matching - check if ANY variant matches
+          const matchesClub = (teamName: string) => {
+            const teamLower = teamName.toLowerCase();
+            return clubNameVariants.some(variant => {
+              const variantLower = variant.toLowerCase();
+              // Match if team name contains variant OR variant contains team name
+              return teamLower.includes(variantLower) || variantLower.includes(teamLower);
+            });
+          };
+          
           const clubLive = live.filter(m => 
-            clubNameVariants.some(name => 
-              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-            )
+            matchesClub(m.homeTeam.name) || matchesClub(m.awayTeam.name)
           );
           const clubUpcoming = upcomingFixtures.filter(m =>
-            clubNameVariants.some(name =>
-              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-            )
+            matchesClub(m.homeTeam.name) || matchesClub(m.awayTeam.name)
           );
           const clubPast = pastFixtures.filter(m =>
-            clubNameVariants.some(name =>
-              m.homeTeam.name.toLowerCase().includes(name.toLowerCase()) ||
-              m.awayTeam.name.toLowerCase().includes(name.toLowerCase())
-            )
+            matchesClub(m.homeTeam.name) || matchesClub(m.awayTeam.name)
           );
+          
+          console.log('[MatchCenter] Filtered - Live:', clubLive.length, 'Upcoming:', clubUpcoming.length, 'Past:', clubPast.length);
           
           setLiveMatches(clubLive);
           setUpcomingMatches(clubUpcoming);
