@@ -135,11 +135,21 @@ async function fetchApiFootball<T>(endpoint: string, params: Record<string, stri
 
 async function fetchTheSportsDB<T>(endpoint: string): Promise<T | null> {
   try {
-    // Use CORS proxy for browser requests
-    const url = `${CORS_PROXY}${encodeURIComponent(`${THESPORTSDB_BASE}/${endpoint}`)}`;
-    const response = await fetch(url);
-    if (!response.ok) return null;
+    // Use CORS proxy for browser requests - different format
+    const fullUrl = `${THESPORTSDB_BASE}/${endpoint}`;
+    const proxyUrl = `${CORS_PROXY}${fullUrl}`;
+    console.log('[TheSportsDB] Fetching:', proxyUrl);
+    
+    const response = await fetch(proxyUrl);
+    console.log('[TheSportsDB] Response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('[TheSportsDB] Response not OK:', response.status, response.statusText);
+      return null;
+    }
+    
     const data = await response.json();
+    console.log('[TheSportsDB] Response data:', JSON.stringify(data).substring(0, 200));
     return data as T;
   } catch (error) {
     console.error('TheSportsDB fetch error:', error);
@@ -209,9 +219,15 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
 
   // Try multiple lookup strategies
   const teamNameLower = teamId.toLowerCase().trim();
-  let tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
+  let tsdbTeamId: string | null = null;
   
-  // If not found, try partial matching
+  // 1. Direct match in our known teams
+  tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
+  if (tsdbTeamId) {
+    console.log(`[FootballAPI] Found team via direct match: ${teamId} -> ${tsdbTeamId}`);
+  }
+  
+  // 2. Partial matching
   if (!tsdbTeamId) {
     for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
       if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
@@ -222,51 +238,60 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     }
   }
   
-  // Try searching for the team if still not found
+  // 3. Word matching (e.g., "Real Madrid FC" matches "real madrid")
+  if (!tsdbTeamId) {
+    const words = teamNameLower.split(/\s+/);
+    for (const word of words) {
+      if (word.length >= 4) { // Only match words with 4+ chars
+        for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
+          if (name.includes(word) || word.includes(name)) {
+            tsdbTeamId = id;
+            console.log(`[FootballAPI] Found team ID via word match: ${word} -> ${name} -> ${id}`);
+            break;
+          }
+        }
+        if (tsdbTeamId) break;
+      }
+    }
+  }
+  
+  // 4. Search API for the team
   if (!tsdbTeamId) {
     try {
       const searchResult = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(
         `searchteams.php?t=${encodeURIComponent(teamId)}`
       );
+      console.log('[FootballAPI] Search result for', teamId, ':', searchResult);
       if (searchResult?.teams?.[0]?.idTeam) {
         tsdbTeamId = searchResult.teams[0].idTeam;
-        console.log(`[FootballAPI] Found team via search: ${teamId} -> ${tsdbTeamId}`);
+        console.log(`[FootballAPI] Found team via API search: ${teamId} -> ${tsdbTeamId}`);
       }
     } catch (err) {
       console.warn('[FootballAPI] Team search failed:', err);
     }
   }
 
+  if (!tsdbTeamId) {
+    console.warn('[FootballAPI] Could not find team ID for:', teamId);
+    return [];
+  }
+
   // Try TheSportsDB eventsnext (ALL competitions for this team)
-  if (tsdbTeamId) {
-    try {
-      const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
-        `eventsnext.php?id=${tsdbTeamId}`
-      );
-      
-      console.log('[FootballAPI] TheSportsDB eventsnext response:', nextEvents);
-      
-      if (nextEvents?.events && nextEvents.events.length > 0) {
-        console.log(`[FootballAPI] Found ${nextEvents.events.length} upcoming events for team ${teamId}`);
-        // Filter by date range and log each event
-        const now = new Date();
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + days);
-        
-        const filteredEvents = nextEvents.events.filter(e => {
-          const eventDate = new Date(e.strTimestamp || e.dateEvent || '');
-          const inRange = eventDate >= now && eventDate <= maxDate;
-          console.log(`[FootballAPI] Event: ${e.strHomeTeam} vs ${e.strAwayTeam} - ${e.strLeague} - ${eventDate.toISOString()} - inRange: ${inRange}`);
-          return inRange;
-        });
-        
-        const matches = filteredEvents.map(transformTheSportsDBEvent);
-        setCache(cacheKey, matches);
-        return matches;
-      }
-    } catch (err) {
-      console.warn('[FootballAPI] TheSportsDB eventsnext failed:', err);
+  try {
+    const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
+      `eventsnext.php?id=${tsdbTeamId}`
+    );
+    
+    console.log('[FootballAPI] eventsnext.php response for', tsdbTeamId, ':', nextEvents);
+    
+    if (nextEvents?.events && nextEvents.events.length > 0) {
+      console.log(`[FootballAPI] Found ${nextEvents.events.length} upcoming events for team ${teamId}`);
+      const matches = nextEvents.events.map(transformTheSportsDBEvent);
+      setCache(cacheKey, matches);
+      return matches;
     }
+  } catch (err) {
+    console.warn('[FootballAPI] TheSportsDB eventsnext failed:', err);
   }
 
   return [];
