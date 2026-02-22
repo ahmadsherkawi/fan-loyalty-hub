@@ -15,6 +15,20 @@ import type {
 // API base URL - uses Vite proxy in development
 const AI_API_BASE = '/api/ai';
 
+// Check if AI server is available
+async function checkAIServer(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/health', { 
+      method: 'GET',
+      signal: AbortSignal.timeout(2000) // 2 second timeout
+    });
+    return response.ok;
+  } catch {
+    console.warn('[AI Service] AI server not available at /api/health');
+    return false;
+  }
+}
+
 // ================= CHANT GENERATION =================
 
 interface ChantGenerationParams {
@@ -26,7 +40,17 @@ interface ChantGenerationParams {
 export async function generateChant(params: ChantGenerationParams): Promise<GeneratedChant> {
   const { context, fanName, style } = params;
   
+  console.log('[AI Service] Generating chant for:', context.clubName, '- Type:', context.type);
+  
   try {
+    // Check if AI server is running
+    const serverAvailable = await checkAIServer();
+    if (!serverAvailable) {
+      console.warn('[AI Service] AI server not available, using fallback');
+      return generateFallbackChant(context);
+    }
+    
+    console.log('[AI Service] Calling AI API for chant generation...');
     const response = await fetch(`${AI_API_BASE}/generate-chant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,10 +66,13 @@ export async function generateChant(params: ChantGenerationParams): Promise<Gene
     });
 
     if (!response.ok) {
-      throw new Error('AI API request failed');
+      console.error('[AI Service] Chant API error:', response.status, response.statusText);
+      throw new Error(`AI API request failed: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('[AI Service] Chant generated successfully:', data.content?.substring(0, 50) + '...');
+    
     return {
       content: data.content,
       mood: data.mood,
@@ -53,7 +80,7 @@ export async function generateChant(params: ChantGenerationParams): Promise<Gene
       createdAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.warn('AI chant generation failed, using fallback:', error);
+    console.error('[AI Service] Chant generation failed:', error);
     return generateFallbackChant(context);
   }
 }
@@ -123,7 +150,18 @@ interface PredictionParams {
 export async function generatePrediction(params: PredictionParams): Promise<MatchPrediction> {
   const { match, homeForm, awayForm, standings } = params;
   
+  console.log('[AI Service] Generating prediction for:', match.homeTeam.name, 'vs', match.awayTeam.name);
+  
   try {
+    // Check if AI server is running
+    const serverAvailable = await checkAIServer();
+    if (!serverAvailable) {
+      console.warn('[AI Service] AI server not available, using algorithmic fallback');
+      return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
+    }
+    
+    console.log('[AI Service] Calling AI API for match prediction...');
+    
     // Call AI API for prediction
     const response = await fetch(`${AI_API_BASE}/predict-match`, {
       method: 'POST',
@@ -158,10 +196,12 @@ export async function generatePrediction(params: PredictionParams): Promise<Matc
     });
 
     if (!response.ok) {
-      throw new Error('AI API request failed');
+      console.error('[AI Service] Prediction API error:', response.status, response.statusText);
+      throw new Error(`AI API request failed: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('[AI Service] Prediction received:', data.homeWin + '%', '-', data.draw + '%', '-', data.awayWin + '%', 'Score:', data.predictedScore.home + '-' + data.predictedScore.away);
     
     // Convert API response to MatchPrediction format
     const prediction: MatchPrediction = {
@@ -195,7 +235,7 @@ export async function generatePrediction(params: PredictionParams): Promise<Matc
     
     return prediction;
   } catch (error) {
-    console.warn('AI prediction failed, using algorithmic fallback:', error);
+    console.error('[AI Service] Prediction failed:', error);
     return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
   }
 }
