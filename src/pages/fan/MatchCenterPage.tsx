@@ -122,23 +122,28 @@ export default function MatchCenterPage() {
       const upcomingFixtures: FootballMatch[] = [];
       const liveIds = new Set(live.map(m => m.id));
       
+      // Get today and the next 6 days (total 7 days)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
       for (let i = 0; i < 7; i++) {
-        const date = new Date();
+        const date = new Date(today);
         date.setDate(date.getDate() + i);
         const dateStr = date.toISOString().split('T')[0];
         
+        console.log(`[MatchCenter] Fetching fixtures for ${dateStr}`);
         const dayMatches = await footballApi.getFixturesByDate(dateStr);
+        console.log(`[MatchCenter] Found ${dayMatches.length} matches for ${dateStr}`);
         
         for (const match of dayMatches) {
-          // Only add scheduled matches that aren't live
-          if (match.status === 'scheduled' && !liveIds.has(match.id)) {
-            // Avoid duplicates
-            if (!upcomingFixtures.find(m => m.id === match.id)) {
-              upcomingFixtures.push(match);
-            }
+          // Add scheduled, postponed matches that aren't live or already added
+          if (!liveIds.has(match.id) && !upcomingFixtures.find(m => m.id === match.id)) {
+            upcomingFixtures.push(match);
           }
         }
       }
+      
+      console.log(`[MatchCenter] Total upcoming fixtures: ${upcomingFixtures.length}`);
       
       // Sort by datetime
       upcomingFixtures.sort((a, b) => 
