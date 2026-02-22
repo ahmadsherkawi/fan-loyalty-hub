@@ -1,6 +1,6 @@
 // Football API Service Layer
-// Uses football-data.org as primary API
-// Free tier: 10 requests per minute, covers major European leagues
+// Uses football-data.org API
+// API Documentation: https://www.football-data.org/documentation/quickstart
 
 import type {
   FootballMatch,
@@ -12,15 +12,11 @@ import type {
 
 // ================= CONFIGURATION =================
 
-// football-data.org API (free tier: 10 req/min)
-const FOOTBALL_DATA_API_KEY = 'YOUR_API_KEY_HERE'; // Get free key at https://www.football-data.org/client/register
+const FOOTBALL_DATA_API_KEY = '68c061d5ee694555966ea266bea15d46';
 const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
 
-// Fallback: Use a free public API (no key required)
-const THE_SPORTS_DB_BASE = 'https://www.thesportsdb.com/api/v1/json/3';
-
-// Team IDs for football-data.org (these are the correct IDs)
-const FOOTBALL_DATA_TEAM_IDS: Record<string, number> = {
+// Team IDs for football-data.org
+const TEAM_IDS: Record<string, number> = {
   'real madrid': 86,
   'barcelona': 81,
   'atletico madrid': 78,
@@ -41,9 +37,11 @@ const FOOTBALL_DATA_TEAM_IDS: Record<string, number> = {
   'porto': 191,
   'sporting': 192,
   'ajax': 194,
+  'celtic': 247,
+  'rangers': 255,
 };
 
-// Competition codes for football-data.org
+// Competition codes
 const COMPETITION_CODES: Record<string, string> = {
   'premier_league': 'PL',
   'la_liga': 'PD',
@@ -51,32 +49,7 @@ const COMPETITION_CODES: Record<string, string> = {
   'serie_a': 'SA',
   'ligue_1': 'FL1',
   'champions_league': 'CL',
-};
-
-// TheSportsDB Team IDs (fallback, free)
-const THESPORTSDB_TEAM_IDS: Record<string, string> = {
-  'real madrid': '53258',
-  'barcelona': '52927',
-  'atletico madrid': '53260',
-  'manchester united': '53340',
-  'manchester city': '53341',
-  'liverpool': '53342',
-  'chelsea': '53343',
-  'arsenal': '53344',
-  'tottenham': '53345',
-  'bayern munich': '53369',
-  'dortmund': '53371',
-  'juventus': '53384',
-  'ac milan': '53382',
-  'inter': '53383',
-  'napoli': '53386',
-  'psg': '53394',
-  'benfica': '53409',
-  'porto': '53410',
-  'sporting': '53411',
-  'ajax': '53419',
-  'celtic': '53435',
-  'rangers': '53436',
+  'europa_league': 'EL',
 };
 
 // Cache configuration
@@ -108,25 +81,32 @@ function setCache<T>(key: string, data: T, isLive = false) {
   cache.set(key, { data, timestamp: Date.now(), isLive });
 }
 
-// ================= THE SPORTS DB CLIENT (FREE, NO KEY REQUIRED) =================
+// ================= FOOTBALL-DATA.ORG CLIENT =================
 
-async function fetchTheSportsDB<T>(endpoint: string): Promise<T | null> {
+async function fetchFootballData<T>(endpoint: string): Promise<T | null> {
+  const url = `${FOOTBALL_DATA_BASE}${endpoint}`;
+  console.log('[FootballData] Fetching:', url);
+  
   try {
-    const url = `${THE_SPORTS_DB_BASE}/${endpoint}`;
-    console.log('[TheSportsDB] Fetching:', endpoint);
+    const response = await fetch(url, {
+      headers: {
+        'X-Auth-Token': FOOTBALL_DATA_API_KEY,
+      },
+    });
     
-    const response = await fetch(url);
-    console.log('[TheSportsDB] Response status:', response.status);
+    console.log('[FootballData] Response status:', response.status);
     
     if (!response.ok) {
-      console.error('[TheSportsDB] Error:', response.status);
+      const errorText = await response.text();
+      console.error('[FootballData] Error:', response.status, errorText);
       return null;
     }
     
     const data = await response.json();
+    console.log('[FootballData] Success, data received');
     return data as T;
   } catch (error) {
-    console.error('[TheSportsDB] Fetch error:', error);
+    console.error('[FootballData] Fetch error:', error);
     return null;
   }
 }
@@ -143,27 +123,30 @@ export async function getLiveMatches(): Promise<FootballMatch[]> {
 
   console.log('[FootballAPI] Getting live matches');
 
-  // Get today's matches and filter for live
-  const today = new Date().toISOString().split('T')[0];
-  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${today}&s=Soccer`);
+  // Get today's matches from Premier League and other major competitions
+  const allMatches: FootballMatch[] = [];
+  const matchIds = new Set<string>();
   
-  if (events?.events && events.events.length > 0) {
-    const matches = events.events
-      .filter(e => {
-        const status = (e.strStatus || '').toLowerCase();
-        // Include all today's matches as potential live/upcoming
-        return status.includes('progress') || status.includes('live') || 
-               status === '1h' || status === '2h' || status === 'ht' ||
-               status === '' || status === 'ns'; // NS = not started
-      })
-      .map(transformTheSportsDBEvent);
-    
-    console.log('[FootballAPI] Found', matches.length, 'matches for today');
-    setCache(cacheKey, matches, true);
-    return matches;
+  for (const code of Object.values(COMPETITION_CODES)) {
+    try {
+      const data = await fetchFootballData<FootballDataMatchesResponse>(`/competitions/${code}/matches?status=LIVE`);
+      
+      if (data?.matches && data.matches.length > 0) {
+        for (const match of data.matches) {
+          if (!matchIds.has(String(match.id))) {
+            matchIds.add(String(match.id));
+            allMatches.push(transformMatch(match));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[FootballAPI] Failed to get live matches for ${code}:`, err);
+    }
   }
-
-  return [];
+  
+  console.log('[FootballAPI] Found', allMatches.length, 'live matches');
+  setCache(cacheKey, allMatches, true);
+  return allMatches;
 }
 
 /**
@@ -177,45 +160,44 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     return cached;
   }
 
-  console.log('[FootballAPI] Getting fixtures for team:', teamId);
+  console.log('[FootballAPI] ========== Getting fixtures for team:', teamId, '==========');
 
   const teamNameLower = teamId.toLowerCase().trim();
-  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
   
-  // Try partial match
-  let teamIdToUse = tsdbTeamId;
-  if (!teamIdToUse) {
-    for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
+  // Find team ID
+  let apiTeamId = TEAM_IDS[teamNameLower];
+  if (!apiTeamId) {
+    for (const [name, id] of Object.entries(TEAM_IDS)) {
       if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
-        teamIdToUse = id;
+        apiTeamId = id;
         console.log(`[FootballAPI] Matched team: ${name} -> ${id}`);
         break;
       }
     }
   } else {
-    console.log(`[FootballAPI] Found team ID: ${teamId} -> ${teamIdToUse}`);
+    console.log(`[FootballAPI] Found team ID: ${teamId} -> ${apiTeamId}`);
   }
 
-  if (!teamIdToUse) {
+  if (!apiTeamId) {
     console.warn('[FootballAPI] No team ID found for:', teamId);
     return [];
   }
 
-  // Get next 5 events for this team
-  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsnext.php?id=${teamIdToUse}`);
+  // Get team matches
+  const data = await fetchFootballData<FootballDataMatchesResponse>(`/teams/${apiTeamId}/matches?status=SCHEDULED,TIMED`);
   
-  if (events?.events && events.events.length > 0) {
-    // Filter to only include events within the next N days
+  if (data?.matches && data.matches.length > 0) {
+    // Filter to next N days
     const now = new Date();
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + days);
     
-    const matches = events.events
-      .filter(e => {
-        const eventDate = new Date(e.strTimestamp || e.dateEvent || '');
-        return eventDate >= now && eventDate <= maxDate;
+    const matches = data.matches
+      .filter(m => {
+        const matchDate = new Date(m.utcDate);
+        return matchDate >= now && matchDate <= maxDate;
       })
-      .map(transformTheSportsDBEvent);
+      .map(transformMatch);
     
     console.log(`[FootballAPI] Found ${matches.length} upcoming fixtures for ${teamId}`);
     setCache(cacheKey, matches);
@@ -237,28 +219,39 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
   console.log('[FootballAPI] Getting past matches for team:', teamId);
 
   const teamNameLower = teamId.toLowerCase().trim();
-  let tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
   
-  // Try partial match
-  if (!tsdbTeamId) {
-    for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
+  let apiTeamId = TEAM_IDS[teamNameLower];
+  if (!apiTeamId) {
+    for (const [name, id] of Object.entries(TEAM_IDS)) {
       if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
-        tsdbTeamId = id;
+        apiTeamId = id;
         break;
       }
     }
   }
 
-  if (!tsdbTeamId) {
+  if (!apiTeamId) {
     console.warn('[FootballAPI] No team ID found for past matches:', teamId);
     return [];
   }
 
-  // Get last 5 events for this team
-  const events = await fetchTheSportsDB<{ results: TheSportsDBEvent[] }>(`eventslast.php?id=${tsdbTeamId}`);
+  // Get finished matches
+  const data = await fetchFootballData<FootballDataMatchesResponse>(`/teams/${apiTeamId}/matches?status=FINISHED`);
   
-  if (events?.results && events.results.length > 0) {
-    const matches = events.results.map(transformTheSportsDBEvent);
+  if (data?.matches && data.matches.length > 0) {
+    // Filter to last N days and take last 10
+    const now = new Date();
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() - days);
+    
+    const matches = data.matches
+      .filter(m => {
+        const matchDate = new Date(m.utcDate);
+        return matchDate >= minDate && matchDate <= now;
+      })
+      .slice(0, 10)
+      .map(transformMatch);
+    
     console.log(`[FootballAPI] Found ${matches.length} past matches for ${teamId}`);
     setCache(cacheKey, matches);
     return matches;
@@ -278,16 +271,32 @@ export async function getFixturesByDate(date: string): Promise<FootballMatch[]> 
 
   console.log('[FootballAPI] Getting fixtures for date:', date);
 
-  const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsday.php?d=${date}&s=Soccer`);
+  const allMatches: FootballMatch[] = [];
+  const matchIds = new Set<string>();
   
-  if (events?.events && events.events.length > 0) {
-    const matches = events.events.map(transformTheSportsDBEvent);
-    console.log('[FootballAPI] Found', matches.length, 'fixtures for', date);
-    setCache(cacheKey, matches);
-    return matches;
+  // Get matches from all competitions for this date
+  for (const code of Object.values(COMPETITION_CODES)) {
+    try {
+      const data = await fetchFootballData<FootballDataMatchesResponse>(
+        `/competitions/${code}/matches?dateFrom=${date}&dateTo=${date}`
+      );
+      
+      if (data?.matches && data.matches.length > 0) {
+        for (const match of data.matches) {
+          if (!matchIds.has(String(match.id))) {
+            matchIds.add(String(match.id));
+            allMatches.push(transformMatch(match));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[FootballAPI] Failed for ${code}:`, err);
+    }
   }
-
-  return [];
+  
+  console.log('[FootballAPI] Found', allMatches.length, 'fixtures for', date);
+  setCache(cacheKey, allMatches);
+  return allMatches;
 }
 
 /**
@@ -303,38 +312,29 @@ export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballM
   const allMatches: FootballMatch[] = [];
   const matchIds = new Set<string>();
   
-  // League IDs in TheSportsDB
-  const leagueIds: Record<string, string> = {
-    'premier_league': '4328',
-    'la_liga': '4335',
-    'bundesliga': '4331',
-    'serie_a': '4332',
-    'ligue_1': '4334',
-    'champions_league': '4346',
-  };
+  const today = new Date().toISOString().split('T')[0];
+  const toDate = new Date();
+  toDate.setDate(toDate.getDate() + days);
+  const toStr = toDate.toISOString().split('T')[0];
   
-  const now = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + days);
-  
-  for (const [leagueName, leagueId] of Object.entries(leagueIds)) {
+  for (const [name, code] of Object.entries(COMPETITION_CODES)) {
     try {
-      const events = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(`eventsnextleague.php?id=${leagueId}`);
+      const data = await fetchFootballData<FootballDataMatchesResponse>(
+        `/competitions/${code}/matches?dateFrom=${today}&dateTo=${toStr}&status=SCHEDULED,TIMED`
+      );
       
-      if (events?.events && events.events.length > 0) {
-        console.log(`[FootballAPI] ${leagueName}: ${events.events.length} events`);
+      if (data?.matches && data.matches.length > 0) {
+        console.log(`[FootballAPI] ${name}: ${data.matches.length} upcoming matches`);
         
-        for (const event of events.events) {
-          const eventDate = new Date(event.strTimestamp || event.dateEvent || '');
-          
-          if (eventDate >= now && eventDate <= maxDate && !matchIds.has(event.idEvent)) {
-            matchIds.add(event.idEvent);
-            allMatches.push(transformTheSportsDBEvent(event));
+        for (const match of data.matches) {
+          if (!matchIds.has(String(match.id))) {
+            matchIds.add(String(match.id));
+            allMatches.push(transformMatch(match));
           }
         }
       }
     } catch (err) {
-      console.warn(`[FootballAPI] Failed for ${leagueName}:`, err);
+      console.warn(`[FootballAPI] Failed for ${name}:`, err);
     }
   }
   
@@ -349,10 +349,41 @@ export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballM
 }
 
 /**
- * Get league standings (not available on free tier, return empty)
+ * Get league standings
  */
 export async function getStandings(leagueId: number, season: number): Promise<TeamStanding[]> {
-  console.warn('[FootballAPI] Standings not available on free API');
+  const cacheKey = `standings-${leagueId}-${season}`;
+  const cached = getCached<TeamStanding[]>(cacheKey);
+  if (cached) return cached;
+
+  // Find competition code from ID
+  const code = Object.entries(COMPETITION_CODES).find(([_, c]) => c === String(leagueId))?.[1];
+  if (!code) return [];
+
+  const data = await fetchFootballData<FootballDataStandingsResponse>(`/competitions/${code}/standings`);
+  
+  if (data?.standings && data.standings.length > 0) {
+    const table = data.standings[0].table;
+    const result: TeamStanding[] = table.map((entry) => ({
+      rank: entry.position,
+      teamId: String(entry.team.id),
+      teamName: entry.team.name,
+      teamLogo: entry.team.crest || null,
+      played: entry.playedGames,
+      won: entry.won,
+      drawn: entry.draw,
+      lost: entry.lost,
+      goalsFor: entry.goalsFor,
+      goalsAgainst: entry.goalsAgainst,
+      goalDifference: entry.goalDifference,
+      points: entry.points,
+      form: entry.form || '',
+    }));
+    
+    setCache(cacheKey, result);
+    return result;
+  }
+
   return [];
 }
 
@@ -367,26 +398,26 @@ export async function getTeamForm(teamId: string, lastN = 5): Promise<TeamForm |
   console.log('[FootballAPI] Getting form for team:', teamId);
 
   const teamNameLower = teamId.toLowerCase().trim();
-  let tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
+  let apiTeamId = TEAM_IDS[teamNameLower];
   
-  if (!tsdbTeamId) {
-    for (const [name, id] of Object.entries(THESPORTSDB_TEAM_IDS)) {
+  if (!apiTeamId) {
+    for (const [name, id] of Object.entries(TEAM_IDS)) {
       if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
-        tsdbTeamId = id;
+        apiTeamId = id;
         break;
       }
     }
   }
 
-  if (!tsdbTeamId) return null;
+  if (!apiTeamId) return null;
 
-  const events = await fetchTheSportsDB<{ results: TheSportsDBEvent[] }>(`eventslast.php?id=${tsdbTeamId}`);
+  const data = await fetchFootballData<FootballDataMatchesResponse>(`/teams/${apiTeamId}/matches?status=FINISHED`);
   
-  if (events?.results && events.results.length > 0) {
-    const lastMatches = events.results.slice(0, lastN).map((e) => {
-      const isHome = e.strHomeTeam?.toLowerCase().includes(teamNameLower);
-      const homeScore = e.intHomeScore ? parseInt(e.intHomeScore) : 0;
-      const awayScore = e.intAwayScore ? parseInt(e.intAwayScore) : 0;
+  if (data?.matches && data.matches.length > 0) {
+    const lastMatches = data.matches.slice(0, lastN).reverse().map((m) => {
+      const isHome = m.homeTeam.id === apiTeamId;
+      const homeScore = m.score.fullTime.home ?? 0;
+      const awayScore = m.score.fullTime.away ?? 0;
       const teamScore = isHome ? homeScore : awayScore;
       const opponentScore = isHome ? awayScore : homeScore;
       
@@ -396,7 +427,7 @@ export async function getTeamForm(teamId: string, lastN = 5): Promise<TeamForm |
       else result = 'D';
 
       return {
-        opponent: isHome ? e.strAwayTeam : e.strHomeTeam,
+        opponent: isHome ? m.awayTeam.name : m.homeTeam.name,
         home: isHome,
         result,
         goalsFor: teamScore,
@@ -430,7 +461,9 @@ export async function getTeamForm(teamId: string, lastN = 5): Promise<TeamForm |
 
     const result: TeamForm = {
       teamId,
-      teamName: events.results[0].strHomeTeam || teamId,
+      teamName: data.matches[0].homeTeam.id === apiTeamId 
+        ? data.matches[0].homeTeam.name 
+        : data.matches[0].awayTeam.name,
       lastMatches,
       winStreak,
       unbeatenStreak,
@@ -454,17 +487,15 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
 
   console.log('[FootballAPI] Searching for team:', query);
 
-  const teams = await fetchTheSportsDB<{ teams: TheSportsDBTeam[] }>(`searchteams.php?t=${encodeURIComponent(query)}`);
+  const data = await fetchFootballData<{ teams: FootballDataTeam[] }>(`/teams?name=${encodeURIComponent(query)}`);
   
-  if (teams?.teams && teams.teams.length > 0) {
-    const result = teams.teams
-      .filter(t => t && t.strTeam)
-      .map(t => ({
-        id: t.idTeam,
-        name: t.strTeam,
-        logo: t.strTeamBadge || null,
-        country: t.strCountry || '',
-      }));
+  if (data?.teams && data.teams.length > 0) {
+    const result = data.teams.map(t => ({
+      id: String(t.id),
+      name: t.name,
+      logo: t.crest || null,
+      country: t.area?.name || '',
+    }));
     
     console.log('[FootballAPI] Found', result.length, 'teams');
     setCache(cacheKey, result);
@@ -473,10 +504,10 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
 
   // Fallback to hardcoded teams
   const lowerQuery = query.toLowerCase();
-  const hardcoded = Object.entries(THESPORTSDB_TEAM_IDS)
+  const hardcoded = Object.entries(TEAM_IDS)
     .filter(([name]) => name.includes(lowerQuery) || lowerQuery.includes(name))
     .map(([name, id]) => ({
-      id: id,
+      id: String(id),
       name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
       logo: null,
       country: '',
@@ -489,7 +520,7 @@ export async function searchTeams(query: string): Promise<Array<{ id: string; na
  * Get match events
  */
 export async function getMatchEvents(fixtureId: string): Promise<MatchEvent[]> {
-  // Not available on free tier
+  // Would need to fetch specific match details
   return [];
 }
 
@@ -498,101 +529,135 @@ export async function getMatchEvents(fixtureId: string): Promise<MatchEvent[]> {
  */
 export function getApiUsageStats() {
   return {
-    dailyLimit: 'Unlimited (TheSportsDB free tier)',
+    dailyLimit: '10 requests/min (free tier)',
     used: 0,
-    remaining: 'Unlimited',
+    remaining: 'Rate limited per minute',
     resetDate: new Date().toDateString(),
   };
 }
 
 // ================= TRANSFORMERS =================
 
-function transformTheSportsDBEvent(e: TheSportsDBEvent): FootballMatch {
+function transformMatch(m: FootballDataMatch): FootballMatch {
   return {
-    id: e.idEvent,
+    id: String(m.id),
     source: 'api-football',
     homeTeam: {
-      id: e.idHomeTeam || '',
-      name: e.strHomeTeam || '',
-      logo: null,
-      score: e.intHomeScore ? parseInt(e.intHomeScore) : null,
+      id: String(m.homeTeam.id),
+      name: m.homeTeam.name,
+      logo: m.homeTeam.crest || null,
+      score: m.score?.fullTime?.home ?? null,
     },
     awayTeam: {
-      id: e.idAwayTeam || '',
-      name: e.strAwayTeam || '',
-      logo: null,
-      score: e.intAwayScore ? parseInt(e.intAwayScore) : null,
+      id: String(m.awayTeam.id),
+      name: m.awayTeam.name,
+      logo: m.awayTeam.crest || null,
+      score: m.score?.fullTime?.away ?? null,
     },
     league: {
-      id: e.idLeague || '',
-      name: e.strLeague || '',
-      country: e.strCountry || '',
-      logo: null,
-      season: parseInt(e.strSeason || new Date().getFullYear().toString()),
-      round: e.intRound ? `Round ${e.intRound}` : null,
+      id: m.competition?.code || '',
+      name: m.competition?.name || '',
+      country: m.competition?.area?.name || '',
+      logo: m.competition?.emblem || null,
+      season: m.season?.currentMatchday || 2024,
+      round: m.matchday ? `Matchday ${m.matchday}` : null,
     },
     venue: {
-      name: e.strVenue || null,
-      city: e.strCity || null,
+      name: null,
+      city: null,
     },
-    datetime: e.strTimestamp || e.dateEvent || '',
-    status: mapTheSportsDBStatus(e.strStatus),
-    elapsed: null,
+    datetime: m.utcDate,
+    status: mapStatus(m.status),
+    elapsed: m.score?.duration === '90_MINUTES' ? 90 : null,
     events: [],
   };
 }
 
-function mapTheSportsDBStatus(status: string | undefined): MatchStatus {
-  if (!status) return 'scheduled';
-  
-  const s = status.toLowerCase();
-  if (s.includes('ft') || s.includes('full') || s.includes('finished')) return 'finished';
-  if (s.includes('live') || s.includes('progress') || s === '1h' || s === '2h' || s === 'ht') return 'live';
-  if (s.includes('post') || s.includes('delay')) return 'postponed';
-  if (s.includes('can') || s.includes('abor')) return 'cancelled';
-  
-  return 'scheduled';
+function mapStatus(status: string): MatchStatus {
+  const statusMap: Record<string, MatchStatus> = {
+    'SCHEDULED': 'scheduled',
+    'TIMED': 'scheduled',
+    'LIVE': 'live',
+    'IN_PLAY': 'live',
+    'PAUSED': 'live',
+    'FINISHED': 'finished',
+    'POSTPONED': 'postponed',
+    'SUSPENDED': 'postponed',
+    'CANCELED': 'cancelled',
+    'CANCELLED': 'cancelled',
+  };
+  return statusMap[status] || 'scheduled';
 }
 
 // ================= TYPES =================
 
-interface TheSportsDBEvent {
-  idEvent: string;
-  strEvent: string;
-  strHomeTeam: string;
-  strAwayTeam: string;
-  idHomeTeam: string;
-  idAwayTeam: string;
-  intHomeScore: string | null;
-  intAwayScore: string | null;
-  idLeague: string;
-  strLeague: string;
-  strSeason: string;
-  intRound: string;
-  strTimestamp: string;
-  dateEvent: string;
-  strVenue: string;
-  strCity: string;
-  strCountry: string;
-  strStatus: string;
+interface FootballDataMatchesResponse {
+  matches: FootballDataMatch[];
 }
 
-interface TheSportsDBTeam {
-  idTeam: string;
-  strTeam: string;
-  strTeamBadge: string;
-  strCountry: string;
+interface FootballDataMatch {
+  id: number;
+  utcDate: string;
+  status: string;
+  matchday: number;
+  stage: string;
+  homeTeam: FootballDataTeamInfo;
+  awayTeam: FootballDataTeamInfo;
+  competition: {
+    id: number;
+    name: string;
+    code: string;
+    area: { name: string };
+    emblem?: string;
+  };
+  season?: { currentMatchday: number };
+  score: {
+    fullTime: { home: number | null; away: number | null };
+    halfTime: { home: number | null; away: number | null };
+    duration: string;
+  };
 }
 
-// ================= NAMED EXPORTS FOR BACKWARD COMPATIBILITY =================
+interface FootballDataTeamInfo {
+  id: number;
+  name: string;
+  crest?: string;
+}
+
+interface FootballDataTeam {
+  id: number;
+  name: string;
+  crest?: string;
+  area?: { name: string };
+}
+
+interface FootballDataStandingsResponse {
+  standings: Array<{
+    table: Array<{
+      position: number;
+      team: FootballDataTeamInfo;
+      playedGames: number;
+      won: number;
+      draw: number;
+      lost: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      goalDifference: number;
+      points: number;
+      form?: string;
+    }>;
+  }>;
+}
+
+// ================= NAMED EXPORTS =================
 
 export const MAJOR_LEAGUES = [
-  { id: 4328, name: 'Premier League', country: 'England', logo: null },
-  { id: 4335, name: 'La Liga', country: 'Spain', logo: null },
-  { id: 4331, name: 'Bundesliga', country: 'Germany', logo: null },
-  { id: 4332, name: 'Serie A', country: 'Italy', logo: null },
-  { id: 4334, name: 'Ligue 1', country: 'France', logo: null },
-  { id: 4346, name: 'Champions League', country: 'Europe', logo: null },
+  { id: 'PL', name: 'Premier League', country: 'England', logo: null },
+  { id: 'PD', name: 'La Liga', country: 'Spain', logo: null },
+  { id: 'BL1', name: 'Bundesliga', country: 'Germany', logo: null },
+  { id: 'SA', name: 'Serie A', country: 'Italy', logo: null },
+  { id: 'FL1', name: 'Ligue 1', country: 'France', logo: null },
+  { id: 'CL', name: 'Champions League', country: 'Europe', logo: null },
 ];
 
 export const footballApi = {
