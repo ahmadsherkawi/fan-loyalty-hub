@@ -38,6 +38,36 @@ const THESPORTSDB_TEAM_IDS: Record<string, string> = {
   'galatasaray': '53453', 'fenerbahce': '53454', 'besiktas': '53455',
 };
 
+// API-Football Team IDs for popular teams (hardcoded to avoid search API calls)
+const API_FOOTBALL_TEAM_IDS: Record<string, number> = {
+  'real madrid': 541,
+  'barcelona': 529,
+  'atletico madrid': 530,
+  'manchester united': 33,
+  'manchester city': 50,
+  'liverpool': 40,
+  'chelsea': 49,
+  'arsenal': 42,
+  'tottenham': 47,
+  'bayern munich': 157,
+  'dortmund': 165,
+  'juventus': 496,
+  'ac milan': 489,
+  'inter': 505,
+  'napoli': 492,
+  'psg': 85,
+  'benfica': 211,
+  'porto': 212,
+  'sporting': 228,
+  'ajax': 194,
+  'psv': 197,
+  'celtic': 247,
+  'rangers': 257,
+  'galatasaray': 645,
+  'fenerbahce': 611,
+  'besiktas': 624,
+};
+
 // TheSportsDB League IDs for major leagues
 const THESPORTSDB_LEAGUE_IDS: Record<string, string> = {
   'premier_league': '4328',
@@ -228,33 +258,6 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
   }
 
   console.log('[FootballAPI] ========== Getting fixtures for team:', teamId, '==========');
-  console.log('[FootballAPI] API Usage:', getApiUsageStats());
-
-  // First, search for the team in API-Football to get their numeric ID
-  let apiFootballTeamId: string | null = null;
-  
-  console.log('[FootballAPI] Step 1: Searching API-Football for team...');
-  
-  // Try to find team by name in API-Football
-  try {
-    const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
-    console.log('[FootballAPI] API-Football search result:', searchResult);
-    
-    if (searchResult && searchResult.length > 0) {
-      // Find best match
-      const teamLower = teamId.toLowerCase();
-      const match = searchResult.find(t => 
-        t.team.name.toLowerCase().includes(teamLower) || 
-        teamLower.includes(t.team.name.toLowerCase())
-      );
-      if (match) {
-        apiFootballTeamId = String(match.team.id);
-        console.log(`[FootballAPI] Found API-Football team ID: ${match.team.name} -> ${apiFootballTeamId}`);
-      }
-    }
-  } catch (err) {
-    console.error('[FootballAPI] API-Football search error:', err);
-  }
 
   const today = new Date();
   const to = new Date(today);
@@ -262,9 +265,26 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
   const fromStr = today.toISOString().split('T')[0];
   const toStr = to.toISOString().split('T')[0];
 
-  // Try API-Football first (REAL data)
+  // Step 1: Try hardcoded API-Football team ID first
+  const teamNameLower = teamId.toLowerCase().trim();
+  let apiFootballTeamId = API_FOOTBALL_TEAM_IDS[teamNameLower];
+  
+  // Try partial match in hardcoded IDs
+  if (!apiFootballTeamId) {
+    for (const [name, id] of Object.entries(API_FOOTBALL_TEAM_IDS)) {
+      if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
+        apiFootballTeamId = id;
+        console.log(`[FootballAPI] Matched team via partial: ${name} -> ${id}`);
+        break;
+      }
+    }
+  } else {
+    console.log(`[FootballAPI] Found hardcoded API-Football ID: ${teamId} -> ${apiFootballTeamId}`);
+  }
+
+  // Step 2: Try API-Football fixtures with hardcoded ID
   if (apiFootballTeamId) {
-    console.log('[FootballAPI] Step 2: Fetching fixtures from API-Football...');
+    console.log('[FootballAPI] Fetching fixtures from API-Football for team ID:', apiFootballTeamId);
     try {
       const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
         team: apiFootballTeamId,
@@ -283,13 +303,11 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
     } catch (err) {
       console.warn('[FootballAPI] API-Football fixtures failed:', err);
     }
-  } else {
-    console.log('[FootballAPI] No API-Football team ID found, trying TheSportsDB...');
   }
 
-  // Fallback to TheSportsDB
-  console.log('[FootballAPI] Step 3: Trying TheSportsDB fallback...');
-  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamId.toLowerCase()];
+  // Step 3: Fallback to TheSportsDB (may return incorrect data on free tier)
+  console.log('[FootballAPI] Trying TheSportsDB fallback...');
+  const tsdbTeamId = THESPORTSDB_TEAM_IDS[teamNameLower];
   if (tsdbTeamId) {
     try {
       const nextEvents = await fetchTheSportsDB<{ events: TheSportsDBEvent[] }>(
@@ -298,13 +316,13 @@ export async function getTeamFixtures(teamId: string, days = 7): Promise<Footbal
       
       if (nextEvents?.events && nextEvents.events.length > 0) {
         // Filter events that actually involve this team
-        const teamLower = teamId.toLowerCase();
         const relevantEvents = nextEvents.events.filter(e => 
-          e.strHomeTeam?.toLowerCase().includes(teamLower) ||
-          e.strAwayTeam?.toLowerCase().includes(teamLower)
+          e.strHomeTeam?.toLowerCase().includes(teamNameLower) ||
+          e.strAwayTeam?.toLowerCase().includes(teamNameLower)
         );
         
         if (relevantEvents.length > 0) {
+          console.log(`[FootballAPI] TheSportsDB found ${relevantEvents.length} relevant events`);
           const matches = relevantEvents.map(transformTheSportsDBEvent);
           setCache(cacheKey, matches);
           return matches;
@@ -332,19 +350,16 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
   console.log('[FootballAPI] Getting past matches for team:', teamId);
 
-  // First, search for the team in API-Football to get their numeric ID
-  let apiFootballTeamId: string | null = null;
+  const teamNameLower = teamId.toLowerCase().trim();
+  let apiFootballTeamId = API_FOOTBALL_TEAM_IDS[teamNameLower];
   
-  const searchResult = await fetchApiFootball<Array<{ team: { id: number; name: string } }>>('teams', { search: teamId });
-  if (searchResult && searchResult.length > 0) {
-    const teamLower = teamId.toLowerCase();
-    const match = searchResult.find(t => 
-      t.team.name.toLowerCase().includes(teamLower) || 
-      teamLower.includes(t.team.name.toLowerCase())
-    );
-    if (match) {
-      apiFootballTeamId = String(match.team.id);
-      console.log(`[FootballAPI] Found API-Football team ID for past: ${match.team.name} -> ${apiFootballTeamId}`);
+  // Try partial match in hardcoded IDs
+  if (!apiFootballTeamId) {
+    for (const [name, id] of Object.entries(API_FOOTBALL_TEAM_IDS)) {
+      if (teamNameLower.includes(name) || name.includes(teamNameLower)) {
+        apiFootballTeamId = id;
+        break;
+      }
     }
   }
 
@@ -356,6 +371,7 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
   // Try API-Football
   if (apiFootballTeamId) {
+    console.log('[FootballAPI] Fetching past matches from API-Football for team ID:', apiFootballTeamId);
     try {
       const fixtures = await fetchApiFootball<ApiFootballFixture[]>('fixtures', {
         team: apiFootballTeamId,
@@ -364,7 +380,7 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
       });
 
       if (fixtures && fixtures.length > 0) {
-        console.log(`[FootballAPI] API-Football found ${fixtures.length} past matches for team ${teamId}`);
+        console.log(`[FootballAPI] API-Football found ${fixtures.length} past matches`);
         const matches = fixtures.map(transformApiFootballFixture);
         setCache(cacheKey, matches);
         return matches;
