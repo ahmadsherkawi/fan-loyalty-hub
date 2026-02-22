@@ -665,3 +665,30 @@ function mapEventType(type: string): 'goal' | 'card' | 'substitution' | 'var' | 
   };
   return typeMap[type] || 'other';
 }
+
+// ================= NAMED EXPORTS FOR BACKWARD COMPATIBILITY =================
+
+// Major leagues constant for UI components
+export const MAJOR_LEAGUES = [
+  { id: 39, name: 'Premier League', country: 'England', logo: null },
+  { id: 140, name: 'La Liga', country: 'Spain', logo: null },
+  { id: 78, name: 'Bundesliga', country: 'Germany', logo: null },
+  { id: 135, name: 'Serie A', country: 'Italy', logo: null },
+  { id: 61, name: 'Ligue 1', country: 'France', logo: null },
+  { id: 2, name: 'Champions League', country: 'Europe', logo: null },
+  { id: 3, name: 'Europa League', country: 'Europe', logo: null },
+];
+
+// Football API object for backward compatibility
+export const footballApi = {
+  getLiveMatches,
+  getTeamFixtures,
+  getTeamPastMatches,
+  getFixturesByDate,
+  getUpcomingMatchesFromLeagues,
+  getStandings,
+  getTeamForm,
+  searchTeams,
+  getMatchEvents,
+  getApiUsageStats,
+};
