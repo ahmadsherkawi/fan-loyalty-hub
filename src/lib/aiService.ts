@@ -1,5 +1,5 @@
 // AI Service for Fan Loyalty Hub
-// Calls backend API that uses z-ai-web-dev-sdk for AI-powered predictions and chants
+// Calls Supabase Edge Functions that use z-ai-web-dev-sdk for AI-powered predictions and chants
 
 import type {
   ChantContext,
@@ -11,23 +11,7 @@ import type {
   PersonalizedRecommendation,
   FanInsights,
 } from '@/types/football';
-
-// API base URL - uses Vite proxy in development
-const AI_API_BASE = '/api/ai';
-
-// Check if AI server is available
-async function checkAIServer(): Promise<boolean> {
-  try {
-    const response = await fetch('/api/health', { 
-      method: 'GET',
-      signal: AbortSignal.timeout(2000) // 2 second timeout
-    });
-    return response.ok;
-  } catch {
-    console.warn('[AI Service] AI server not available at /api/health');
-    return false;
-  }
-}
+import { supabase } from '@/integrations/supabase/client';
 
 // ================= CHANT GENERATION =================
 
@@ -43,18 +27,10 @@ export async function generateChant(params: ChantGenerationParams): Promise<Gene
   console.log('[AI Service] Generating chant for:', context.clubName, '- Type:', context.type);
   
   try {
-    // Check if AI server is running
-    const serverAvailable = await checkAIServer();
-    if (!serverAvailable) {
-      console.warn('[AI Service] AI server not available, using fallback');
-      return generateFallbackChant(context);
-    }
+    console.log('[AI Service] Calling Supabase Edge Function ai-chant...');
     
-    console.log('[AI Service] Calling AI API for chant generation...');
-    const response = await fetch(`${AI_API_BASE}/generate-chant`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('ai-chant', {
+      body: {
         clubName: context.clubName,
         context: context.type,
         opponent: context.opponent,
@@ -62,16 +38,15 @@ export async function generateChant(params: ChantGenerationParams): Promise<Gene
         stadium: context.stadium,
         fanName,
         style: style || 'passionate',
-      }),
+      },
     });
 
-    if (!response.ok) {
-      console.error('[AI Service] Chant API error:', response.status, response.statusText);
-      throw new Error(`AI API request failed: ${response.status}`);
+    if (error) {
+      console.error('[AI Service] Chant function error:', error);
+      throw error;
     }
 
-    const data = await response.json();
-    console.log('[AI Service] Chant generated successfully:', data.content?.substring(0, 50) + '...');
+    console.log('[AI Service] Chant generated:', data.content?.substring(0, 50) + '...');
     
     return {
       content: data.content,
@@ -153,20 +128,10 @@ export async function generatePrediction(params: PredictionParams): Promise<Matc
   console.log('[AI Service] Generating prediction for:', match.homeTeam.name, 'vs', match.awayTeam.name);
   
   try {
-    // Check if AI server is running
-    const serverAvailable = await checkAIServer();
-    if (!serverAvailable) {
-      console.warn('[AI Service] AI server not available, using algorithmic fallback');
-      return generateAlgorithmicPrediction(match, homeForm, awayForm, standings);
-    }
+    console.log('[AI Service] Calling Supabase Edge Function ai-predict...');
     
-    console.log('[AI Service] Calling AI API for match prediction...');
-    
-    // Call AI API for prediction
-    const response = await fetch(`${AI_API_BASE}/predict-match`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('ai-predict', {
+      body: {
         homeTeam: match.homeTeam.name,
         awayTeam: match.awayTeam.name,
         league: match.league.name,
@@ -192,15 +157,14 @@ export async function generatePrediction(params: PredictionParams): Promise<Matc
             match.awayTeam.name.toLowerCase().includes(s.teamName.toLowerCase())
           )?.rank,
         },
-      }),
+      },
     });
 
-    if (!response.ok) {
-      console.error('[AI Service] Prediction API error:', response.status, response.statusText);
-      throw new Error(`AI API request failed: ${response.status}`);
+    if (error) {
+      console.error('[AI Service] Prediction function error:', error);
+      throw error;
     }
 
-    const data = await response.json();
     console.log('[AI Service] Prediction received:', data.homeWin + '%', '-', data.draw + '%', '-', data.awayWin + '%', 'Score:', data.predictedScore.home + '-' + data.predictedScore.away);
     
     // Convert API response to MatchPrediction format
