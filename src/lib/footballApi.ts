@@ -84,18 +84,15 @@ function setCache<T>(key: string, data: T, isLive = false) {
   cache.set(key, { data, timestamp: Date.now(), isLive });
 }
 
-// ================= FOOTBALL-DATA.ORG CLIENT =================
+// ================= FOOTBALL-DATA.ORG CLIENT (via Supabase Edge Function proxy) =================
 
 async function fetchFootballData<T>(endpoint: string): Promise<T | null> {
-  const url = `${FOOTBALL_DATA_BASE}${endpoint}`;
-  console.log('[FootballData] Fetching:', url);
+  // Use Supabase Edge Function as proxy to bypass CORS
+  const url = `${SUPABASE_FUNCTIONS_URL}?endpoint=${encodeURIComponent(endpoint)}`;
+  console.log('[FootballData] Fetching via proxy:', endpoint);
   
   try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Auth-Token': FOOTBALL_DATA_API_KEY,
-      },
-    });
+    const response = await fetch(url);
     
     console.log('[FootballData] Response status:', response.status);
     
