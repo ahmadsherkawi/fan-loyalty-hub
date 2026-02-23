@@ -182,7 +182,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 8. Update get_club_chants to include match attendance data
-CREATE OR REPLACE FUNCTION public.get_club_chants(
+-- Drop the existing function first (required when changing return type)
+DROP FUNCTION IF EXISTS public.get_club_chants(UUID, UUID, TEXT, INTEGER, INTEGER);
+
+CREATE FUNCTION public.get_club_chants(
   p_club_id UUID,
   p_fan_id UUID,
   p_sort TEXT DEFAULT 'cheers',

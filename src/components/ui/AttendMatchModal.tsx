@@ -184,16 +184,26 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
 
     setSharing(true);
     try {
-      // Get user's membership
-      const { data: membership, error: memberError } = await supabase
+      // Check for fan membership (official club)
+      const { data: membership } = await supabase
         .from('fan_memberships')
-        .select('id')
+        .select('id, club_id')
         .eq('fan_id', profile.id)
         .limit(1)
         .single();
 
-      if (memberError || !membership) {
-        toast.error('You need to join a club first');
+      // Check for community membership if no fan membership
+      const { data: communityMembership } = !membership 
+        ? await supabase
+            .from('community_memberships')
+            .select('club_id')
+            .eq('fan_id', profile.id)
+            .limit(1)
+            .single()
+        : { data: null };
+
+      if (!membership && !communityMembership) {
+        toast.error('You need to join a club or community first');
         return;
       }
 
@@ -210,13 +220,25 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         matchId: match.id,
       };
 
-      const { data, error } = await supabase.rpc('create_chant', {
-        p_membership_id: membership.id,
+      // Build RPC params based on membership type
+      const rpcParams: Record<string, unknown> = {
         p_content: `I'm going to this match! Who's joining? 🎉`,
         p_image_url: null,
         p_post_type: 'match_attendance',
         p_match_data: matchData,
-      });
+      };
+
+      if (membership) {
+        // Official club membership
+        rpcParams.p_membership_id = membership.id;
+        rpcParams.p_community_club_id = null;
+      } else if (communityMembership) {
+        // Community membership
+        rpcParams.p_membership_id = null;
+        rpcParams.p_community_club_id = communityMembership.club_id;
+      }
+
+      const { data, error } = await supabase.rpc('create_chant', rpcParams);
 
       if (error) {
         console.error('[Share] Error:', error);
