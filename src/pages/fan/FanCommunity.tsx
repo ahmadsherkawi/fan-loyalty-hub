@@ -47,6 +47,18 @@ interface Community {
   chant_count: number;
 }
 
+interface MatchData {
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamLogo?: string;
+  awayTeamLogo?: string;
+  matchDate: string;
+  venue?: string;
+  city?: string;
+  league?: string;
+  matchId?: string;
+}
+
 interface Chant {
   id: string;
   fan_id: string;
@@ -55,10 +67,14 @@ interface Chant {
   content: string;
   image_url: string | null;
   cheers_count: number;
+  going_count?: number;
   is_edited: boolean;
   created_at: string;
   updated_at: string;
   cheered_by_me: boolean;
+  going_by_me?: boolean;
+  post_type?: string;
+  match_data?: MatchData | null;
 }
 
 interface CommunityEvent {
@@ -99,6 +115,7 @@ export default function FanCommunity() {
   const [joining, setJoining] = useState(false);
   const [posting, setPosting] = useState(false);
   const [cheeringId, setCheeringId] = useState<string | null>(null);
+  const [goingId, setGoingId] = useState<string | null>(null);
 
   // Loyalty program state
   const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null);
@@ -412,6 +429,44 @@ export default function FanCommunity() {
       });
     } finally {
       setCheeringId(null);
+    }
+  };
+
+  const handleGoing = async (chantId: string) => {
+    if (!profile) return;
+
+    setGoingId(chantId);
+    try {
+      const { data, error } = await supabase.rpc("toggle_match_going", {
+        p_chant_id: chantId,
+        p_fan_id: profile.id,
+      });
+
+      if (error) throw error;
+
+      setChants((prev) =>
+        prev.map((c) =>
+          c.id === chantId
+            ? {
+                ...c,
+                going_count: data.going_count,
+                going_by_me: data.going,
+              }
+            : c
+        )
+      );
+
+      if (data.going) {
+        sonnerToast.success("You're going! 🎉");
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Could not update attendance.",
+        variant: "destructive",
+      });
+    } finally {
+      setGoingId(null);
     }
   };
 
@@ -959,9 +1014,11 @@ export default function FanCommunity() {
                 chant={chant}
                 currentFanId={profile?.id || ""}
                 onCheer={handleCheer}
+                onGoing={handleGoing}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 isCheering={cheeringId === chant.id}
+                isGoing={goingId === chant.id}
                 hideActions={!isMember}
               />
             ))
