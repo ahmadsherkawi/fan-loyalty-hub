@@ -66,11 +66,11 @@ const COMPETITION_CODES: Record<string, string> = {
 const PRIORITY_COMPETITIONS = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL'];
 
 // Cache configuration
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-const CACHE_DURATION_LIVE = 2 * 60 * 1000; // 2 minutes for live matches
+const CACHE_DURATION = 60 * 60 * 1000; // 60 minutes (increased from 30)
+const CACHE_DURATION_LIVE = 5 * 60 * 1000; // 5 minutes for live matches (increased from 2)
 
 // Rate limiting: 10 requests per minute on free tier
-const REQUEST_DELAY_MS = 6500; // 6.5 seconds between requests to stay under 10/min
+const REQUEST_DELAY_MS = 7000; // 7 seconds between requests to stay safely under 10/min
 let lastRequestTime = 0;
 
 interface CacheEntry<T> {

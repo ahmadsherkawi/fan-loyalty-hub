@@ -116,67 +116,47 @@ export default function MatchCenterPage() {
     const fetchAllData = async () => {
       setLoading(true);
       try {
-        // Get live matches
-        const live = await footballApi.getLiveMatches();
-        setAllLiveMatches(live);
-
-        // Get upcoming matches for next 7 days
-        const upcomingFixtures: FootballMatch[] = [];
-        const liveIds = new Set(live.map(m => m.id));
-        const upcomingIds = new Set<string>();
-        
-        // Get past matches for last 7 days
-        const pastFixtures: FootballMatch[] = [];
-        const pastIds = new Set<string>();
-        
-        // Get SPECIFIC club fixtures (upcoming AND past) first!
+        // PRIORITY 1: Get fan's club fixtures first (most important)
         const clubName = club?.name;
+        const liveIds = new Set<string>();
+        const upcomingIds = new Set<string>();
+        const pastIds = new Set<string>();
+        const upcomingFixtures: FootballMatch[] = [];
+        const pastFixtures: FootballMatch[] = [];
+        let live: FootballMatch[] = [];
+
         if (clubName) {
           console.log(`[MatchCenter] Fetching fixtures for club: ${clubName}`);
           
-          // Upcoming
+          // Get club-specific fixtures (sequentially to respect rate limit)
           const clubUpcoming = await footballApi.getTeamFixtures(clubName, 7);
-          console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming fixtures for ${clubName}`);
-          for (const match of clubUpcoming) {
-            if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
-              upcomingIds.add(match.id);
-              upcomingFixtures.push(match);
-            }
-          }
+          console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming for ${clubName}`);
           
-          // Past
-          const clubPast = await footballApi.getTeamPastMatches(clubName, 7);
-          console.log(`[MatchCenter] Found ${clubPast.length} past matches for ${clubName}`);
-          for (const match of clubPast) {
-            if (!pastIds.has(match.id)) {
-              pastIds.add(match.id);
-              pastFixtures.push(match);
-            }
-          }
-        }
-        
-        // Get from major leagues (additional coverage)
-        console.log('[MatchCenter] Fetching from major leagues...');
-        const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
-        for (const match of leagueMatches) {
-          if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
+          for (const match of clubUpcoming) {
             upcomingIds.add(match.id);
             upcomingFixtures.push(match);
           }
+          
+          const clubPast = await footballApi.getTeamPastMatches(clubName, 7);
+          console.log(`[MatchCenter] Found ${clubPast.length} past for ${clubName}`);
+          
+          for (const match of clubPast) {
+            pastIds.add(match.id);
+            pastFixtures.push(match);
+          }
         }
         
-        // Get by date for additional coverage
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // PRIORITY 2: Get live matches (up to 6 requests)
+        console.log('[MatchCenter] Fetching live matches...');
+        live = await footballApi.getLiveMatches();
+        live.forEach(m => liveIds.add(m.id));
         
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(today);
-          date.setDate(date.getDate() + i);
-          const dateStr = date.toISOString().split('T')[0];
-          
-          const dayMatches = await footballApi.getFixturesByDate(dateStr);
-          
-          for (const match of dayMatches) {
+        // PRIORITY 3: Get upcoming from leagues only if we need more data (up to 6 requests)
+        // Skip this if we already have enough matches from club fixtures
+        if (upcomingFixtures.length < 5 && !clubName) {
+          console.log('[MatchCenter] Fetching from major leagues...');
+          const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
+          for (const match of leagueMatches) {
             if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
               upcomingIds.add(match.id);
               upcomingFixtures.push(match);
@@ -184,7 +164,10 @@ export default function MatchCenterPage() {
           }
         }
         
-        console.log(`[MatchCenter] Total upcoming: ${upcomingFixtures.length}, past: ${pastFixtures.length}`);
+        // REMOVED: getFixturesByDate loop (was making 7 extra requests!)
+        // This was causing rate limit errors
+        
+        console.log(`[MatchCenter] Total upcoming: ${upcomingFixtures.length}, past: ${pastFixtures.length}, live: ${live.length}`);
         
         // Sort by datetime
         upcomingFixtures.sort((a, b) => 
@@ -196,6 +179,7 @@ export default function MatchCenterPage() {
         
         setAllUpcomingMatches(upcomingFixtures);
         setAllPastMatches(pastFixtures);
+        setAllLiveMatches(live);
 
         // Log what we have for debugging
         console.log('[MatchCenter] Sample upcoming match:', upcomingFixtures[0]);
