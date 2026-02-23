@@ -369,7 +369,81 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
 
         {/* Content */}
         <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
-          {loading ? (
+          {isWatchingLive ? (
+            /* Simplified view for live matches */
+            <div className="p-6 space-y-6">
+              <div className="text-center">
+                <Radio className="h-16 w-16 text-red-400 mx-auto mb-4 animate-pulse" />
+                <h3 className="text-lg font-semibold mb-2">Watching Live Match</h3>
+                <p className="text-sm text-muted-foreground">
+                  Share with other fans who might be watching too! Connect and chat about the game.
+                </p>
+              </div>
+
+              {/* Match Score Display */}
+              <div className="rounded-xl bg-muted/30 border border-border/50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Home Team */}
+                  <div className="flex-1 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      {match.homeTeam.logo ? (
+                        <img src={match.homeTeam.logo} alt={match.homeTeam.name} className="w-12 h-12 object-contain" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center text-lg font-bold">
+                          {match.homeTeam.name.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-sm font-semibold">{match.homeTeam.name}</span>
+                      {match.homeTeam.score !== undefined && (
+                        <span className="text-2xl font-bold">{match.homeTeam.score}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* VS */}
+                  <div className="text-center">
+                    <span className="text-lg font-bold text-red-400">VS</span>
+                  </div>
+
+                  {/* Away Team */}
+                  <div className="flex-1 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      {match.awayTeam.logo ? (
+                        <img src={match.awayTeam.logo} alt={match.awayTeam.name} className="w-12 h-12 object-contain" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center text-lg font-bold">
+                          {match.awayTeam.name.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-sm font-semibold">{match.awayTeam.name}</span>
+                      {match.awayTeam.score !== undefined && (
+                        <span className="text-2xl font-bold">{match.awayTeam.score}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleShareAttendance}
+                  disabled={sharing}
+                  className="w-full bg-red-500 hover:bg-red-600 gap-2"
+                >
+                  {sharing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4" />
+                  )}
+                  Share & Chat with Fans
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Let other fans know you're watching and start chatting!
+                </p>
+              </div>
+            </div>
+          ) : loading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
               <p className="text-muted-foreground">AI is searching for the best options...</p>
@@ -661,35 +735,44 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
           ) : null}
         </ScrollArea>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border bg-muted/20">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {isWatchingLive ? 'Share with fans to chat while watching!' : 'Powered by AI • Links open in new tabs'}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant={isWatchingLive ? "default" : "default"} 
-                size="sm" 
-                onClick={handleShareAttendance}
-                disabled={sharing || loading}
-                className={`gap-1.5 ${isWatchingLive ? 'bg-red-500 hover:bg-red-600' : ''}`}
-              >
-                {sharing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isWatchingLive ? (
-                  <MessageCircle className="h-4 w-4" />
-                ) : (
-                  <Share2 className="h-4 w-4" />
-                )}
-                {isWatchingLive ? "Share & Chat" : "Share with Fans"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Close
-              </Button>
+        {/* Footer - only show for non-live matches */}
+        {!isWatchingLive && (
+          <div className="p-4 border-t border-border bg-muted/20">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Powered by AI • Links open in new tabs
+              </p>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={handleShareAttendance}
+                  disabled={sharing || loading}
+                  className="gap-1.5"
+                >
+                  {sharing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Share2 className="h-4 w-4" />
+                  )}
+                  Share with Fans
+                </Button>
+                <Button variant="outline" size="sm" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Simple close button for live matches */}
+        {isWatchingLive && (
+          <div className="p-4 border-t border-border bg-muted/20">
+            <Button variant="outline" size="sm" onClick={onClose} className="w-full">
+              Close
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
