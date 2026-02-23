@@ -190,7 +190,7 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         .select('id, club_id')
         .eq('fan_id', profile.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // Check for community membership if no fan membership
       const { data: communityMembership } = !membership 
@@ -199,7 +199,7 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
             .select('club_id')
             .eq('fan_id', profile.id)
             .limit(1)
-            .single()
+            .maybeSingle()
         : { data: null };
 
       if (!membership && !communityMembership) {
