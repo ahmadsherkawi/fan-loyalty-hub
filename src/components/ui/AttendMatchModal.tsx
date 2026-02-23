@@ -33,6 +33,9 @@ import {
   Wind,
   Umbrella,
   Share2,
+  Radio,
+  MessageCircle,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -44,6 +47,7 @@ interface AttendMatchModalProps {
   userLocation?: { city: string; country: string };
   onShareSuccess?: () => void;
   clubId?: string; // Current club/community context for posting
+  isWatchingLive?: boolean; // True when watching a live match
 }
 
 interface AttendMatchData {
@@ -86,7 +90,7 @@ interface AttendMatchData {
   };
 }
 
-export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShareSuccess, clubId }: AttendMatchModalProps) {
+export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShareSuccess, clubId, isWatchingLive = false }: AttendMatchModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AttendMatchData | null>(null);
@@ -252,11 +256,17 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         clubId: clubIdToUse,
       };
 
+      // Determine post type and content based on whether watching live
+      const postType = isWatchingLive ? 'watching_match' : 'match_attendance';
+      const postContent = isWatchingLive 
+        ? `I'm watching this match live! Let's chat! 📺⚽` 
+        : `I'm going to this match! Who's joining? 🎉`;
+
       // Build RPC params based on membership type
       const rpcParams: Record<string, unknown> = {
-        p_content: `I'm going to this match! Who's joining? 🎉`,
+        p_content: postContent,
         p_image_url: null,
-        p_post_type: 'match_attendance',
+        p_post_type: postType,
         p_match_data: matchData,
       };
 
@@ -278,7 +288,10 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         return;
       }
 
-      toast.success('Shared! Other fans can now see you\'re attending 🎉');
+      toast.success(isWatchingLive 
+        ? 'Shared! Other fans can now chat with you! 📺'
+        : 'Shared! Other fans can now see you\'re attending 🎉'
+      );
       
       if (onShareSuccess) {
         onShareSuccess();
@@ -304,14 +317,20 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
+        <div className={`p-4 border-b border-border ${isWatchingLive ? 'bg-gradient-to-r from-red-500/20 to-red-500/5' : 'bg-gradient-to-r from-primary/10 to-primary/5'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <Ticket className="h-5 w-5 text-primary" />
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isWatchingLive ? 'bg-red-500/20' : 'bg-primary/20'}`}>
+                {isWatchingLive ? (
+                  <Radio className="h-5 w-5 text-red-400 animate-pulse" />
+                ) : (
+                  <Ticket className="h-5 w-5 text-primary" />
+                )}
               </div>
               <div>
-                <h2 className="font-semibold text-lg">Attend Match</h2>
+                <h2 className="font-semibold text-lg">
+                  {isWatchingLive ? "I'm Watching Live" : 'Attend Match'}
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   {match.homeTeam.name} vs {match.awayTeam.name}
                 </p>
@@ -324,6 +343,12 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
 
           {/* Match Info Bar */}
           <div className="flex items-center gap-3 mt-3 text-sm">
+            {isWatchingLive && (
+              <Badge className="gap-1.5 bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">
+                <Radio className="h-3 w-3" />
+                LIVE
+              </Badge>
+            )}
             <Badge variant="outline" className="gap-1.5">
               <Clock className="h-3 w-3" />
               {dateStr} at {timeStr}
@@ -640,22 +665,24 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         <div className="p-4 border-t border-border bg-muted/20">
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              Powered by AI • Links open in new tabs
+              {isWatchingLive ? 'Share with fans to chat while watching!' : 'Powered by AI • Links open in new tabs'}
             </p>
             <div className="flex items-center gap-2">
               <Button 
-                variant="default" 
+                variant={isWatchingLive ? "default" : "default"} 
                 size="sm" 
                 onClick={handleShareAttendance}
                 disabled={sharing || loading}
-                className="gap-1.5"
+                className={`gap-1.5 ${isWatchingLive ? 'bg-red-500 hover:bg-red-600' : ''}`}
               >
                 {sharing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isWatchingLive ? (
+                  <MessageCircle className="h-4 w-4" />
                 ) : (
                   <Share2 className="h-4 w-4" />
                 )}
-                Share with Fans
+                {isWatchingLive ? "Share & Chat" : "Share with Fans"}
               </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close

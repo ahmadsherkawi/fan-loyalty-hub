@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic, MoreHorizontal, Edit2, Trash2, Clock, X, Check, Flag, Users, Calendar, MapPin, ExternalLink, Ticket } from "lucide-react";
+import { Mic, MoreHorizontal, Edit2, Trash2, Clock, X, Check, Flag, Users, Calendar, MapPin, ExternalLink, Ticket, Eye, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,6 +160,7 @@ export function ChantCard({
 
   const isOwnChant = chant.fan_id === currentFanId;
   const isMatchAttendance = chant.post_type === 'match_attendance';
+  const isWatchingMatch = chant.post_type === 'watching_match';
   const matchData = chant.match_data;
 
   const handleCheer = async () => {
@@ -217,14 +218,22 @@ export function ChantCard({
     }
   };
 
-  // Match Attendance Card
-  if (isMatchAttendance && matchData) {
+  // Match Attendance Card (for both match_attendance and watching_match)
+  if ((isMatchAttendance || isWatchingMatch) && matchData) {
     return (
-      <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-card to-accent/5 border border-primary/20 p-4 hover:border-primary/40 transition-all">
+      <div className={`rounded-2xl border p-4 transition-all ${
+        isWatchingMatch 
+          ? 'bg-gradient-to-br from-red-500/10 via-card to-red-500/5 border-red-500/20 hover:border-red-500/40' 
+          : 'bg-gradient-to-br from-primary/10 via-card to-accent/5 border-primary/20 hover:border-primary/40'
+      }`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-semibold text-primary">
+            <div className={`h-10 w-10 rounded-full border flex items-center justify-center text-sm font-semibold ${
+              isWatchingMatch 
+                ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                : 'bg-primary/10 border-primary/20 text-primary'
+            }`}>
               {chant.fan_avatar_url ? (
                 <img
                   src={chant.fan_avatar_url}
@@ -281,9 +290,22 @@ export function ChantCard({
         <div className="rounded-xl bg-card/80 border border-border/50 p-4 mb-3">
           {/* Match Header */}
           <div className="flex items-center justify-between mb-3">
-            <Badge variant="outline" className="gap-1.5 text-xs">
-              <Ticket className="h-3 w-3" />
-              Match Attendance
+            <Badge variant="outline" className={`gap-1.5 text-xs ${
+              isWatchingMatch 
+                ? 'bg-red-500/10 text-red-400 border-red-500/30' 
+                : ''
+            }`}>
+              {isWatchingMatch ? (
+                <>
+                  <Eye className="h-3 w-3" />
+                  Watching Live
+                </>
+              ) : (
+                <>
+                  <Ticket className="h-3 w-3" />
+                  Match Attendance
+                </>
+              )}
             </Badge>
             {matchData.league && (
               <span className="text-[10px] text-muted-foreground">{matchData.league}</span>
@@ -308,7 +330,11 @@ export function ChantCard({
 
             {/* VS */}
             <div className="text-center px-2">
-              <span className="text-sm font-bold text-muted-foreground">VS</span>
+              {isWatchingMatch ? (
+                <span className="text-sm font-bold text-red-400">VS</span>
+              ) : (
+                <span className="text-sm font-bold text-muted-foreground">VS</span>
+              )}
             </div>
 
             {/* Away Team */}
@@ -350,22 +376,35 @@ export function ChantCard({
         {/* Actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {/* Going Button */}
-            {onGoing && (
+            {isWatchingMatch ? (
+              /* Chat Button for watching posts */
               <Button
-                variant={chant.going_by_me ? "default" : "outline"}
+                variant="default"
                 size="sm"
-                onClick={handleGoing}
-                disabled={isGoing || hideActions}
-                className={`rounded-full gap-1.5 h-8 px-3 ${
-                  chant.going_by_me
-                    ? "bg-green-500 hover:bg-green-600 text-white"
-                    : "hover:bg-green-500/10 hover:text-green-500 hover:border-green-500"
-                }`}
+                onClick={handleViewMatch}
+                className="rounded-full gap-1.5 h-8 px-3 bg-red-500 hover:bg-red-600 text-white"
               >
-                <Users className="h-4 w-4" />
-                <span className="text-xs font-medium">{chant.going_count || 1} going</span>
+                <MessageCircle className="h-4 w-4" />
+                <span className="text-xs font-medium">Join Chat</span>
               </Button>
+            ) : (
+              /* Going Button for attendance posts */
+              onGoing && (
+                <Button
+                  variant={chant.going_by_me ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleGoing}
+                  disabled={isGoing || hideActions}
+                  className={`rounded-full gap-1.5 h-8 px-3 ${
+                    chant.going_by_me
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : "hover:bg-green-500/10 hover:text-green-500 hover:border-green-500"
+                  }`}
+                >
+                  <Users className="h-4 w-4" />
+                  <span className="text-xs font-medium">{chant.going_count || 1} going</span>
+                </Button>
+              )
             )}
 
             {/* Cheer Button */}
@@ -406,7 +445,10 @@ export function ChantCard({
               <DialogTitle>Delete Post?</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              This will remove your match attendance post. Other fans will no longer see that you're attending.
+              {isWatchingMatch 
+                ? 'This will remove your watching post. Other fans will no longer see that you\'re watching.'
+                : 'This will remove your match attendance post. Other fans will no longer see that you\'re attending.'
+              }
             </p>
             <DialogFooter className="gap-2 sm:gap-0 mt-4">
               <Button

@@ -74,6 +74,7 @@ export default function MatchCenterPage() {
   const [selectedMatch, setSelectedMatch] = useState<FootballMatch | null>(null);
   const [showAttendModal, setShowAttendModal] = useState(false);
   const [attendMatch, setAttendMatch] = useState<FootballMatch | null>(null);
+  const [isWatchingLive, setIsWatchingLive] = useState(false);
 
   // Load fan's club
   useEffect(() => {
@@ -437,8 +438,9 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
-                  onAttend={() => {
+                  onAttend={(isLive) => {
                     setAttendMatch(match);
+                    setIsWatchingLive(isLive);
                     setShowAttendModal(true);
                   }}
                   isFinished
@@ -469,8 +471,9 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
-                  onAttend={() => {
+                  onAttend={(isLive) => {
                     setAttendMatch(match);
+                    setIsWatchingLive(isLive);
                     setShowAttendModal(true);
                   }}
                   isLive
@@ -492,8 +495,9 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
-                  onAttend={() => {
+                  onAttend={(isLive) => {
                     setAttendMatch(match);
+                    setIsWatchingLive(isLive);
                     setShowAttendModal(true);
                   }}
                 />
@@ -547,8 +551,10 @@ export default function MatchCenterPage() {
             onClose={() => {
               setShowAttendModal(false);
               setAttendMatch(null);
+              setIsWatchingLive(false);
             }}
             clubId={club?.id}
+            isWatchingLive={isWatchingLive}
           />
         )}
 
@@ -567,7 +573,7 @@ export default function MatchCenterPage() {
 function MatchCard({ match, onSelect, onAttend, isLive = false, isFinished = false }: { 
   match: FootballMatch; 
   onSelect: () => void;
-  onAttend: () => void;
+  onAttend: (isLive: boolean) => void;
   isLive?: boolean; 
   isFinished?: boolean;
 }) {
@@ -654,15 +660,24 @@ function MatchCard({ match, onSelect, onAttend, isLive = false, isFinished = fal
         {!isFinished && (
           <Button
             size="sm"
-            variant="outline"
-            className="h-7 text-[10px] gap-1 ml-auto"
+            variant={isLive ? "default" : "outline"}
+            className={`h-7 text-[10px] gap-1 ml-auto ${isLive ? 'bg-red-500 hover:bg-red-600' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
-              onAttend();
+              onAttend(isLive);
             }}
           >
-            <Ticket className="h-3 w-3" />
-            Attend
+            {isLive ? (
+              <>
+                <Radio className="h-3 w-3" />
+                I'm Watching
+              </>
+            ) : (
+              <>
+                <Ticket className="h-3 w-3" />
+                Attend
+              </>
+            )}
           </Button>
         )}
       </div>
