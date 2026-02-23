@@ -61,9 +61,17 @@ const COMPETITION_CODES: Record<string, string> = {
   'copa_del_rey': 'CDR',         // Spain - Copa del Rey
 };
 
+// Priority competitions for live/upcoming matches (stay under 10 req/min limit)
+// Only check top 6 competitions to avoid rate limiting
+const PRIORITY_COMPETITIONS = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL'];
+
 // Cache configuration
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const CACHE_DURATION_LIVE = 2 * 60 * 1000; // 2 minutes for live matches
+
+// Rate limiting: 10 requests per minute on free tier
+const REQUEST_DELAY_MS = 6500; // 6.5 seconds between requests to stay under 10/min
+let lastRequestTime = 0;
 
 interface CacheEntry<T> {
   data: T;
@@ -90,9 +98,28 @@ function setCache<T>(key: string, data: T, isLive = false) {
   cache.set(key, { data, timestamp: Date.now(), isLive });
 }
 
+// Throttle requests to avoid 429 rate limit errors
+async function throttleRequest(): Promise<void> {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  
+  if (timeSinceLastRequest < REQUEST_DELAY_MS) {
+    const waitTime = REQUEST_DELAY_MS - timeSinceLastRequest;
+    console.log(`[FootballAPI] Throttling: waiting ${Math.round(waitTime/1000)}s to avoid rate limit`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastRequestTime = Date.now();
+}
+
 // ================= FOOTBALL-DATA.ORG CLIENT (via Supabase Edge Function proxy) =================
 
-async function fetchFootballData<T>(endpoint: string): Promise<T | null> {
+async function fetchFootballData<T>(endpoint: string, skipThrottle = false): Promise<T | null> {
+  // Throttle requests to avoid rate limiting
+  if (!skipThrottle) {
+    await throttleRequest();
+  }
+  
   // Use Supabase Edge Function as proxy to bypass CORS
   const url = `${SUPABASE_FUNCTIONS_URL}?endpoint=${encodeURIComponent(endpoint)}`;
   console.log('[FootballData] Fetching via proxy:', endpoint);
@@ -101,6 +128,12 @@ async function fetchFootballData<T>(endpoint: string): Promise<T | null> {
     const response = await fetch(url);
     
     console.log('[FootballData] Response status:', response.status);
+    
+    if (response.status === 429) {
+      // Rate limited - return null gracefully
+      console.warn('[FootballData] Rate limited (429) - skipping this request');
+      return null;
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -121,19 +154,20 @@ async function fetchFootballData<T>(endpoint: string): Promise<T | null> {
 
 /**
  * Get live matches
+ * NOTE: Only checks PRIORITY_COMPETITIONS (top 6) to stay under rate limit
  */
 export async function getLiveMatches(): Promise<FootballMatch[]> {
   const cacheKey = 'live-matches';
   const cached = getCached<FootballMatch[]>(cacheKey);
   if (cached) return cached;
 
-  console.log('[FootballAPI] Getting live matches');
+  console.log('[FootballAPI] Getting live matches from priority competitions');
 
-  // Get today's matches from Premier League and other major competitions
+  // Only check priority competitions to stay under 10 req/min limit
   const allMatches: FootballMatch[] = [];
   const matchIds = new Set<string>();
   
-  for (const code of Object.values(COMPETITION_CODES)) {
+  for (const code of PRIORITY_COMPETITIONS) {
     try {
       const data = await fetchFootballData<FootballDataMatchesResponse>(`/competitions/${code}/matches?status=LIVE`);
       
@@ -269,6 +303,7 @@ export async function getTeamPastMatches(teamId: string, days = 7): Promise<Foot
 
 /**
  * Get fixtures by date
+ * NOTE: Only checks PRIORITY_COMPETITIONS (top 6) to stay under rate limit
  */
 export async function getFixturesByDate(date: string): Promise<FootballMatch[]> {
   const cacheKey = `fixtures-${date}`;
@@ -280,8 +315,8 @@ export async function getFixturesByDate(date: string): Promise<FootballMatch[]> 
   const allMatches: FootballMatch[] = [];
   const matchIds = new Set<string>();
   
-  // Get matches from all competitions for this date
-  for (const code of Object.values(COMPETITION_CODES)) {
+  // Only check priority competitions to stay under rate limit
+  for (const code of PRIORITY_COMPETITIONS) {
     try {
       const data = await fetchFootballData<FootballDataMatchesResponse>(
         `/competitions/${code}/matches?dateFrom=${date}&dateTo=${date}`
@@ -307,13 +342,14 @@ export async function getFixturesByDate(date: string): Promise<FootballMatch[]> 
 
 /**
  * Get upcoming matches from major leagues
+ * NOTE: Only checks PRIORITY_COMPETITIONS (top 6) to stay under rate limit
  */
 export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballMatch[]> {
   const cacheKey = `upcoming-leagues-${days}`;
   const cached = getCached<FootballMatch[]>(cacheKey);
   if (cached) return cached;
 
-  console.log('[FootballAPI] Getting upcoming matches from major leagues');
+  console.log('[FootballAPI] Getting upcoming matches from priority competitions');
   
   const allMatches: FootballMatch[] = [];
   const matchIds = new Set<string>();
@@ -323,14 +359,15 @@ export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballM
   toDate.setDate(toDate.getDate() + days);
   const toStr = toDate.toISOString().split('T')[0];
   
-  for (const [name, code] of Object.entries(COMPETITION_CODES)) {
+  // Only check priority competitions to stay under rate limit
+  for (const code of PRIORITY_COMPETITIONS) {
     try {
       const data = await fetchFootballData<FootballDataMatchesResponse>(
         `/competitions/${code}/matches?dateFrom=${today}&dateTo=${toStr}&status=SCHEDULED,TIMED`
       );
       
       if (data?.matches && data.matches.length > 0) {
-        console.log(`[FootballAPI] ${name}: ${data.matches.length} upcoming matches`);
+        console.log(`[FootballAPI] ${code}: ${data.matches.length} upcoming matches`);
         
         for (const match of data.matches) {
           if (!matchIds.has(String(match.id))) {
@@ -340,7 +377,7 @@ export async function getUpcomingMatchesFromLeagues(days = 7): Promise<FootballM
         }
       }
     } catch (err) {
-      console.warn(`[FootballAPI] Failed for ${name}:`, err);
+      console.warn(`[FootballAPI] Failed for ${code}:`, err);
     }
   }
   
