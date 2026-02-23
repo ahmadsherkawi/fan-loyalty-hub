@@ -28,6 +28,7 @@ interface MatchData {
   city?: string;
   league?: string;
   matchId?: string;
+  clubId?: string;
 }
 
 interface Chant {
@@ -206,7 +207,11 @@ export function ChantCard({
 
   const handleViewMatch = () => {
     if (matchData?.matchId) {
-      navigate(`/fan/matches?matchId=${matchData.matchId}`);
+      const params = new URLSearchParams({ matchId: matchData.matchId });
+      if (matchData.clubId) {
+        params.set('clubId', matchData.clubId);
+      }
+      navigate(`/fan/matches?${params.toString()}`);
     } else {
       navigate('/fan/matches');
     }

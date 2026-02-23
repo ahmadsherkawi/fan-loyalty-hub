@@ -56,6 +56,7 @@ export default function MatchCenterPage() {
 
   // Get clubId from URL params (for community-specific match viewing)
   const urlClubId = searchParams.get('clubId');
+  const urlMatchId = searchParams.get('matchId');
 
   const [club, setClub] = useState<Club | null>(null);
   const [liveMatches, setLiveMatches] = useState<FootballMatch[]>([]);
@@ -233,6 +234,22 @@ export default function MatchCenterPage() {
 
     fetchAllData();
   }, [club, showAllMatches]);
+
+  // Handle matchId from URL - select specific match after loading
+  useEffect(() => {
+    if (urlMatchId && !loading) {
+      const allMatches = [...allLiveMatches, ...allUpcomingMatches, ...allPastMatches];
+      const match = allMatches.find(m => m.id === urlMatchId);
+      if (match) {
+        setSelectedMatch(match);
+        // Also open attend modal if requested
+        if (searchParams.get('action') === 'attend') {
+          setAttendMatch(match);
+          setShowAttendModal(true);
+        }
+      }
+    }
+  }, [urlMatchId, loading, allLiveMatches, allUpcomingMatches, allPastMatches, searchParams]);
 
   // Filter matches by search and league
   const filterMatches = (matches: FootballMatch[]) => {
@@ -497,6 +514,26 @@ export default function MatchCenterPage() {
               </div>
               <div className="p-4">
                 <AIPredictionCard match={selectedMatch} />
+              </div>
+              <div className="p-4 pt-0 flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSelectedMatch(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    setAttendMatch(selectedMatch);
+                    setShowAttendModal(true);
+                    setSelectedMatch(null);
+                  }}
+                >
+                  <Ticket className="h-4 w-4" />
+                  Attend Match
+                </Button>
               </div>
             </div>
           </div>

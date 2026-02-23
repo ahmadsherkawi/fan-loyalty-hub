@@ -238,6 +238,7 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
       }
 
       // Create match attendance post
+      const clubIdToUse = membership?.club_id || communityMembership?.club_id;
       const matchData = {
         homeTeam: match.homeTeam.name,
         awayTeam: match.awayTeam.name,
@@ -248,6 +249,7 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
         city: match.venue?.city,
         league: match.league?.name,
         matchId: match.id,
+        clubId: clubIdToUse,
       };
 
       // Build RPC params based on membership type
