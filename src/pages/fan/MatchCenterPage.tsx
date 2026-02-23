@@ -289,8 +289,9 @@ export default function MatchCenterPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="container py-3 flex items-center justify-between">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -300,14 +301,7 @@ export default function MatchCenterPage() {
             >
               <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-red-500/15 flex items-center justify-center">
-                <Radio className="h-4 w-4 text-red-400" />
-              </div>
-              <div>
-                <h1 className="font-semibold text-foreground">Match Center</h1>
-              </div>
-            </div>
+            <Logo size="sm" />
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -317,7 +311,7 @@ export default function MatchCenterPage() {
               className={`h-8 w-8 rounded-full ${autoRefresh ? 'text-green-400' : 'text-muted-foreground'}`}
               title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
             >
-              <div className={`h-2 w-2 rounded-full ${autoRefresh ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <div className={`h-2 w-2 rounded-full ${autoRefresh ? 'bg-green-500' : 'bg-muted-foreground'}`} />
             </Button>
             <Button
               variant="ghost"
@@ -332,26 +326,36 @@ export default function MatchCenterPage() {
         </div>
       </header>
 
-      <main className="container py-4 space-y-4">
-        {/* Club Filter Banner */}
-        {club && (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20">
-            <div className="flex items-center gap-2">
-              {club.logo_url && (
-                <img src={club.logo_url} alt={club.name} className="w-6 h-6 object-contain" />
-              )}
-              <span className="text-sm font-medium">Showing matches for <strong>{club.name}</strong></span>
+      <main className="container py-6 space-y-6">
+        {/* HERO */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+
+          <div className="relative z-10 p-6 md:p-10 flex justify-between items-center gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Radio className="h-3.5 w-3.5 text-red-400" />
+                <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Live Scores</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">Match Center</h1>
+              <p className="text-white/50 mt-1 text-sm">
+                {club ? `Matches for ${club.name}` : 'Live scores, fixtures & results'}
+              </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAllMatches(!showAllMatches)}
-              className="h-7 text-xs"
-            >
-              {showAllMatches ? 'Show My Club Only' : 'Show All Matches'}
-            </Button>
+            {club && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllMatches(!showAllMatches)}
+                className="rounded-full glass-dark text-white/70 hover:text-white text-xs"
+              >
+                {showAllMatches ? 'Show My Club Only' : 'Show All Matches'}
+              </Button>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Search & Filters */}
         <div className="flex gap-2">
@@ -377,7 +381,7 @@ export default function MatchCenterPage() {
           <select
             value={selectedLeague || ''}
             onChange={(e) => setSelectedLeague(e.target.value || null)}
-            className="h-10 px-3 rounded-xl border border-border/40 bg-background text-sm"
+            className="h-10 px-3 rounded-xl border border-border/40 bg-card text-sm text-foreground"
           >
             <option value="">All Leagues</option>
             {leagues.map(l => (
@@ -388,17 +392,17 @@ export default function MatchCenterPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="live" className="w-full">
-          <TabsList className="w-full h-10 bg-muted/30 grid grid-cols-3">
-            <TabsTrigger value="past" className="h-8 text-xs">
+          <TabsList className="grid grid-cols-3 max-w-md rounded-full h-10 bg-card border border-border/40 p-1">
+            <TabsTrigger value="past" className="rounded-full text-xs font-semibold">
               Past ({filteredPast.length})
             </TabsTrigger>
-            <TabsTrigger value="live" className="h-8 text-xs data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400">
+            <TabsTrigger value="live" className="rounded-full text-xs font-semibold data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400">
               <span className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full bg-red-500 ${filteredLive.length > 0 ? 'animate-pulse' : ''}`} />
                 Live ({filteredLive.length})
               </span>
             </TabsTrigger>
-            <TabsTrigger value="upcoming" className="h-8 text-xs">
+            <TabsTrigger value="upcoming" className="rounded-full text-xs font-semibold">
               Upcoming ({filteredUpcoming.length})
             </TabsTrigger>
           </TabsList>

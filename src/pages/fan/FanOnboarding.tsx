@@ -281,25 +281,32 @@ export default function FanOnboarding() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/40">
-        <div className="container py-4 flex items-center justify-center">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-4 flex items-center justify-center">
           <Logo size="sm" />
         </div>
       </header>
 
       <main className="container py-8 max-w-4xl space-y-8">
         {/* Hero */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-            <Sparkles className="h-4 w-4" />
-            Welcome to Fan Loyalty Hub
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
+
+          <div className="relative z-10 p-6 md:p-10 text-center">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Welcome</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
+              Pick Your Teams
+            </h1>
+            <p className="text-white/50 max-w-md mx-auto mt-2 text-sm">
+              Search and select up to {MAX_COMMUNITIES} clubs you support. Names match official football databases!
+            </p>
           </div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold tracking-tight">
-            Pick Your Teams
-          </h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Search and select up to {MAX_COMMUNITIES} clubs you support. Names match official football databases!
-          </p>
         </div>
 
         {/* Selected Teams */}

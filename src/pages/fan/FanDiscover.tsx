@@ -339,8 +339,9 @@ export default function FanDiscover() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/40">
-        <div className="container py-4 flex items-center justify-between">
+      <header className="relative border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="relative container py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -348,22 +349,19 @@ export default function FanDiscover() {
               onClick={() => navigate("/fan/home")}
               className="rounded-full text-muted-foreground hover:text-foreground h-9"
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Back</span>
             </Button>
+            <div className="h-5 w-px bg-border/40 hidden sm:block" />
             <Logo size="sm" />
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-xs">
-              <Globe className="h-3 w-3 mr-1" />
-              Discover
-            </Badge>
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleSignOut}
               className="rounded-full text-muted-foreground hover:text-foreground h-9"
             >
-              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
+              <LogOut className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
@@ -371,37 +369,45 @@ export default function FanDiscover() {
 
       <main className="container py-6 max-w-4xl space-y-6">
         {/* Hero */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-display font-bold tracking-tight">
-            Discover Fan Communities
-          </h1>
-          <p className="text-muted-foreground">
-            Search from thousands of clubs worldwide. Names match official football databases!
-          </p>
-        </div>
+        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+          <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
 
-        {/* Search */}
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search any club (e.g., Barcelona, Manchester, Real Madrid...)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-14 text-lg rounded-2xl border-border/40 focus:border-primary/40"
-            />
-            {apiLoading && (
-              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
-            )}
+          <div className="relative z-10 p-6 md:p-10 text-center">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Discover</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
+              Fan Communities
+            </h1>
+            <p className="text-white/50 mt-2 max-w-md mx-auto text-sm">
+              Search from thousands of clubs worldwide. Names match official football databases!
+            </p>
+
+            {/* Search inside hero */}
+            <div className="relative max-w-md mx-auto mt-6">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/30" />
+              <Input
+                placeholder="Search any club (e.g., Barcelona, Manchester...)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-full backdrop-blur-xl focus:border-primary/40 focus:bg-white/10 transition-all"
+              />
+              {apiLoading && (
+                <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-white/50" />
+              )}
+            </div>
+            <p className="text-xs text-white/30 mt-3">
+              <Sparkles className="h-3 w-3 inline mr-1" />
+              Minimum 2 characters to search
+            </p>
           </div>
-          <p className="text-xs text-center text-muted-foreground">
-            <Sparkles className="h-3 w-3 inline mr-1" />
-            Powered by football database API - minimum 2 characters to search
-          </p>
         </div>
 
         {/* Stats Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-card border border-border/40">
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Database className="h-4 w-4" />
