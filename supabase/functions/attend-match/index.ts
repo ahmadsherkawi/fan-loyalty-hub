@@ -31,6 +31,7 @@ const VENUE_COORDINATES: Record<string, { lat: number; lon: number; country: str
   'brentford': { lat: 51.4875, lon: -0.3087, country: 'UK' },
   'fulham': { lat: 51.4749, lon: -0.2216, country: 'UK' },
   'crystal palace': { lat: 51.4232, lon: -0.0827, country: 'UK' },
+  'wolves': { lat: 52.5866, lon: -2.1293, country: 'UK' },
   
   // La Liga
   'madrid': { lat: 40.4168, lon: -3.7038, country: 'Spain' },
@@ -96,15 +97,6 @@ const VENUE_COORDINATES: Record<string, { lat: number; lon: number; country: str
   'zurich': { lat: 47.3769, lon: 8.5417, country: 'Switzerland' },
   'geneva': { lat: 46.2044, lon: 6.1432, country: 'Switzerland' },
   
-  // Other major football cities
-  'moscow': { lat: 55.7558, lon: 37.6173, country: 'Russia' },
-  'kiev': { lat: 50.4501, lon: 30.5234, country: 'Ukraine' },
-  'bucharest': { lat: 44.4268, lon: 26.1025, country: 'Romania' },
-  'belgrade': { lat: 44.7866, lon: 20.4489, country: 'Serbia' },
-  'zagreb': { lat: 45.8150, lon: 15.9819, country: 'Croatia' },
-  'lisbon': { lat: 38.7223, lon: -9.1393, country: 'Portugal' },
-  'benfica': { lat: 38.7528, lon: -9.1849, country: 'Portugal' },
-  
   // International
   'doha': { lat: 25.2854, lon: 51.5310, country: 'Qatar' },
   'dubai': { lat: 25.2048, lon: 55.2708, country: 'UAE' },
@@ -112,21 +104,8 @@ const VENUE_COORDINATES: Record<string, { lat: number; lon: number; country: str
   'jeddah': { lat: 21.4858, lon: 39.1925, country: 'Saudi Arabia' },
 };
 
-interface AttendMatchRequest {
-  match: {
-    homeTeam: string;
-    awayTeam: string;
-    venue: string;
-    city: string;
-    country: string;
-    date: string;
-    time: string;
-    league: string;
-  };
-  userLocation?: { city: string; country: string };
-}
-
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -134,21 +113,58 @@ serve(async (req) => {
   console.log('[Attend Match] Received request');
 
   try {
-    const data: AttendMatchRequest = await req.json();
-    console.log('[Attend Match] Match:', data.match.homeTeam, 'vs', data.match.awayTeam);
-    console.log('[Attend Match] City:', data.match.city, 'Country:', data.match.country);
+    // Parse request body with error handling
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('[Attend Match] Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid request body',
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const matchData = requestBody?.match;
+    
+    if (!matchData) {
+      console.error('[Attend Match] No match data in request');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Match data is required',
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Extract match data with defaults
+    const homeTeam = matchData.homeTeam || 'Home Team';
+    const awayTeam = matchData.awayTeam || 'Away Team';
+    const venue = matchData.venue || homeTeam + ' Stadium';
+    const city = matchData.city || 'Unknown';
+    const country = matchData.country || 'Unknown';
+    const date = matchData.date || new Date().toISOString();
+    const league = matchData.league || '';
+    const userLocation = requestBody.userLocation;
+
+    console.log('[Attend Match] Match:', homeTeam, 'vs', awayTeam);
+    console.log('[Attend Match] City:', city, 'Country:', country);
 
     // 1. Get Weather Forecast
-    const weather = await getWeatherForecast(data.match.city, data.match.date);
+    const weather = await getWeatherForecast(city, date);
 
     // 2. Generate Ticket Links (Deep links to multiple platforms)
-    const tickets = generateTicketLinks(data.match);
+    const tickets = generateTicketLinks(homeTeam, awayTeam, venue, city, date);
 
     // 3. Generate Transportation Links
-    const transportation = generateTransportationLinks(data.match, data.userLocation);
+    const transportation = generateTransportationLinks(city, venue, country, date, userLocation);
 
     // 4. Generate AI Tips
-    const aiTips = await generateAITips(data.match, weather);
+    const aiTips = await generateAITips(homeTeam, awayTeam, venue, city, country, league, weather);
 
     const response = {
       success: true,
@@ -160,16 +176,19 @@ serve(async (req) => {
       },
     };
 
+    console.log('[Attend Match] Success, returning data');
+
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[Attend Match] Error:', error);
+    console.error('[Attend Match] Unhandled error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: 'Failed to fetch match attendance data',
+      error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error'),
     }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -184,6 +203,11 @@ async function getWeatherForecast(city: string, matchDate: string): Promise<{
   recommendation: string;
 } | null> {
   console.log('[Weather] Getting forecast for:', city);
+  
+  if (!city || city === 'Unknown') {
+    console.log('[Weather] No valid city provided');
+    return null;
+  }
   
   // Find coordinates for the city
   const cityLower = city.toLowerCase().trim();
@@ -201,7 +225,7 @@ async function getWeatherForecast(city: string, matchDate: string): Promise<{
   }
   
   if (!coords) {
-    console.log('[Weather] City not found in coordinates map');
+    console.log('[Weather] City not found in coordinates map:', city);
     return null;
   }
   
@@ -307,13 +331,13 @@ function getWeatherRecommendation(condition: string, temp: number | null): strin
 
 // ================= TICKET LINKS =================
 
-function generateTicketLinks(match: {
-  homeTeam: string;
-  awayTeam: string;
-  venue: string;
-  city: string;
-  date: string;
-}): {
+function generateTicketLinks(
+  homeTeam: string,
+  awayTeam: string,
+  venue: string,
+  city: string,
+  date: string
+): {
   ticketmaster: Array<{
     id: string;
     name: string;
@@ -328,10 +352,9 @@ function generateTicketLinks(match: {
   }>;
   alternativeSources: Array<{ name: string; url: string }>;
 } {
-  const eventName = `${match.homeTeam} vs ${match.awayTeam}`;
+  const eventName = `${homeTeam} vs ${awayTeam}`;
   const encodedEvent = encodeURIComponent(eventName);
-  const encodedEventWithCity = encodeURIComponent(`${eventName} ${match.city}`);
-  const dateStr = new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dateStr = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   
   return {
     ticketmaster: [], // No API access, use alternatives
@@ -354,7 +377,7 @@ function generateTicketLinks(match: {
       },
       {
         name: 'Live Football Tickets',
-        url: `https://www.livefootballtickets.com/search/?q=${encodeURIComponent(match.homeTeam)}`,
+        url: `https://www.livefootballtickets.com/search/?q=${encodeURIComponent(homeTeam)}`,
       },
       {
         name: 'Google Tickets',
@@ -366,7 +389,7 @@ function generateTicketLinks(match: {
       },
       {
         name: 'Football Ticket Net',
-        url: `https://www.footballticketnet.com/search?q=${encodeURIComponent(match.homeTeam)}`,
+        url: `https://www.footballticketnet.com/search?q=${encodeURIComponent(homeTeam)}`,
       },
     ],
   };
@@ -375,7 +398,10 @@ function generateTicketLinks(match: {
 // ================= TRANSPORTATION LINKS =================
 
 function generateTransportationLinks(
-  match: { city: string; venue: string; country: string; date: string; time: string },
+  city: string,
+  venue: string,
+  country: string,
+  date: string,
   userLocation?: { city: string; country: string }
 ): {
   flights: string;
@@ -383,30 +409,26 @@ function generateTransportationLinks(
   driving: string;
   localTransport: string;
 } {
-  const venueCity = match.city;
-  const venueCountry = match.country;
-  const venueQuery = encodeURIComponent(`${match.venue || venueCity} Stadium`);
-  const cityQuery = encodeURIComponent(venueCity);
+  const venueQuery = encodeURIComponent(`${venue || city} Stadium`);
+  const cityQuery = encodeURIComponent(city);
   
-  // Format date for travel searches (next day usually for return)
-  const matchDate = new Date(match.date);
+  // Format date for travel searches
+  const matchDate = new Date(date);
   const returnDate = new Date(matchDate);
   returnDate.setDate(returnDate.getDate() + 1);
   
   const departDate = matchDate.toISOString().split('T')[0];
   const returnDateStr = returnDate.toISOString().split('T')[0];
   
-  // Use user location if available, otherwise general search
   const fromCity = userLocation?.city || '';
-  const fromQuery = encodeURIComponent(fromCity);
   
   return {
     flights: fromCity
-      ? `https://www.skyscanner.net/transport/flights/${fromQuery}/${cityQuery}/${departDate}/${returnDateStr}/`
+      ? `https://www.skyscanner.net/transport/flights/${encodeURIComponent(fromCity)}/${cityQuery}/${departDate}/${returnDateStr}/`
       : `https://www.skyscanner.net/transport/flights/Anywhere/${cityQuery}/${departDate}/${returnDateStr}/`,
     
     trains: fromCity
-      ? `https://www.trainline.eu/search/${fromQuery}/${cityQuery}/${departDate}`
+      ? `https://www.trainline.eu/search/${encodeURIComponent(fromCity)}/${cityQuery}/${departDate}`
       : `https://www.raileurope.com/search?destination=${cityQuery}`,
     
     driving: `https://www.google.com/maps/dir/?api=1&destination=${venueQuery},${cityQuery}`,
@@ -418,7 +440,12 @@ function generateTransportationLinks(
 // ================= AI TIPS =================
 
 async function generateAITips(
-  match: { homeTeam: string; awayTeam: string; venue: string; city: string; country: string; league: string },
+  homeTeam: string,
+  awayTeam: string,
+  venue: string,
+  city: string,
+  country: string,
+  league: string,
   weather: { temperature: number | null; condition: string } | null
 ): Promise<{
   arrival: string;
@@ -427,13 +454,13 @@ async function generateAITips(
   atmosphere: string;
   safety: string;
 }> {
-  console.log('[AI Tips] Generating tips for:', match.homeTeam, 'vs', match.awayTeam);
+  console.log('[AI Tips] Generating tips for:', homeTeam, 'vs', awayTeam);
   
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   
   if (!openaiKey) {
     console.log('[AI Tips] No OpenAI key, using fallback');
-    return generateFallbackTips(match, weather);
+    return generateFallbackTips(homeTeam, awayTeam, venue, city, weather);
   }
   
   try {
@@ -443,8 +470,8 @@ async function generateAITips(
     
     const systemPrompt = `You are a local football fan expert. Provide practical, friendly advice for away fans attending a match. Be specific and helpful. Respond with ONLY valid JSON.`;
 
-    const userPrompt = `Give tips for attending ${match.homeTeam} vs ${match.awayTeam} at ${match.venue || match.homeTeam + ' Stadium'} in ${match.city}, ${match.country}.
-League: ${match.league}
+    const userPrompt = `Give tips for attending ${homeTeam} vs ${awayTeam} at ${venue || homeTeam + ' Stadium'} in ${city}, ${country}.
+League: ${league}
 ${weatherInfo}
 
 JSON format only:
@@ -480,16 +507,19 @@ JSON format only:
       console.log('[AI Tips] Failed to parse JSON, using fallback');
     }
 
-    return generateFallbackTips(match, weather);
+    return generateFallbackTips(homeTeam, awayTeam, venue, city, weather);
     
   } catch (error) {
     console.error('[AI Tips] Error:', error);
-    return generateFallbackTips(match, weather);
+    return generateFallbackTips(homeTeam, awayTeam, venue, city, weather);
   }
 }
 
 function generateFallbackTips(
-  match: { homeTeam: string; awayTeam: string; venue: string; city: string; country: string },
+  homeTeam: string,
+  awayTeam: string,
+  venue: string,
+  city: string,
   weather: { temperature: number | null; condition: string } | null
 ): {
   arrival: string;
@@ -498,8 +528,8 @@ function generateFallbackTips(
   atmosphere: string;
   safety: string;
 } {
-  const isDerby = match.homeTeam.toLowerCase().includes('united') && match.awayTeam.toLowerCase().includes('city') ||
-                  match.homeTeam.toLowerCase().includes('city') && match.awayTeam.toLowerCase().includes('united');
+  const isDerby = homeTeam.toLowerCase().includes('united') && awayTeam.toLowerCase().includes('city') ||
+                  homeTeam.toLowerCase().includes('city') && awayTeam.toLowerCase().includes('united');
   
   const coldWeather = weather && weather.temperature !== null && weather.temperature < 10;
   const rainyWeather = weather && weather.condition.toLowerCase().includes('rain');
@@ -507,11 +537,11 @@ function generateFallbackTips(
   return {
     arrival: `Arrive at least 90 minutes before kickoff to soak in the atmosphere and find your seat. Gates typically open 2 hours before the match.`,
     
-    parking: `Public transport is recommended for most major stadiums. Check local transit apps for the best routes to ${match.venue || match.homeTeam + ' Stadium'}.`,
+    parking: `Public transport is recommended for most major stadiums. Check local transit apps for the best routes to ${venue || homeTeam + ' Stadium'}.`,
     
     food: `Try local favorites near the stadium - ask locals for their matchday recommendations. Stadium food options are available but can be pricey.`,
     
-    atmosphere: `${match.homeTeam} fans are known for their passionate support. ${isDerby ? 'This is a derby match - expect intense atmosphere!' : 'Expect a lively matchday experience.'}`,
+    atmosphere: `${homeTeam} fans are known for their passionate support. ${isDerby ? 'This is a derby match - expect intense atmosphere!' : 'Expect a lively matchday experience.'}`,
     
     safety: `${coldWeather ? 'Dress warmly for the weather. ' : ''}${rainyWeather ? 'Bring rain gear. ' : ''}Stay with fellow fans if you're visiting as an away supporter. Keep valuables secure and know your exit routes.`,
   };
