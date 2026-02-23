@@ -32,13 +32,17 @@ import {
   Thermometer,
   Wind,
   Umbrella,
+  Share2,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface AttendMatchModalProps {
   match: FootballMatch;
   isOpen: boolean;
   onClose: () => void;
   userLocation?: { city: string; country: string };
+  onShareSuccess?: () => void;
 }
 
 interface AttendMatchData {
@@ -81,10 +85,12 @@ interface AttendMatchData {
   };
 }
 
-export function AttendMatchModal({ match, isOpen, onClose, userLocation }: AttendMatchModalProps) {
+export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShareSuccess }: AttendMatchModalProps) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AttendMatchData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const fetchAttendMatchData = useCallback(async () => {
     setLoading(true);
@@ -168,6 +174,69 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     return { dateStr, timeStr };
+  };
+
+  const handleShareAttendance = async () => {
+    if (!profile) {
+      toast.error('Please sign in to share your attendance');
+      return;
+    }
+
+    setSharing(true);
+    try {
+      // Get user's membership
+      const { data: membership, error: memberError } = await supabase
+        .from('fan_memberships')
+        .select('id')
+        .eq('fan_id', profile.id)
+        .limit(1)
+        .single();
+
+      if (memberError || !membership) {
+        toast.error('You need to join a club first');
+        return;
+      }
+
+      // Create match attendance post
+      const matchData = {
+        homeTeam: match.homeTeam.name,
+        awayTeam: match.awayTeam.name,
+        homeTeamLogo: match.homeTeam.logo,
+        awayTeamLogo: match.awayTeam.logo,
+        matchDate: match.datetime,
+        venue: match.venue?.name,
+        city: match.venue?.city,
+        league: match.league?.name,
+        matchId: match.id,
+      };
+
+      const { data, error } = await supabase.rpc('create_chant', {
+        p_membership_id: membership.id,
+        p_content: `I'm going to this match! Who's joining? 🎉`,
+        p_image_url: null,
+        p_post_type: 'match_attendance',
+        p_match_data: matchData,
+      });
+
+      if (error) {
+        console.error('[Share] Error:', error);
+        toast.error('Failed to share. Please try again.');
+        return;
+      }
+
+      toast.success('Shared! Other fans can now see you\'re attending 🎉');
+      
+      if (onShareSuccess) {
+        onShareSuccess();
+      }
+      
+      onClose();
+    } catch (err) {
+      console.error('[Share] Error:', err);
+      toast.error('Something went wrong');
+    } finally {
+      setSharing(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -519,9 +588,25 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
             <p className="text-xs text-muted-foreground">
               Powered by AI • Links open in new tabs
             </p>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleShareAttendance}
+                disabled={sharing || loading}
+                className="gap-1.5"
+              >
+                {sharing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
+                Share with Fans
+              </Button>
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       </div>

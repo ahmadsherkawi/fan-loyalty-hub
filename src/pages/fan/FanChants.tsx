@@ -26,6 +26,18 @@ import {
 import { AIChantGenerator } from "@/components/ai";
 import { toast as sonnerToast } from "sonner";
 
+interface MatchData {
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamLogo?: string;
+  awayTeamLogo?: string;
+  matchDate: string;
+  venue?: string;
+  city?: string;
+  league?: string;
+  matchId?: string;
+}
+
 interface Chant {
   id: string;
   fan_id: string;
@@ -34,10 +46,14 @@ interface Chant {
   content: string;
   image_url: string | null;
   cheers_count: number;
+  going_count?: number;
   is_edited: boolean;
   created_at: string;
   updated_at: string;
   cheered_by_me: boolean;
+  going_by_me?: boolean;
+  post_type?: string;
+  match_data?: MatchData | null;
 }
 
 interface FanMembership {
@@ -79,6 +95,7 @@ export default function FanChants() {
   const [dataLoading, setDataLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [cheeringId, setCheeringId] = useState<string | null>(null);
+  const [goingId, setGoingId] = useState<string | null>(null);
   const [reportingId, setReportingId] = useState<string | null>(null);
 
   // Compose state
@@ -315,6 +332,45 @@ export default function FanChants() {
       });
     } finally {
       setCheeringId(null);
+    }
+  };
+
+  const handleGoing = async (chantId: string) => {
+    if (!profile) return;
+
+    setGoingId(chantId);
+    try {
+      const { data, error } = await supabase.rpc("toggle_match_going", {
+        p_chant_id: chantId,
+        p_fan_id: profile.id,
+      });
+
+      if (error) throw error;
+
+      // Update chant in list
+      setChants((prev) =>
+        prev.map((c) =>
+          c.id === chantId
+            ? {
+                ...c,
+                going_count: data.going_count,
+                going_by_me: data.going,
+              }
+            : c
+        )
+      );
+
+      if (data.going) {
+        sonnerToast.success("You're going! 🎉");
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: (err as Error)?.message || "Could not update attendance.",
+        variant: "destructive",
+      });
+    } finally {
+      setGoingId(null);
     }
   };
 
@@ -630,10 +686,12 @@ export default function FanChants() {
                 chant={chant}
                 currentFanId={profile?.id || ""}
                 onCheer={handleCheer}
+                onGoing={handleGoing}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onReport={handleReport}
                 isCheering={cheeringId === chant.id}
+                isGoing={goingId === chant.id}
                 isReporting={reportingId === chant.id}
               />
             ))}
