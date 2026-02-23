@@ -1,13 +1,14 @@
 // Attend Match Modal - AI-powered match attendance planning
 // Shows tickets, transportation, weather, and personalized tips
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { FootballMatch } from '@/types/football';
+import { supabase } from '@/integrations/supabase/client';
+import type { FootballMatch } from '@/types/database';
 import {
   X,
   Ticket,
@@ -28,6 +29,9 @@ import {
   Shield,
   CheckCircle,
   AlertCircle,
+  Thermometer,
+  Wind,
+  Umbrella,
 } from 'lucide-react';
 
 interface AttendMatchModalProps {
@@ -82,54 +86,63 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
   const [data, setData] = useState<AttendMatchData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && match) {
-      fetchAttendMatchData();
-    }
-  }, [isOpen, match]);
-
-  const fetchAttendMatchData = async () => {
+  const fetchAttendMatchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/attend-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      console.log('[AttendMatch] Fetching data for:', match.homeTeam.name, 'vs', match.awayTeam.name);
+
+      // Call Supabase Edge Function
+      const { data: result, error: fnError } = await supabase.functions.invoke('attend-match', {
+        body: {
           match: {
             homeTeam: match.homeTeam.name,
             awayTeam: match.awayTeam.name,
-            venue: match.venue.name || match.homeTeam.name + ' Stadium',
-            city: match.venue.city || 'Unknown',
-            country: match.league.country || 'Unknown',
+            venue: match.venue?.name || match.homeTeam.name + ' Stadium',
+            city: match.venue?.city || 'Unknown',
+            country: match.league?.country || 'Unknown',
             date: match.datetime,
             time: new Date(match.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            league: match.league.name,
+            league: match.league?.name || '',
           },
           userLocation,
-        }),
+        },
       });
 
-      const result = await response.json();
+      if (fnError) {
+        console.error('[AttendMatch] Function error:', fnError);
+        setError(fnError.message || 'Failed to fetch data');
+        return;
+      }
 
-      if (result.success) {
+      if (result?.success && result?.data) {
+        console.log('[AttendMatch] Data received:', result.data);
         setData(result.data);
       } else {
-        setError(result.error || 'Failed to fetch data');
+        setError(result?.error || 'Failed to fetch data');
       }
     } catch (err) {
+      console.error('[AttendMatch] Error:', err);
       setError('Failed to connect to server');
     } finally {
       setLoading(false);
     }
-  };
+  }, [match, userLocation]);
+
+  useEffect(() => {
+    if (isOpen && match) {
+      fetchAttendMatchData();
+    }
+  }, [isOpen, match, fetchAttendMatchData]);
 
   const getWeatherIcon = (condition: string) => {
     const lower = condition.toLowerCase();
-    if (lower.includes('rain')) return <CloudRain className="h-8 w-8 text-blue-400" />;
+    if (lower.includes('rain') || lower.includes('drizzle')) return <CloudRain className="h-8 w-8 text-blue-400" />;
     if (lower.includes('snow')) return <CloudSnow className="h-8 w-8 text-blue-200" />;
     if (lower.includes('clear') || lower.includes('sun')) return <Sun className="h-8 w-8 text-yellow-400" />;
+    if (lower.includes('cloud')) return <Cloud className="h-8 w-8 text-gray-400" />;
+    if (lower.includes('storm') || lower.includes('thunder')) return <CloudRain className="h-8 w-8 text-purple-400" />;
     return <Cloud className="h-8 w-8 text-gray-400" />;
   };
 
@@ -142,11 +155,28 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
     }).format(price);
   };
 
+  const getMatchDateInfo = () => {
+    const date = new Date(match.datetime);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const dateStr = date.toDateString() === today.toDateString() ? 'Today' :
+                    date.toDateString() === tomorrow.toDateString() ? 'Tomorrow' :
+                    date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return { dateStr, timeStr };
+  };
+
   if (!isOpen) return null;
+
+  const { dateStr, timeStr } = getMatchDateInfo();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div 
+      <div
         className="w-full max-w-2xl max-h-[90vh] bg-card rounded-2xl border border-border shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -160,7 +190,7 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
               <div>
                 <h2 className="font-semibold text-lg">Attend Match</h2>
                 <p className="text-sm text-muted-foreground">
-                  AI-powered planning for {match.homeTeam.name} vs {match.awayTeam.name}
+                  {match.homeTeam.name} vs {match.awayTeam.name}
                 </p>
               </div>
             </div>
@@ -168,10 +198,29 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
               <X className="h-5 w-5" />
             </Button>
           </div>
+
+          {/* Match Info Bar */}
+          <div className="flex items-center gap-3 mt-3 text-sm">
+            <Badge variant="outline" className="gap-1.5">
+              <Clock className="h-3 w-3" />
+              {dateStr} at {timeStr}
+            </Badge>
+            {match.venue?.name && (
+              <Badge variant="outline" className="gap-1.5">
+                <MapPin className="h-3 w-3" />
+                {match.venue.city || match.venue.name}
+              </Badge>
+            )}
+            {match.league?.name && (
+              <Badge variant="secondary" className="text-xs">
+                {match.league.name}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Content */}
-        <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+        <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
@@ -276,6 +325,13 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
                       ))}
                     </div>
                   </div>
+
+                  {/* Tip */}
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      💡 <strong>Tip:</strong> Compare prices across multiple platforms. Official club tickets are usually cheapest but sell fast. Resale platforms offer last-minute options.
+                    </p>
+                  </div>
                 </TabsContent>
 
                 {/* Transport Tab */}
@@ -350,21 +406,54 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation }: Atten
                 {/* Weather Tab */}
                 <TabsContent value="weather" className="mt-4">
                   {data.weather ? (
-                    <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-                      <div className="flex items-center gap-4">
-                        {getWeatherIcon(data.weather.condition)}
-                        <div className="flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold">{data.weather.temperature}°C</span>
-                            <span className="text-muted-foreground">{data.weather.condition}</span>
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-4">
+                          {getWeatherIcon(data.weather.condition)}
+                          <div className="flex-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-3xl font-bold">{data.weather.temperature}°C</span>
+                              <span className="text-muted-foreground">{data.weather.condition}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {data.weather.description}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground capitalize">
-                            {data.weather.description}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
+                        <div className="flex items-start gap-2">
+                          <Thermometer className="h-4 w-4 text-primary mt-0.5" />
+                          <p className="text-sm">{data.weather.recommendation}</p>
+                        </div>
+                      </div>
+
+                      {/* Weather Quick Tips */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border/50">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Umbrella className="h-4 w-4 text-blue-400" />
+                            <span className="text-xs font-medium">Rain Gear</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {data.weather.condition.toLowerCase().includes('rain')
+                              ? 'Essential - bring umbrella or poncho'
+                              : 'Not needed based on forecast'}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border/50">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Wind className="h-4 w-4 text-cyan-400" />
+                            <span className="text-xs font-medium">Wind</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Stadium may be windy - dress in layers
                           </p>
                         </div>
                       </div>
-                      <Separator className="my-4" />
-                      <p className="text-sm">{data.weather.recommendation}</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8">
