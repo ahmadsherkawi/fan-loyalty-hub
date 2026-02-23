@@ -13,6 +13,7 @@ import { Logo } from '@/components/ui/Logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpotlightCard, AnimatedBorderCard } from '@/components/design-system';
 import { AIPredictionCard } from '@/components/ai';
+import { AttendMatchModal } from '@/components/ui/AttendMatchModal';
 import { footballApi, MAJOR_LEAGUES } from '@/lib/footballApi';
 import type { FootballMatch, Club } from '@/types/database';
 import {
@@ -29,6 +30,7 @@ import {
   Star,
   ChevronDown,
   X,
+  Ticket,
 } from 'lucide-react';
 
 // Utility functions - defined outside components for reuse
@@ -69,6 +71,8 @@ export default function MatchCenterPage() {
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<FootballMatch | null>(null);
+  const [showAttendModal, setShowAttendModal] = useState(false);
+  const [attendMatch, setAttendMatch] = useState<FootballMatch | null>(null);
 
   // Load fan's club
   useEffect(() => {
@@ -412,6 +416,10 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
+                  onAttend={() => {
+                    setAttendMatch(match);
+                    setShowAttendModal(true);
+                  }}
                   isFinished
                 />
               ))
@@ -440,6 +448,10 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
+                  onAttend={() => {
+                    setAttendMatch(match);
+                    setShowAttendModal(true);
+                  }}
                   isLive
                 />
               ))
@@ -459,6 +471,10 @@ export default function MatchCenterPage() {
                   key={match.id}
                   match={match}
                   onSelect={() => setSelectedMatch(match)}
+                  onAttend={() => {
+                    setAttendMatch(match);
+                    setShowAttendModal(true);
+                  }}
                 />
               ))
             )}
@@ -482,6 +498,18 @@ export default function MatchCenterPage() {
           </div>
         )}
 
+        {/* Attend Match Modal */}
+        {attendMatch && (
+          <AttendMatchModal
+            match={attendMatch}
+            isOpen={showAttendModal}
+            onClose={() => {
+              setShowAttendModal(false);
+              setAttendMatch(null);
+            }}
+          />
+        )}
+
         {/* API Usage (dev only) */}
         {process.env.NODE_ENV === 'development' && (
           <div className="text-[10px] text-muted-foreground text-center pt-4 border-t border-border/30">
@@ -494,7 +522,13 @@ export default function MatchCenterPage() {
 }
 
 // Match Card Component
-function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { match: FootballMatch; onSelect: () => void; isLive?: boolean; isFinished?: boolean }) {
+function MatchCard({ match, onSelect, onAttend, isLive = false, isFinished = false }: { 
+  match: FootballMatch; 
+  onSelect: () => void;
+  onAttend: () => void;
+  isLive?: boolean; 
+  isFinished?: boolean;
+}) {
   const getElapsedTime = (m: FootballMatch) => {
     if (!m.elapsed) return null;
     if (m.elapsed > 45 && m.elapsed < 60) return 'HT';
@@ -504,13 +538,12 @@ function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { ma
 
   return (
     <SpotlightCard
-      className="p-4 cursor-pointer"
+      className="p-4"
       spotlightColor="hsl(var(--primary) / 0.05)"
-      onClick={onSelect}
     >
       {/* Live Badge & League */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={onSelect}>
           {isLive && (
             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse text-[10px]">
               LIVE {getElapsedTime(match)}
@@ -524,7 +557,7 @@ function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { ma
           <span className="text-[10px] text-muted-foreground">{match.league.name}</span>
         </div>
         {!isLive && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs cursor-pointer" onClick={onSelect}>
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="font-semibold text-primary">{formatMatchTime(match.datetime)}</span>
             <Badge variant="outline" className="text-[10px]">{formatMatchDate(match.datetime)}</Badge>
@@ -533,7 +566,7 @@ function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { ma
       </div>
 
       {/* Score Display */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 cursor-pointer" onClick={onSelect}>
         {/* Home Team */}
         <div className="flex-1 flex items-center gap-2">
           {match.homeTeam.logo ? (
@@ -568,13 +601,29 @@ function MatchCard({ match, onSelect, isLive = false, isFinished = false }: { ma
         </div>
       </div>
 
-      {/* Venue */}
-      {match.venue.name && (
-        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/30 text-[10px] text-muted-foreground">
-          <MapPin className="h-3 w-3" />
-          <span>{match.venue.name}{match.venue.city && `, ${match.venue.city}`}</span>
-        </div>
-      )}
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+        {match.venue.name && (
+          <div className="flex-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            <span>{match.venue.name}{match.venue.city && `, ${match.venue.city}`}</span>
+          </div>
+        )}
+        {!isFinished && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[10px] gap-1 ml-auto"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAttend();
+            }}
+          >
+            <Ticket className="h-3 w-3" />
+            Attend
+          </Button>
+        )}
+      </div>
     </SpotlightCard>
   );
 }
