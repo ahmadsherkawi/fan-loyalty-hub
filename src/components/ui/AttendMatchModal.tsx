@@ -43,6 +43,7 @@ interface AttendMatchModalProps {
   onClose: () => void;
   userLocation?: { city: string; country: string };
   onShareSuccess?: () => void;
+  clubId?: string; // Current club/community context for posting
 }
 
 interface AttendMatchData {
@@ -85,7 +86,7 @@ interface AttendMatchData {
   };
 }
 
-export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShareSuccess }: AttendMatchModalProps) {
+export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShareSuccess, clubId }: AttendMatchModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AttendMatchData | null>(null);
@@ -184,23 +185,52 @@ export function AttendMatchModal({ match, isOpen, onClose, userLocation, onShare
 
     setSharing(true);
     try {
-      // Check for fan membership (official club)
-      const { data: membership } = await supabase
-        .from('fan_memberships')
-        .select('id, club_id')
-        .eq('fan_id', profile.id)
-        .limit(1)
-        .maybeSingle();
+      let membership = null;
+      let communityMembership = null;
 
-      // Check for community membership if no fan membership
-      const { data: communityMembership } = !membership 
-        ? await supabase
+      // If clubId is provided, check membership for that specific club
+      if (clubId) {
+        // Check for fan membership first
+        const { data: fanMember } = await supabase
+          .from('fan_memberships')
+          .select('id, club_id')
+          .eq('fan_id', profile.id)
+          .eq('club_id', clubId)
+          .maybeSingle();
+        
+        if (fanMember) {
+          membership = fanMember;
+        } else {
+          // Check for community membership
+          const { data: commMember } = await supabase
+            .from('community_memberships')
+            .select('club_id')
+            .eq('fan_id', profile.id)
+            .eq('club_id', clubId)
+            .maybeSingle();
+          communityMembership = commMember;
+        }
+      } else {
+        // No clubId provided, check for any membership
+        const { data: fanMember } = await supabase
+          .from('fan_memberships')
+          .select('id, club_id')
+          .eq('fan_id', profile.id)
+          .limit(1)
+          .maybeSingle();
+        
+        if (fanMember) {
+          membership = fanMember;
+        } else {
+          const { data: commMember } = await supabase
             .from('community_memberships')
             .select('club_id')
             .eq('fan_id', profile.id)
             .limit(1)
-            .maybeSingle()
-        : { data: null };
+            .maybeSingle();
+          communityMembership = commMember;
+        }
+      }
 
       if (!membership && !communityMembership) {
         toast.error('You need to join a club or community first');

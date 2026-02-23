@@ -511,6 +511,7 @@ export default function MatchCenterPage() {
               setShowAttendModal(false);
               setAttendMatch(null);
             }}
+            clubId={club?.id}
           />
         )}
 
