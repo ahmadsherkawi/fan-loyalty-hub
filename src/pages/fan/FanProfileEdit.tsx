@@ -381,12 +381,15 @@ export default function FanProfileEditPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container py-4 flex items-center justify-between">
+      <header className="relative border-b border-border/40 overflow-hidden sticky top-0 z-50">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" />
+        <div className="relative container py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/profile")} className="rounded-full h-9">
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            <Button variant="ghost" size="sm" onClick={() => navigate("/fan/profile")} className="rounded-full text-muted-foreground hover:text-foreground h-9">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Back</span>
             </Button>
+            <div className="h-5 w-px bg-border/40 hidden sm:block" />
             <Logo size="sm" />
           </div>
           <Button onClick={handleSave} disabled={isSaving} size="sm" className="rounded-full gradient-stadium font-semibold">

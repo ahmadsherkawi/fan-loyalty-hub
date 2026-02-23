@@ -112,7 +112,7 @@ Home advantage ~10-15%. JSON only:
 
   } catch (error) {
     console.error('[AI Predict] Error:', error);
-    return new Response(JSON.stringify(generateFallbackPrediction({})), {
+    return new Response(JSON.stringify(generateFallbackPrediction({ homeTeam: 'Home', awayTeam: 'Away' } as MatchPredictionRequest)), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
