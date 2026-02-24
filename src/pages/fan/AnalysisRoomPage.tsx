@@ -260,6 +260,7 @@ export default function AnalysisRoomPage() {
         mode: room.mode,
         homeTeam: room.home_team,
         awayTeam: room.away_team,
+        roomId: roomId, // Pass roomId for conversation history
         matchData: {
           home_score: room.home_score,
           away_score: room.away_score,

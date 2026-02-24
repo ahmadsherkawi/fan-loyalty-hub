@@ -403,50 +403,64 @@ export const aiService = {
 // ================= ALEX AI CHAT =================
 
 const ALEX_SYSTEM_PROMPTS: Record<string, string> = {
-  pre_match: `You are Alex, an expert football analyst AI assistant. You have deep knowledge of:
-- Football tactics and formations (4-3-3, 4-4-2, 3-5-2, etc.)
-- Player statistics and performance analysis
-- Team strategies and playing styles
+  pre_match: `You are Alex, an elite football analyst AI with deep expertise in Premier League and European football. You have extensive knowledge of:
+- Football tactics and formations (4-3-3, 4-4-2, 3-5-2, 4-2-3-1, etc.)
+- Player statistics, performance metrics, and scouting reports
+- Team strategies, pressing systems, and playing styles
 - Historical match data and head-to-head records
-- League standings and competition contexts
-- Injury reports and squad depth analysis
+- League standings, xG data, and competition contexts
+- Injury reports, squad depth, and rotation policies
 
-For pre-match analysis, provide:
-1. Team form analysis (based on the data provided)
-2. Key player matchups to watch
-3. Tactical battles and likely formations
-4. Head-to-head history insights
-5. Prediction with reasoning based on the data
+CRITICAL RULES:
+1. NEVER give generic responses - always provide SPECIFIC, DETAILED analysis
+2. ALWAYS reference the STATISTICAL DATA provided in your response
+3. When asked about tactics, explain formations, pressing triggers, build-up patterns
+4. When asked about players, mention specific stats, recent performances, playing style
+5. When asked for predictions, give score predictions with reasoning based on data
+6. Be direct and informative - don't ask follow-up questions, provide the analysis requested
+7. Use bullet points and clear formatting for readability
 
-Always use the STATISTICAL DATA provided to support your analysis. Reference specific numbers, positions, and form guides. Be concise but thorough. Format insights clearly with bullet points when appropriate.`,
+For pre-match analysis, always include:
+- Team form analysis with specific results (W/D/L from last 5 games)
+- Key player matchups with specific stats
+- Tactical battles: how each team's system matches up
+- Head-to-head history with actual results
+- Score prediction with confidence level`;
 
-  live: `You are Alex, an expert football analyst AI assistant watching a LIVE match.
-You provide real-time analysis including:
-- Tactical adjustments and their impact
-- Key moments and turning points explanation
-- Player performance observations
-- Statistical insights during the game
-- Prediction updates as the match progresses
+  live: `You are Alex, an elite football analyst AI watching a LIVE match.
 
-React to events naturally. Be engaging. Explain WHY things happen, not just WHAT happened.
-Keep responses concise since fans are watching live.`,
+CRITICAL RULES:
+1. Provide REAL-TIME analysis of what's happening on the pitch
+2. Explain WHY tactical changes are being made, not just what
+3. Reference specific players and their performances with stats
+4. Give live score predictions based on match flow
+5. Be engaging and passionate - you're watching with the fans
+6. Keep responses focused but informative
 
-  post_match: `You are Alex, an expert football analyst AI assistant for post-match analysis.
-After the final whistle, provide:
-1. Match summary and key turning points
-2. Player ratings and standout performances
-3. Tactical analysis - what worked, what didn't
-4. Statistical breakdown using the data
-5. Implications for upcoming fixtures
+React to events naturally. Explain tactical nuances. Keep fans engaged.`,
 
-Be thorough but engaging. Answer fans' questions about specific moments or decisions.`
+  post_match: `You are Alex, an elite football analyst AI for post-match analysis.
+
+CRITICAL RULES:
+1. Provide comprehensive match summary with key turning points
+2. Give player ratings out of 10 with justification
+3. Analyze tactics - what worked, what failed, why
+4. Use actual statistics from the match
+5. Discuss implications for upcoming fixtures
+6. Be thorough and specific - no generic observations
+
+Answer all fan questions with detailed, specific insights.`
 };
+
+// Store conversation history for context
+const conversationHistory: Map<string, Array<{role: 'user' | 'assistant', content: string}>> = new Map();
 
 interface AlexChatParams {
   message: string;
   mode: 'pre_match' | 'live' | 'post_match';
   homeTeam: string;
   awayTeam: string;
+  roomId?: string;
   matchData?: {
     home_score?: number;
     away_score?: number;
@@ -466,78 +480,202 @@ interface AlexChatParams {
 }
 
 export async function alexChat(params: AlexChatParams): Promise<string> {
-  const { message, mode, homeTeam, awayTeam, matchData, analysisContext } = params;
+  const { message, mode, homeTeam, awayTeam, roomId, matchData, analysisContext } = params;
   
   console.log('[Alex] Chat request:', message.substring(0, 50));
+  console.log('[Alex] Has analysis context:', !!analysisContext);
+  console.log('[Alex] Context data:', analysisContext ? JSON.stringify(analysisContext, null, 2).substring(0, 500) : 'none');
   
   try {
     const zai = await getZAI();
+    console.log('[Alex] ZAI instance ready');
 
-    // Build context
-    let matchContext = `Current Match: ${homeTeam} vs ${awayTeam}`;
+    // Build comprehensive match context
+    let matchContext = `MATCH ANALYSIS DATA
+====================
+Fixture: ${homeTeam} vs ${awayTeam}`;
     
     if (matchData?.league_name) matchContext += `\nCompetition: ${matchData.league_name}`;
     if (matchData?.venue) matchContext += `\nVenue: ${matchData.venue}`;
     if (matchData?.home_score !== undefined) {
-      matchContext += `\nScore: ${homeTeam} ${matchData.home_score} - ${matchData.away_score} ${awayTeam}`;
+      matchContext += `\nCurrent Score: ${homeTeam} ${matchData.home_score} - ${matchData.away_score} ${awayTeam}`;
     }
     
-    matchContext += `\nAnalysis Mode: ${mode === 'pre_match' ? 'Pre-Match' : mode === 'live' ? 'Live Match' : 'Post-Match'}`;
+    matchContext += `\nAnalysis Mode: ${mode === 'pre_match' ? 'Pre-Match Analysis' : mode === 'live' ? 'Live Match Analysis' : 'Post-Match Analysis'}`;
 
-    // Add rich context if provided
+    // Add rich context if provided - this is CRITICAL for quality responses
     if (analysisContext) {
-      matchContext += '\n\n=== STATISTICAL DATA ===';
-      if (analysisContext.homeTeamForm) matchContext += `\n\nHome Team Form:\n${analysisContext.homeTeamForm}`;
-      if (analysisContext.awayTeamForm) matchContext += `\n\nAway Team Form:\n${analysisContext.awayTeamForm}`;
-      if (analysisContext.headToHead) matchContext += `\n\nHead-to-Head:\n${analysisContext.headToHead}`;
-      if (analysisContext.standings) matchContext += `\n\nStandings:\n${analysisContext.standings}`;
-      if (analysisContext.injuries) matchContext += `\n\nInjuries:\n${analysisContext.injuries}`;
-      if (analysisContext.teamStats) matchContext += `\n\nTeam Stats:\n${analysisContext.teamStats}`;
-      if (analysisContext.liveEvents) matchContext += `\n\nMatch Events:\n${analysisContext.liveEvents}`;
-      if (analysisContext.lineups) matchContext += `\n\nLineups:\n${analysisContext.lineups}`;
+      matchContext += '\n\n=== DETAILED STATISTICAL DATA ===\n';
+      
+      if (analysisContext.homeTeamForm) {
+        matchContext += `\n📊 HOME TEAM FORM (${homeTeam}):\n${analysisContext.homeTeamForm}\n`;
+      }
+      if (analysisContext.awayTeamForm) {
+        matchContext += `\n📊 AWAY TEAM FORM (${awayTeam}):\n${analysisContext.awayTeamForm}\n`;
+      }
+      if (analysisContext.headToHead) {
+        matchContext += `\n🔄 HEAD-TO-HEAD RECORD:\n${analysisContext.headToHead}\n`;
+      }
+      if (analysisContext.standings) {
+        matchContext += `\n📈 LEAGUE STANDINGS:\n${analysisContext.standings}\n`;
+      }
+      if (analysisContext.injuries) {
+        matchContext += `\n🏥 INJURY NEWS:\n${analysisContext.injuries}\n`;
+      }
+      if (analysisContext.teamStats) {
+        matchContext += `\n📉 TEAM STATISTICS:\n${analysisContext.teamStats}\n`;
+      }
+      if (analysisContext.liveEvents) {
+        matchContext += `\n⚽ MATCH EVENTS:\n${analysisContext.liveEvents}\n`;
+      }
+      if (analysisContext.lineups) {
+        matchContext += `\n👥 CONFIRMED LINEUPS:\n${analysisContext.lineups}\n`;
+      }
+    } else {
+      // Provide basic context even without API data
+      matchContext += `\n\nNote: Detailed statistical data not available for this match. Use your knowledge of these teams.`;
     }
 
     const systemPrompt = ALEX_SYSTEM_PROMPTS[mode] || ALEX_SYSTEM_PROMPTS.pre_match;
-    const userPrompt = `Match Context:\n${matchContext}\n\nFan's question: ${message}`;
+    
+    // Get or create conversation history for this room
+    const historyKey = roomId || `${homeTeam}-${awayTeam}`;
+    let history = conversationHistory.get(historyKey) || [];
+    
+    // Build messages array with history for context
+    const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Here is the match data for context:\n${matchContext}` }
+    ];
+    
+    // Add conversation history (last 6 exchanges for context)
+    const recentHistory = history.slice(-12); // Last 6 exchanges (user + assistant pairs)
+    messages.push(...recentHistory);
+    
+    // Add current question
+    messages.push({ role: 'user', content: message });
+
+    console.log('[Alex] Sending request with', messages.length, 'messages');
 
     const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 800
+      messages,
+      temperature: 0.8,
+      max_tokens: 1000
     });
 
     const response = completion.choices[0]?.message?.content;
     
     if (response) {
-      console.log('[Alex] Response generated');
+      console.log('[Alex] Response generated:', response.substring(0, 100) + '...');
+      
+      // Update conversation history
+      history.push({ role: 'user', content: message });
+      history.push({ role: 'assistant', content: response });
+      conversationHistory.set(historyKey, history);
+      
       return response;
     }
     
-    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode);
+    console.error('[Alex] No response from AI, using fallback');
+    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode, analysisContext);
     
-  } catch (error) {
-    console.error('[Alex] Chat error:', error);
-    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode);
+  } catch (error: any) {
+    console.error('[Alex] Chat error:', error?.message || error);
+    console.error('[Alex] Full error:', error);
+    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode, analysisContext);
   }
 }
 
-function generateFallbackAlexResponse(message: string, homeTeam: string, awayTeam: string, mode: string): string {
+function generateFallbackAlexResponse(
+  message: string, 
+  homeTeam: string, 
+  awayTeam: string, 
+  mode: string,
+  context?: any
+): string {
   const lowerMessage = message.toLowerCase();
   
+  // Use context if available to provide better responses
+  if (context) {
+    if (lowerMessage.includes('tactic') || lowerMessage.includes('formation')) {
+      return `**Tactical Analysis: ${homeTeam} vs ${awayTeam}**
+
+Based on the available data:
+
+• **${homeTeam}** will look to control possession and build from the back
+• **${awayTeam}** may employ a more counter-attacking approach
+${context.standings ? `• League positions suggest ${context.standings}` : ''}
+${context.homeTeamForm ? `• ${homeTeam} form: ${context.homeTeamForm}` : ''}
+${context.awayTeamForm ? `• ${awayTeam} form: ${context.awayTeamForm}` : ''}
+
+The key tactical battle will be in midfield. Watch for how each team's pressing system matches up.`;
+    }
+    
+    if (lowerMessage.includes('lineup') || lowerMessage.includes('who will play') || lowerMessage.includes('player')) {
+      return `**Expected Lineups & Key Players**
+
+${context.lineups ? `Confirmed lineups:\n${context.lineups}` : 'Lineups not yet confirmed.'}
+
+${context.injuries ? `**Injury News:**\n${context.injuries}` : 'No major injury concerns reported.'}
+
+Key players to watch will be the creative midfielders and strikers who can make the difference in tight matches.`;
+    }
+    
+    if (lowerMessage.includes('prediction') || lowerMessage.includes('who will win') || lowerMessage.includes('score')) {
+      return `**Match Prediction: ${homeTeam} vs ${awayTeam}**
+
+${context.homeTeamForm ? `**${homeTeam} Form:** ${context.homeTeamForm}` : ''}
+${context.awayTeamForm ? `**${awayTeam} Form:** ${context.awayTeamForm}` : ''}
+${context.headToHead ? `**Head-to-Head:** ${context.headToHead}` : ''}
+
+**Prediction:** This looks like a closely contested match. ${homeTeam} has home advantage, but ${awayTeam} cannot be underestimated. I predict a ${Math.random() > 0.5 ? '2-1' : '1-1'} scoreline, with the result likely decided by a moment of individual quality or set-piece.`;
+    }
+  }
+  
+  // Generic fallbacks when no context available
   if (lowerMessage.includes('prediction') || lowerMessage.includes('who will win')) {
-    return `Based on my analysis of ${homeTeam} vs ${awayTeam}, this looks like a closely contested match. ${homeTeam} will have home advantage, but ${awayTeam} has shown good form recently. I'd say it could go either way, with a likely score of 1-1 or 2-1 to the home side. What aspects of the match are you most interested in?`;
+    return `**Match Prediction: ${homeTeam} vs ${awayTeam}**
+
+Based on my analysis:
+• ${homeTeam} will have home advantage - historically worth 0.3-0.5 goals
+• Both teams have quality in their squads
+• The result could hinge on key individual performances
+
+**Prediction:** I expect a tight, competitive match. A 1-1 or 2-1 result seems most likely. The team that takes their chances clinically will win this one.`;
   }
   
   if (lowerMessage.includes('tactic') || lowerMessage.includes('formation')) {
-    return `${homeTeam} typically plays with a balanced approach, looking to control possession. ${awayTeam} often employs a counter-attacking style. The tactical battle will likely be won in midfield. Would you like me to analyze any specific players?`;
+    return `**Tactical Analysis: ${homeTeam} vs ${awayTeam}**
+
+Key tactical points:
+• ${homeTeam} typically looks to dominate possession at home
+• ${awayTeam} will likely set up to counter-attack
+• The midfield battle will be crucial
+• Set pieces could be decisive
+
+Both managers will have specific game plans. Watch for in-game tactical adjustments after the first 30 minutes.`;
   }
   
-  if (lowerMessage.includes('player') || lowerMessage.includes('key')) {
-    return `Key players to watch in this ${homeTeam} vs ${awayTeam} match would be the creative midfielders and the strikers on both sides. Their individual battles could determine the outcome. Is there a specific player you'd like me to focus on?`;
+  if (lowerMessage.includes('player') || lowerMessage.includes('lineup') || lowerMessage.includes('who will play')) {
+    return `**Key Players: ${homeTeam} vs ${awayTeam}**
+
+Players who could make the difference:
+• The creative midfielders who can unlock defenses
+• The strikers' finishing will be crucial
+• Full-backs pushing forward could create overloads
+• Goalkeepers making key saves at important moments
+
+Check official team news closer to kickoff for confirmed lineups.`;
   }
   
-  return `Great question about the ${homeTeam} vs ${awayTeam} match! This ${mode === 'pre_match' ? 'upcoming fixture' : mode === 'live' ? 'ongoing match' : 'completed match'} has several interesting aspects to analyze. What specific aspect would you like me to dive into - tactics, players, or predictions?`;
+  // Default response
+  return `**${homeTeam} vs ${awayTeam} Analysis**
+
+This ${mode === 'pre_match' ? 'upcoming' : mode === 'live' ? 'ongoing' : 'completed'} match has several interesting angles:
+
+• **Tactics:** How each team sets up and adapts
+• **Key Players:** Who can make the difference
+• **Form:** Recent performances and momentum
+
+What would you like me to analyze in detail - tactics, players, or predictions?`;
 }
