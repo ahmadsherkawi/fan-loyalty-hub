@@ -2,39 +2,23 @@
 // This file contains configuration for external APIs
 
 // API-Football Configuration
-// Get your API key from https://www.api-football.com/
 // PRO Plan: 7,500 requests/day for $19/month
-
-let API_FOOTBALL_KEY = '';
-
-/**
- * Initialize API-Football with your API key
- * Call this once at app startup
- */
-export function initApiFootball(apiKey: string) {
-  API_FOOTBALL_KEY = apiKey;
-  
-  // Also set it in the apiFootball module
-  // This is done dynamically to support runtime configuration
-  import('@/lib/apiFootball').then((module) => {
-    module.apiFootball.setApiKey(apiKey);
-  });
-  
-  console.log('[Config] API-Football initialized');
-}
+// API Key is pre-configured in apiFootball.ts
 
 /**
- * Get the current API key (for checking if configured)
+ * Initialize API-Football (key is already configured)
+ * This function exists for compatibility
  */
-export function getApiFootballKey(): string {
-  return API_FOOTBALL_KEY;
+export function initApiFootball(_apiKey?: string) {
+  // API key is already configured in apiFootball.ts
+  console.log('[Config] API-Football PRO is ready (7,500 requests/day)');
 }
 
 /**
  * Check if API-Football is configured
  */
 export function isApiFootballConfigured(): boolean {
-  return API_FOOTBALL_KEY.length > 0;
+  return true; // Key is pre-configured
 }
 
 /**
@@ -43,7 +27,6 @@ export function isApiFootballConfigured(): boolean {
 export const apiConfig = {
   apiFootball: {
     init: initApiFootball,
-    getKey: getApiFootballKey,
     isConfigured: isApiFootballConfigured,
   },
 };

@@ -14,7 +14,8 @@ import type {
 
 // API-Football configuration
 // PRO Plan: 7,500 requests/day, resets at 00:00 UTC
-let API_FOOTBALL_KEY = ''; // Will be set via setApiKey()
+// API Key provided - PRO subscription active
+const API_FOOTBALL_KEY = '2a6e0fcd209780c4e8c0ba090272e5dd';
 
 const API_FOOTBALL_BASE = 'https://v3.football.api-sports.io';
 
@@ -84,11 +85,12 @@ function checkDailyReset() {
 // ================= API CLIENT =================
 
 /**
- * Set the API key (call this once at app startup)
+ * Set the API key (optional - key is pre-configured for PRO plan)
+ * This function exists for future key rotation if needed
  */
 export function setApiKey(key: string) {
-  API_FOOTBALL_KEY = key;
-  console.log('[API-Football] API key configured');
+  // Key is already configured, this is for future use
+  console.log('[API-Football] API key update requested (already configured)');
 }
 
 /**
