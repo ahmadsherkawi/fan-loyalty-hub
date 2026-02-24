@@ -433,6 +433,171 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ================= ALEX AI CHAT API =================
+
+const ALEX_SYSTEM_PROMPTS: Record<string, string> = {
+  pre_match: `You are Alex, an expert football analyst AI assistant. You have deep knowledge of:
+- Football tactics and formations (4-3-3, 4-4-2, 3-5-2, etc.)
+- Player statistics and performance analysis
+- Team strategies and playing styles
+- Historical match data and head-to-head records
+- League standings and competition contexts
+- Injury reports and squad depth analysis
+
+For pre-match analysis, provide:
+1. Team form analysis (based on the data provided)
+2. Key player matchups to watch
+3. Tactical battles and likely formations
+4. Head-to-head history insights
+5. Prediction with reasoning based on the data
+
+Always use the STATISTICAL DATA provided to support your analysis. Reference specific numbers, positions, and form guides. Be concise but thorough. Format insights clearly with bullet points when appropriate.`,
+
+  live: `You are Alex, an expert football analyst AI assistant watching a LIVE match.
+You provide real-time analysis including:
+- Tactical adjustments and their impact
+- Key moments and turning points explanation
+- Player performance observations
+- Statistical insights during the game
+- Prediction updates as the match progresses
+
+React to events naturally based on the match events data. Be engaging. Explain WHY things happen, not just WHAT happened.
+Keep responses concise since fans are watching live. Highlight key statistics from the data provided.`,
+
+  post_match: `You are Alex, an expert football analyst AI assistant for post-match analysis.
+After the final whistle, provide:
+1. Match summary and key turning points
+2. Player ratings and standout performances
+3. Tactical analysis - what worked, what didn't
+4. Statistical breakdown using the data
+5. Implications for upcoming fixtures
+
+Be thorough but engaging. Answer fans' questions about specific moments or decisions.
+Use the statistical data to support your analysis. Compare performances to seasonal averages when relevant.`
+};
+
+interface AlexChatRequest {
+  message: string;
+  mode: 'pre_match' | 'live' | 'post_match';
+  homeTeam: string;
+  awayTeam: string;
+  matchData?: {
+    home_score?: number;
+    away_score?: number;
+    league_name?: string;
+    venue?: string;
+  };
+  analysisContext?: {
+    homeTeamForm?: string;
+    awayTeamForm?: string;
+    headToHead?: string;
+    standings?: string;
+    injuries?: string;
+    teamStats?: string;
+    liveEvents?: string;
+    lineups?: string;
+  };
+}
+
+app.post('/api/ai/chat', async (req, res) => {
+  const startTime = Date.now();
+  console.log('[Alex] Received chat request:', req.body.message?.substring(0, 50));
+  
+  try {
+    const data: AlexChatRequest = req.body;
+    const { message, mode, homeTeam, awayTeam, matchData, analysisContext } = data;
+
+    if (!message || !mode || !homeTeam || !awayTeam) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const zai = await getZAI();
+
+    // Build context for the AI
+    let matchContext = `Current Match: ${homeTeam} vs ${awayTeam}`;
+
+    if (matchData?.league_name) {
+      matchContext += `\nCompetition: ${matchData.league_name}`;
+    }
+    if (matchData?.venue) {
+      matchContext += `\nVenue: ${matchData.venue}`;
+    }
+    if (matchData?.home_score !== undefined) {
+      matchContext += `\nScore: ${homeTeam} ${matchData.home_score} - ${matchData.away_score} ${awayTeam}`;
+    }
+
+    matchContext += `\nAnalysis Mode: ${mode === 'pre_match' ? 'Pre-Match Analysis' : mode === 'live' ? 'Live Match' : 'Post-Match Analysis'}`;
+
+    // Add rich context if provided
+    if (analysisContext) {
+      matchContext += '\n\n=== STATISTICAL DATA ===';
+
+      if (analysisContext.homeTeamForm) {
+        matchContext += `\n\nHome Team Form:\n${analysisContext.homeTeamForm}`;
+      }
+      if (analysisContext.awayTeamForm) {
+        matchContext += `\n\nAway Team Form:\n${analysisContext.awayTeamForm}`;
+      }
+      if (analysisContext.headToHead) {
+        matchContext += `\n\nHead-to-Head History:\n${analysisContext.headToHead}`;
+      }
+      if (analysisContext.standings) {
+        matchContext += `\n\nLeague Standings:\n${analysisContext.standings}`;
+      }
+      if (analysisContext.injuries) {
+        matchContext += `\n\nInjury News:\n${analysisContext.injuries}`;
+      }
+      if (analysisContext.teamStats) {
+        matchContext += `\n\nTeam Statistics:\n${analysisContext.teamStats}`;
+      }
+      if (analysisContext.liveEvents) {
+        matchContext += `\n\nMatch Events:\n${analysisContext.liveEvents}`;
+      }
+      if (analysisContext.lineups) {
+        matchContext += `\n\nLineups:\n${analysisContext.lineups}`;
+      }
+    }
+
+    const systemPrompt = ALEX_SYSTEM_PROMPTS[mode] || ALEX_SYSTEM_PROMPTS.pre_match;
+
+    const userPrompt = `Match Context:\n${matchContext}\n\nFan's question: ${message}`;
+
+    console.log('[Alex] Sending request to LLM...');
+
+    const completion = await zai.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 800
+    });
+
+    const aiResponse = completion.choices[0]?.message?.content;
+
+    if (!aiResponse) {
+      throw new Error('No response from AI');
+    }
+
+    console.log('[Alex] Response received in', Date.now() - startTime, 'ms');
+    console.log('[Alex] Response:', aiResponse.substring(0, 100) + '...');
+
+    res.json({
+      success: true,
+      response: aiResponse,
+      sender: 'Alex (AI Analyst)',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[Alex] Chat error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate AI response', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log('');

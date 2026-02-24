@@ -253,11 +253,10 @@ export default function AnalysisRoomPage() {
         }
       }
 
-      const response = await fetch('/api/analysis/ai-chat', {
+      const response = await fetch('http://localhost:3001/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomId,
           message: messageContent,
           mode: room.mode,
           homeTeam: room.home_team,
