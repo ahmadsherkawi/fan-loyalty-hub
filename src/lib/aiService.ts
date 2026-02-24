@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import ZAI from 'z-ai-web-dev-sdk';
 import { fetchTargetedData, formatTargetedDataForAI, detectDataNeeds } from './alexLiveData';
 import { apiFootball } from './apiFootball';
+import { alexChatOpenAI } from './openaiService';
 
 // Initialize ZAI for frontend use
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
@@ -468,6 +469,7 @@ interface AlexChatParams {
     away_score?: number;
     league_name?: string;
     venue?: string;
+    match_datetime?: string;
   };
   analysisContext?: {
     homeTeamForm?: string;
@@ -478,6 +480,7 @@ interface AlexChatParams {
     teamStats?: string;
     liveEvents?: string;
     lineups?: string;
+    squadData?: string;
   };
   // For dynamic data fetching
   fixtureId?: string;
@@ -495,172 +498,199 @@ export async function alexChat(params: AlexChatParams): Promise<string> {
   console.log('[Alex] Chat request:', message.substring(0, 50));
   console.log('[Alex] Mode:', mode, '| Has fixtureId:', !!fixtureId);
   
-  try {
-    const zai = await getZAI();
-    console.log('[Alex] ZAI instance ready');
-
-    // Detect what data the user is asking about
-    const dataNeeds = detectDataNeeds(message);
-    console.log('[Alex] Question needs:', Array.from(dataNeeds));
-
-    // Build match context
-    let matchContext = `MATCH ANALYSIS DATA
-====================
-Fixture: ${homeTeam} vs ${awayTeam}`;
-    
-    if (matchData?.league_name) matchContext += `\nCompetition: ${matchData.league_name}`;
-    if (matchData?.venue) matchContext += `\nVenue: ${matchData.venue}`;
-    if (matchData?.home_score !== undefined) {
-      matchContext += `\nCurrent Score: ${homeTeam} ${matchData.home_score} - ${matchData.away_score} ${awayTeam}`;
-    }
-    
-    matchContext += `\nAnalysis Mode: ${mode === 'pre_match' ? 'Pre-Match Analysis' : mode === 'live' ? 'Live Match Analysis' : 'Post-Match Analysis'}`;
-
-    // Dynamically fetch targeted data based on the question
-    let targetedDataSection = '';
-    let analysisContext = params.analysisContext;
-    
-    // Always try to fetch live/targeted data if we have the IDs
-    if (apiFootball.isApiConfigured()) {
-      try {
-        console.log('[Alex] Fetching targeted live data...');
-        const { context, targetedData } = await fetchTargetedData(
-          homeTeam,
-          awayTeam,
-          message,
-          {
-            fixtureId,
-            homeTeamId,
-            awayTeamId,
-            leagueId,
+  // Build rich analysis context from Football API
+  let analysisContext: AlexChatParams['analysisContext'] = params.analysisContext || {};
+  let squadData = '';
+  
+  // Fetch targeted data based on the question
+  if (apiFootball.isApiConfigured()) {
+    try {
+      console.log('[Alex] Fetching live data from Football API...');
+      const { context, targetedData } = await fetchTargetedData(
+        homeTeam,
+        awayTeam,
+        message,
+        {
+          fixtureId,
+          homeTeamId,
+          awayTeamId,
+          leagueId,
+        }
+      );
+      
+      // Build rich context from API data
+      if (context) {
+        // Team form
+        if (context.homeTeamForm) {
+          const form = context.homeTeamForm.lastMatches.map(m => m.result).join('');
+          analysisContext.homeTeamForm = `${form} (Form Score: ${context.homeTeamForm.formScore}/100)\n`;
+          analysisContext.homeTeamForm += `Last 5: ${context.homeTeamForm.lastMatches.map(m => 
+            `${m.result} vs ${m.opponent} (${m.home ? 'H' : 'A'}) ${m.goalsFor}-${m.goalsAgainst}`
+          ).join(', ')}\n`;
+          if (context.homeTeamForm.winStreak > 0) {
+            analysisContext.homeTeamForm += `🔥 On a ${context.homeTeamForm.winStreak}-game winning streak!\n`;
           }
-        );
-        
-        if (targetedData && Object.keys(targetedData).length > 0) {
-          targetedDataSection = formatTargetedDataForAI(homeTeam, awayTeam, targetedData);
-          console.log('[Alex] Targeted data section length:', targetedDataSection.length);
+          if (context.homeTeamForm.unbeatenStreak > 0) {
+            analysisContext.homeTeamForm += `💪 ${context.homeTeamForm.unbeatenStreak} games unbeaten\n`;
+          }
         }
         
-        // Also use the full context if available
-        if (context) {
-          if (!analysisContext) {
-            analysisContext = {};
+        if (context.awayTeamForm) {
+          const form = context.awayTeamForm.lastMatches.map(m => m.result).join('');
+          analysisContext.awayTeamForm = `${form} (Form Score: ${context.awayTeamForm.formScore}/100)\n`;
+          analysisContext.awayTeamForm += `Last 5: ${context.awayTeamForm.lastMatches.map(m => 
+            `${m.result} vs ${m.opponent} (${m.home ? 'H' : 'A'}) ${m.goalsFor}-${m.goalsAgainst}`
+          ).join(', ')}\n`;
+          if (context.awayTeamForm.winStreak > 0) {
+            analysisContext.awayTeamForm += `🔥 On a ${context.awayTeamForm.winStreak}-game winning streak!\n`;
           }
+        }
+        
+        // Head to head
+        if (context.headToHead.length > 0) {
+          const h2h = context.headToHead.slice(0, 5);
+          analysisContext.headToHead = `Last ${h2h.length} meetings:\n`;
+          h2h.forEach(m => {
+            analysisContext.headToHead! += `• ${m.homeTeam.name} ${m.homeTeam.score ?? 0} - ${m.awayTeam.score ?? 0} ${m.awayTeam.name} (${new Date(m.datetime).toLocaleDateString()})\n`;
+          });
           
-          // Populate analysis context from the fetched data
-          if (context.homeTeamForm) {
-            const formStr = context.homeTeamForm.lastMatches.map(m => m.result).join('');
-            analysisContext.homeTeamForm = `${context.homeTeamForm.teamName}: ${formStr} (Form: ${context.homeTeamForm.formScore}/100)`;
-          }
-          if (context.awayTeamForm) {
-            const formStr = context.awayTeamForm.lastMatches.map(m => m.result).join('');
-            analysisContext.awayTeamForm = `${context.awayTeamForm.teamName}: ${formStr} (Form: ${context.awayTeamForm.formScore}/100)`;
-          }
-          if (context.headToHead.length > 0) {
-            const h2h = context.headToHead.slice(0, 5).map(m => 
-              `${m.homeTeam.name} ${m.homeTeam.score ?? 0}-${m.awayTeam.score ?? 0} ${m.awayTeam.name}`
-            ).join(', ');
-            analysisContext.headToHead = `Last ${Math.min(5, context.headToHead.length)} meetings: ${h2h}`;
-          }
-          if (context.standings.length > 0 && context.homeTeamForm && context.awayTeamForm) {
-            const homePos = context.standings.find(t => t.teamId === context.homeTeamForm!.teamId);
-            const awayPos = context.standings.find(t => t.teamId === context.awayTeamForm!.teamId);
-            if (homePos && awayPos) {
-              analysisContext.standings = `${homePos.teamName}: ${homePos.rank}th, ${homePos.points} pts | ${awayPos.teamName}: ${awayPos.rank}th, ${awayPos.points} pts`;
-            }
-          }
-          if (context.homeTeamInjuries.length > 0 || context.awayTeamInjuries.length > 0) {
-            const injuries: string[] = [];
-            if (context.homeTeamInjuries.length > 0) {
-              injuries.push(`${homeTeam}: ${context.homeTeamInjuries.slice(0, 3).map(i => i.player.name).join(', ')}`);
-            }
-            if (context.awayTeamInjuries.length > 0) {
-              injuries.push(`${awayTeam}: ${context.awayTeamInjuries.slice(0, 3).map(i => i.player.name).join(', ')}`);
-            }
-            analysisContext.injuries = injuries.join('; ');
-          }
-          if (context.homeTeamStats && context.awayTeamStats) {
-            analysisContext.teamStats = `${homeTeam}: ${context.homeTeamStats.goals.average.home.toFixed(2)} goals/game (home), ${context.homeTeamStats.cleanSheet} clean sheets\n${awayTeam}: ${context.awayTeamStats.goals.average.away.toFixed(2)} goals/game (away), ${context.awayTeamStats.cleanSheet} clean sheets`;
-          }
-          if (context.lineups.length === 2) {
-            analysisContext.lineups = context.lineups.map(l => 
-              `${l.team.name} (${l.formation})`
-            ).join(' vs ');
-          }
-          if (context.events.length > 0) {
-            const goals = context.events.filter(e => e.type === 'goal');
-            analysisContext.liveEvents = goals.map(g => `${g.player} ${g.minute}'`).join(', ');
+          // Calculate H2H stats
+          let homeWins = 0, awayWins = 0, draws = 0;
+          h2h.forEach(m => {
+            const hs = m.homeTeam.score ?? 0;
+            const as = m.awayTeam.score ?? 0;
+            const homeIsFirst = m.homeTeam.name.toLowerCase().includes(homeTeam.toLowerCase());
+            if (hs > as) homeIsFirst ? homeWins++ : awayWins++;
+            else if (hs < as) homeIsFirst ? awayWins++ : homeWins++;
+            else draws++;
+          });
+          analysisContext.headToHead += `\nSummary: ${homeTeam} ${homeWins}W, ${awayTeam} ${awayWins}W, ${draws}D`;
+        }
+        
+        // Standings
+        if (context.standings.length > 0 && context.homeTeamForm && context.awayTeamForm) {
+          const homePos = context.standings.find(t => t.teamId === context.homeTeamForm!.teamId);
+          const awayPos = context.standings.find(t => t.teamId === context.awayTeamForm!.teamId);
+          
+          if (homePos && awayPos) {
+            analysisContext.standings = `${homePos.teamName}: ${homePos.rank}th place, ${homePos.points} pts (${homePos.won}W ${homePos.drawn}D ${homePos.lost}L)\n`;
+            analysisContext.standings += `${awayPos.teamName}: ${awayPos.rank}th place, ${awayPos.points} pts (${awayPos.won}W ${awayPos.drawn}D ${awayPos.lost}L)\n`;
+            analysisContext.standings += `\nPoints gap: ${Math.abs(homePos.points - awayPos.points)} points`;
           }
         }
-      } catch (dataError) {
-        console.warn('[Alex] Could not fetch targeted data:', dataError);
+        
+        // Injuries
+        if (context.homeTeamInjuries.length > 0 || context.awayTeamInjuries.length > 0) {
+          analysisContext.injuries = '';
+          if (context.homeTeamInjuries.length > 0) {
+            analysisContext.injuries += `${homeTeam}: ${context.homeTeamInjuries.slice(0, 5).map(i => 
+              `${i.player.name} (${i.type || i.reason})`
+            ).join(', ')}\n`;
+          }
+          if (context.awayTeamInjuries.length > 0) {
+            analysisContext.injuries += `${awayTeam}: ${context.awayTeamInjuries.slice(0, 5).map(i => 
+              `${i.player.name} (${i.type || i.reason})`
+            ).join(', ')}`;
+          }
+        }
+        
+        // Team stats
+        if (context.homeTeamStats && context.awayTeamStats) {
+          analysisContext.teamStats = `${homeTeam}:\n`;
+          analysisContext.teamStats += `• Goals/game (home): ${context.homeTeamStats.goals.average.home.toFixed(2)}\n`;
+          analysisContext.teamStats += `• Clean sheets: ${context.homeTeamStats.cleanSheet}\n`;
+          analysisContext.teamStats += `• Failed to score: ${context.homeTeamStats.failedToScore} times\n\n`;
+          analysisContext.teamStats += `${awayTeam}:\n`;
+          analysisContext.teamStats += `• Goals/game (away): ${context.awayTeamStats.goals.average.away.toFixed(2)}\n`;
+          analysisContext.teamStats += `• Clean sheets: ${context.awayTeamStats.cleanSheet}\n`;
+          analysisContext.teamStats += `• Failed to score: ${context.awayTeamStats.failedToScore} times`;
+        }
+        
+        // Lineups
+        if (context.lineups.length === 2) {
+          analysisContext.lineups = '';
+          context.lineups.forEach(lineup => {
+            analysisContext.lineups! += `${lineup.team.name} (${lineup.formation}):\n`;
+            analysisContext.lineups! += lineup.startXI.slice(0, 11).map(p => 
+              `  ${p.player.name} (${p.player.pos})`
+            ).join('\n');
+            analysisContext.lineups! += '\n\n';
+          });
+        }
+        
+        // Live events
+        if (context.events.length > 0) {
+          const goals = context.events.filter(e => e.type === 'goal');
+          const cards = context.events.filter(e => e.type === 'card');
+          analysisContext.liveEvents = '';
+          if (goals.length > 0) {
+            analysisContext.liveEvents += `Goals: ${goals.map(g => `⚽ ${g.player} ${g.minute}'`).join(', ')}\n`;
+          }
+          if (cards.length > 0) {
+            analysisContext.liveEvents += `Cards: ${cards.map(c => `🟨 ${c.player} ${c.minute}'`).join(', ')}`;
+          }
+        }
+        
+        // Squad data
+        if (targetedData.homeSquad || targetedData.awaySquad) {
+          if (targetedData.homeSquad) {
+            const squad = targetedData.homeSquad as Array<{ name: string; position: string }>;
+            squadData += `${homeTeam} Squad:\n`;
+            // Group by position
+            const byPos = squad.reduce((acc, p) => {
+              if (!acc[p.position]) acc[p.position] = [];
+              acc[p.position].push(p.name);
+              return acc;
+            }, {} as Record<string, string[]>);
+            Object.entries(byPos).forEach(([pos, players]) => {
+              squadData += `${pos}: ${players.slice(0, 3).join(', ')}\n`;
+            });
+          }
+          if (targetedData.awaySquad) {
+            const squad = targetedData.awaySquad as Array<{ name: string; position: string }>;
+            squadData += `\n${awayTeam} Squad:\n`;
+            const byPos = squad.reduce((acc, p) => {
+              if (!acc[p.position]) acc[p.position] = [];
+              acc[p.position].push(p.name);
+              return acc;
+            }, {} as Record<string, string[]>);
+            Object.entries(byPos).forEach(([pos, players]) => {
+              squadData += `${pos}: ${players.slice(0, 3).join(', ')}\n`;
+            });
+          }
+        }
       }
+      
+      console.log('[Alex] Data fetched successfully');
+    } catch (dataError) {
+      console.warn('[Alex] Could not fetch data:', dataError);
     }
-
-    // Add analysis context to match context
-    if (analysisContext) {
-      matchContext += '\n\n=== TEAM DATA ===\n';
-      if (analysisContext.homeTeamForm) matchContext += `\n📊 HOME FORM: ${analysisContext.homeTeamForm}`;
-      if (analysisContext.awayTeamForm) matchContext += `\n📊 AWAY FORM: ${analysisContext.awayTeamForm}`;
-      if (analysisContext.headToHead) matchContext += `\n🔄 HEAD-TO-HEAD: ${analysisContext.headToHead}`;
-      if (analysisContext.standings) matchContext += `\n📈 STANDINGS: ${analysisContext.standings}`;
-      if (analysisContext.injuries) matchContext += `\n🏥 INJURIES: ${analysisContext.injuries}`;
-      if (analysisContext.teamStats) matchContext += `\n📉 STATS: ${analysisContext.teamStats}`;
-    }
-    
-    // Add targeted data section (live events, lineups, etc.)
-    if (targetedDataSection) {
-      matchContext += `\n\n=== LIVE DATA ===\n${targetedDataSection}`;
-    }
-
-    const systemPrompt = ALEX_SYSTEM_PROMPTS[mode] || ALEX_SYSTEM_PROMPTS.pre_match;
-    
-    // Get or create conversation history for this room
-    const historyKey = roomId || `${homeTeam}-${awayTeam}`;
-    let history = conversationHistory.get(historyKey) || [];
-    
-    // Build messages array with history for context
-    const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Here is the match data for context:\n${matchContext}` }
-    ];
-    
-    // Add conversation history (last 6 exchanges for context)
-    const recentHistory = history.slice(-12);
-    messages.push(...recentHistory);
-    
-    // Add current question
-    messages.push({ role: 'user', content: message });
-
-    console.log('[Alex] Sending request with', messages.length, 'messages');
-    console.log('[Alex] Context length:', matchContext.length, 'chars');
-
-    const completion = await zai.chat.completions.create({
-      messages,
-      temperature: 0.8,
-      max_tokens: 1200
+  }
+  
+  // Add squad data to context
+  if (squadData) {
+    analysisContext.squadData = squadData;
+  }
+  
+  // Use OpenAI for the response
+  try {
+    const response = await alexChatOpenAI({
+      message,
+      mode,
+      homeTeam,
+      awayTeam,
+      roomId,
+      matchData: {
+        ...matchData,
+        match_datetime: matchData?.match_datetime,
+      },
+      analysisContext,
     });
-
-    const response = completion.choices[0]?.message?.content;
     
-    if (response) {
-      console.log('[Alex] Response generated:', response.substring(0, 100) + '...');
-      
-      // Update conversation history
-      history.push({ role: 'user', content: message });
-      history.push({ role: 'assistant', content: response });
-      conversationHistory.set(historyKey, history);
-      
-      return response;
-    }
-    
-    console.error('[Alex] No response from AI, using fallback');
+    return response;
+  } catch (error) {
+    console.error('[Alex] OpenAI error:', error);
     return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode, analysisContext);
-    
-  } catch (error: any) {
-    console.error('[Alex] Chat error:', error?.message || error);
-    console.error('[Alex] Full error:', error);
-    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode, params.analysisContext);
   }
 }
 
