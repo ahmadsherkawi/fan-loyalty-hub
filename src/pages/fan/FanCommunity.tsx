@@ -706,6 +706,23 @@ export default function FanCommunity() {
             </div>
           </SpotlightCard>
           
+          {/* AI Analysis Room Card */}
+          <SpotlightCard 
+            className="p-3 cursor-pointer"
+            spotlightColor="hsl(var(--accent) / 0.08)"
+            onClick={() => navigate('/fan/analysis')}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                <Brain className="h-4 w-4 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">AI Analysis</h3>
+                <p className="text-[10px] text-muted-foreground">Chat with Alex</p>
+              </div>
+            </div>
+          </SpotlightCard>
+          
           {/* AI Chant Generator Card */}
           <SpotlightCard 
             className="p-3 cursor-pointer"
@@ -714,7 +731,7 @@ export default function FanCommunity() {
           >
             <div className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                <Brain className="h-4 w-4 text-purple-400" />
+                <Sparkles className="h-4 w-4 text-purple-400" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground text-sm">AI Chants</h3>

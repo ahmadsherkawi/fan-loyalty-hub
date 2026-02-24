@@ -718,13 +718,73 @@ export default function FanHome() {
 
         {/* NO MEMBERSHIP STATE */}
         {!membership && (
-          <div className="text-center py-12">
-            <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h2 className="text-xl font-display font-bold mb-2">No Club Joined</h2>
-            <p className="text-muted-foreground mb-6">Join an official club to start your loyalty journey.</p>
-            <Button onClick={() => navigate("/fan/discover")} className="rounded-xl gradient-stadium">
-              Discover Clubs
-            </Button>
+          <div className="space-y-6">
+            {/* Quick Access for non-members */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Match Center Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--primary) / 0.08)"
+                onClick={() => navigate('/fan/matches')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-red-500/15 flex items-center justify-center">
+                    <Radio className="h-6 w-6 text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Match Center</h3>
+                    <p className="text-xs text-muted-foreground">Live scores & predictions</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
+              
+              {/* AI Analysis Room Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--accent) / 0.08)"
+                onClick={() => navigate('/fan/analysis')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                    <Brain className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">AI Analysis</h3>
+                    <p className="text-xs text-muted-foreground">Chat with Alex the AI expert</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
+              
+              {/* AI Chant Generator Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--accent) / 0.08)"
+                onClick={() => navigate('/fan/chants')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">AI Chants</h3>
+                    <p className="text-xs text-muted-foreground">Generate unique chants</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
+            </div>
+
+            {/* Join Club CTA */}
+            <div className="text-center py-8">
+              <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <h2 className="text-xl font-display font-bold mb-2">Join a Club</h2>
+              <p className="text-muted-foreground mb-6">Join an official club to start your loyalty journey and earn rewards.</p>
+              <Button onClick={() => navigate("/fan/discover")} className="rounded-xl gradient-stadium">
+                Discover Clubs
+              </Button>
+            </div>
           </div>
         )}
       </main>
