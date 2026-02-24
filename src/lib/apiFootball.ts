@@ -568,6 +568,44 @@ export async function getTeamById(teamId: string | number): Promise<{ id: string
   return null;
 }
 
+/**
+ * Get upcoming fixtures for a team by name (searches for team ID first)
+ */
+export async function getTeamFixturesByName(teamName: string, next = 10): Promise<FootballMatch[]> {
+  // First, search for the team to get its ID
+  const teams = await searchTeams(teamName);
+  
+  if (teams.length === 0) {
+    console.warn(`[API-Football] Team not found: ${teamName}`);
+    return [];
+  }
+  
+  // Use the first matching team
+  const teamId = teams[0].id;
+  console.log(`[API-Football] Found team ID ${teamId} for "${teamName}" (${teams[0].name})`);
+  
+  return getTeamFixtures(teamId, next);
+}
+
+/**
+ * Get past fixtures for a team by name (searches for team ID first)
+ */
+export async function getTeamPastFixturesByName(teamName: string, last = 10): Promise<FootballMatch[]> {
+  // First, search for the team to get its ID
+  const teams = await searchTeams(teamName);
+  
+  if (teams.length === 0) {
+    console.warn(`[API-Football] Team not found: ${teamName}`);
+    return [];
+  }
+  
+  // Use the first matching team
+  const teamId = teams[0].id;
+  console.log(`[API-Football] Found team ID ${teamId} for "${teamName}" (${teams[0].name})`);
+  
+  return getTeamPastFixtures(teamId, last);
+}
+
 // ================= MATCH EVENTS =================
 
 /**

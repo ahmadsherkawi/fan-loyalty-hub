@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpotlightCard, AnimatedBorderCard } from '@/components/design-system';
 import { AIPredictionCard } from '@/components/ai';
 import { AttendMatchModal } from '@/components/ui/AttendMatchModal';
-import { apiFootball, LEAGUE_IDS } from '@/lib/apiFootball';
+import { apiFootball, LEAGUE_IDS, getTeamFixturesByName, getTeamPastFixturesByName } from '@/lib/apiFootball';
 import type { FootballMatch, Club } from '@/types/database';
 import {
   ArrowLeft,
@@ -135,7 +135,7 @@ export default function MatchCenterPage() {
           console.log(`[MatchCenter] Fetching fixtures for club: ${clubName}`);
           
           // Get club-specific fixtures (sequentially to respect rate limit)
-          const clubUpcoming = await apiFootball.getTeamFixtures(clubName, 10);
+          const clubUpcoming = await getTeamFixturesByName(clubName, 10);
           console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming for ${clubName}`);
           
           for (const match of clubUpcoming) {
@@ -143,7 +143,7 @@ export default function MatchCenterPage() {
             upcomingFixtures.push(match);
           }
           
-          const clubPast = await apiFootball.getTeamPastFixtures(clubName, 10);
+          const clubPast = await getTeamPastFixturesByName(clubName, 10);
           console.log(`[MatchCenter] Found ${clubPast.length} past for ${clubName}`);
           
           for (const match of clubPast) {
@@ -334,7 +334,7 @@ export default function MatchCenterPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => fetchData(true)}
+              onClick={() => window.location.reload()}
               disabled={refreshing}
               className="h-8 w-8 rounded-full"
             >
