@@ -450,7 +450,7 @@ export default function FanHome() {
             </div>
 
             {/* ===================== QUICK ACCESS CARDS ===================== */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Match Center Card */}
               <SpotlightCard 
                 className="p-4 cursor-pointer"
@@ -469,6 +469,24 @@ export default function FanHome() {
                 </div>
               </SpotlightCard>
               
+              {/* AI Analysis Room Card */}
+              <SpotlightCard 
+                className="p-4 cursor-pointer"
+                spotlightColor="hsl(var(--accent) / 0.08)"
+                onClick={() => navigate('/fan/analysis')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                    <Brain className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">AI Analysis</h3>
+                    <p className="text-xs text-muted-foreground">Chat with AI expert</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </SpotlightCard>
+              
               {/* AI Chant Generator Card */}
               <SpotlightCard 
                 className="p-4 cursor-pointer"
@@ -477,7 +495,7 @@ export default function FanHome() {
               >
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                    <Brain className="h-6 w-6 text-purple-400" />
+                    <Sparkles className="h-6 w-6 text-purple-400" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-foreground">AI Chants</h3>

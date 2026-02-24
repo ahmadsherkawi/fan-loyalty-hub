@@ -421,3 +421,126 @@ export interface ClubAnalyticsData {
   member_growth: AnalyticsDataPoint[];
   points_distribution: AnalyticsDataPoint[];
 }
+
+// ============================================================
+// ANALYSIS ROOM TYPES (AI Football Expert Agent)
+// ============================================================
+
+export type AnalysisRoomMode = 'pre_match' | 'live' | 'post_match';
+export type AnalysisRoomStatus = 'active' | 'archived';
+export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
+export type AnalysisMessageType = 'chat' | 'insight' | 'event' | 'summary' | 'system';
+export type SenderType = 'fan' | 'ai_agent';
+
+export interface AnalysisRoom {
+  id: string;
+  created_by: string;
+  club_id: string | null;
+  
+  // Match Context
+  match_id: string | null;
+  home_team: string;
+  away_team: string;
+  home_team_logo: string | null;
+  away_team_logo: string | null;
+  home_score: number;
+  away_score: number;
+  match_datetime: string | null;
+  match_status: MatchStatus;
+  league_name: string | null;
+  league_id: string | null;
+  venue: string | null;
+  
+  // Room Settings
+  mode: AnalysisRoomMode;
+  status: AnalysisRoomStatus;
+  title: string | null;
+  description: string | null;
+  
+  // Stats
+  participant_count: number;
+  message_count: number;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalysisRoomParticipant {
+  id: string;
+  room_id: string;
+  fan_id: string;
+  joined_at: string;
+  last_read_at: string;
+  is_active: boolean;
+}
+
+export interface AnalysisMessage {
+  id: string;
+  room_id: string;
+  sender_id: string | null;
+  sender_type: SenderType;
+  sender_name: string | null;
+  content: string;
+  message_type: AnalysisMessageType;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AnalysisContextCache {
+  id: string;
+  room_id: string;
+  match_data: Record<string, unknown>;
+  home_team_stats: Record<string, unknown>;
+  away_team_stats: Record<string, unknown>;
+  home_players: unknown[];
+  away_players: unknown[];
+  head_to_head: unknown[];
+  league_standings: Record<string, unknown>;
+  recent_form: Record<string, unknown>;
+  context_version: number;
+  last_updated: string;
+  expires_at: string | null;
+}
+
+// Extended types with relations
+export interface AnalysisRoomWithCreator extends AnalysisRoom {
+  profiles?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+  clubs?: {
+    id: string;
+    name: string;
+    logo_url: string | null;
+  };
+}
+
+export interface AnalysisRoomWithParticipants extends AnalysisRoom {
+  participants?: AnalysisRoomParticipant[];
+  is_participant?: boolean;
+}
+
+export interface AnalysisMessageWithSender extends AnalysisMessage {
+  sender?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+// Create room request
+export interface CreateAnalysisRoomRequest {
+  club_id?: string;
+  match_id?: string;
+  home_team: string;
+  away_team: string;
+  home_team_logo?: string;
+  away_team_logo?: string;
+  match_datetime?: string;
+  league_name?: string;
+  league_id?: string;
+  venue?: string;
+  title?: string;
+  description?: string;
+}
