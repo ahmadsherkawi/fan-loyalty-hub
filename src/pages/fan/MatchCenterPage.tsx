@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpotlightCard, AnimatedBorderCard } from '@/components/design-system';
 import { AIPredictionCard } from '@/components/ai';
 import { AttendMatchModal } from '@/components/ui/AttendMatchModal';
-import { footballApi, MAJOR_LEAGUES } from '@/lib/footballApi';
+import { apiFootball, LEAGUE_IDS } from '@/lib/apiFootball';
 import type { FootballMatch, Club } from '@/types/database';
 import {
   ArrowLeft,
@@ -135,7 +135,7 @@ export default function MatchCenterPage() {
           console.log(`[MatchCenter] Fetching fixtures for club: ${clubName}`);
           
           // Get club-specific fixtures (sequentially to respect rate limit)
-          const clubUpcoming = await footballApi.getTeamFixtures(clubName, 7);
+          const clubUpcoming = await apiFootball.getTeamFixtures(clubName, 10);
           console.log(`[MatchCenter] Found ${clubUpcoming.length} upcoming for ${clubName}`);
           
           for (const match of clubUpcoming) {
@@ -143,7 +143,7 @@ export default function MatchCenterPage() {
             upcomingFixtures.push(match);
           }
           
-          const clubPast = await footballApi.getTeamPastMatches(clubName, 7);
+          const clubPast = await apiFootball.getTeamPastFixtures(clubName, 10);
           console.log(`[MatchCenter] Found ${clubPast.length} past for ${clubName}`);
           
           for (const match of clubPast) {
@@ -152,16 +152,16 @@ export default function MatchCenterPage() {
           }
         }
         
-        // PRIORITY 2: Get live matches (up to 6 requests)
+        // PRIORITY 2: Get live matches (single request for all)
         console.log('[MatchCenter] Fetching live matches...');
-        live = await footballApi.getLiveMatches();
+        live = await apiFootball.getLiveMatches();
         live.forEach(m => liveIds.add(m.id));
         
-        // PRIORITY 3: Get upcoming from leagues only if we need more data (up to 6 requests)
-        // Skip this if we already have enough matches from club fixtures
+        // PRIORITY 3: Get upcoming from leagues only if we need more data
         if (upcomingFixtures.length < 5 && !clubName) {
-          console.log('[MatchCenter] Fetching from major leagues...');
-          const leagueMatches = await footballApi.getUpcomingMatchesFromLeagues(7);
+          console.log('[MatchCenter] Fetching today\'s fixtures...');
+          const today = new Date().toISOString().split('T')[0];
+          const leagueMatches = await apiFootball.getFixturesByDate(today);
           for (const match of leagueMatches) {
             if (!liveIds.has(match.id) && !upcomingIds.has(match.id)) {
               upcomingIds.add(match.id);
@@ -559,9 +559,9 @@ export default function MatchCenterPage() {
         )}
 
         {/* API Usage (dev only) */}
-        {process.env.NODE_ENV === 'development' && (
+        {process.env.NODE_ENV === 'development' && apiFootball.isApiConfigured() && (
           <div className="text-[10px] text-muted-foreground text-center pt-4 border-t border-border/30">
-            API Requests: {footballApi.getApiUsageStats().used}/{footballApi.getApiUsageStats().dailyLimit}
+            API-Football: {apiFootball.getApiUsageStats().used}/{apiFootball.getApiUsageStats().dailyLimit} requests today
           </div>
         )}
       </main>

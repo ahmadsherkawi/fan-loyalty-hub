@@ -32,6 +32,8 @@ import {
   getModeDisplayText,
   generateWelcomeMessage,
 } from '@/lib/analysisApi';
+import { apiFootball } from '@/lib/apiFootball';
+import { getAlexAnalysisContext, getLeagueId } from '@/lib/alexContext';
 import type {
   AnalysisRoomWithCreator,
   AnalysisMessage,
@@ -255,6 +257,24 @@ export default function AnalysisRoomPage() {
       // Call AI for response
       setAiTyping(true);
 
+      // Fetch analysis context from API-Football (if configured)
+      let analysisContext = null;
+      if (apiFootball.isApiConfigured()) {
+        try {
+          const leagueId = room.league_name ? getLeagueId(room.league_name) : undefined;
+          analysisContext = await getAlexAnalysisContext(
+            room.home_team,
+            room.away_team,
+            {
+              leagueId,
+              fixtureId: room.match_id || undefined,
+            }
+          );
+        } catch (ctxError) {
+          console.warn('Could not fetch analysis context:', ctxError);
+        }
+      }
+
       const response = await fetch('/api/analysis/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,6 +290,7 @@ export default function AnalysisRoomPage() {
             league_name: room.league_name,
             venue: room.venue,
           },
+          analysisContext: analysisContext || undefined,
         }),
       });
 
