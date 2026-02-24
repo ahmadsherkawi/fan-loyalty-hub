@@ -19,6 +19,8 @@ import {
   ArrowRight,
   Globe,
   Users,
+  ArrowLeft,
+  LogOut,
 } from "lucide-react";
 
 // API Team type
@@ -283,8 +285,29 @@ export default function FanOnboarding() {
       {/* Header */}
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
-        <div className="relative container py-4 flex items-center justify-center">
-          <Logo size="sm" />
+        <div className="relative container py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/auth")}
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
+            <div className="h-5 w-px bg-border/40" />
+            <Logo size="sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/auth")}
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 

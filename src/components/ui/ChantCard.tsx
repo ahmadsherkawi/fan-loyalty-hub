@@ -377,15 +377,16 @@ export function ChantCard({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {isWatchingMatch ? (
-              /* Chat Button for watching posts */
+              /* Chat Button for watching posts - just cheers, no navigation */
               <Button
                 variant="default"
                 size="sm"
-                onClick={handleViewMatch}
+                onClick={handleCheer}
+                disabled={isCheering || hideActions}
                 className="rounded-full gap-1.5 h-8 px-3 bg-red-500 hover:bg-red-600 text-white"
               >
                 <MessageCircle className="h-4 w-4" />
-                <span className="text-xs font-medium">Join Chat</span>
+                <span className="text-xs font-medium">{chant.cheered_by_me ? 'Joined!' : 'Join Chat'}</span>
               </Button>
             ) : (
               /* Going Button for attendance posts */

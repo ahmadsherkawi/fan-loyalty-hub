@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, AlertCircle, LogOut, Sparkles, Search, MapPin, Users,
   ShieldCheck, Building2, Clock, CheckCircle, Send, Info,
-  Mail, ExternalLink, AlertTriangle
+  Mail, ExternalLink, AlertTriangle, ArrowLeft
 } from "lucide-react";
 import { Club, LoyaltyProgram } from "@/types/database";
 
@@ -307,8 +307,19 @@ export default function JoinClub() {
       <header className="relative border-b border-border/40 overflow-hidden">
         <div className="absolute inset-0 gradient-mesh opacity-40" />
         <div className="relative container py-4 flex items-center justify-between">
-          <Logo size="sm" />
-          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate("/fan/profile")} 
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
+            <div className="h-5 w-px bg-border/40" />
+            <Logo size="sm" />
+          </div>
+          <Button variant="ghost" onClick={handleSignOut} className="rounded-full text-muted-foreground hover:text-foreground h-9">
             <LogOut className="h-4 w-4 mr-2" /> Sign out
           </Button>
         </div>

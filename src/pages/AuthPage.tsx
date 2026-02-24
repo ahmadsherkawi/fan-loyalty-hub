@@ -204,6 +204,13 @@ export default function AuthPage() {
   if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <button
+          onClick={() => navigate("/")}
+          className="absolute top-4 left-4 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-sm font-medium">Back to Home</span>
+        </button>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="mt-4 text-muted-foreground">
           {isRedirecting ? "Redirecting..." : "Loading..."}
@@ -217,6 +224,13 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mx-auto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </button>
           <Card className="rounded-2xl border-border/40">
             <CardContent className="pt-6 text-center">
               <div className="mx-auto h-16 w-16 rounded-2xl bg-destructive/20 flex items-center justify-center mb-4">
@@ -260,6 +274,13 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-lg space-y-8">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mx-auto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </button>
           <div className="relative overflow-hidden rounded-3xl border border-border/40">
             <div className="absolute inset-0 gradient-hero" />
             <div className="absolute inset-0 stadium-pattern" />
@@ -299,6 +320,15 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
+        {/* Back to Home Link */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mx-auto"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-sm font-medium">Back to Home</span>
+        </button>
+
         {/* HERO CARD */}
         <div className="relative overflow-hidden rounded-3xl border border-border/40">
           <div className="absolute inset-0 gradient-hero" />
