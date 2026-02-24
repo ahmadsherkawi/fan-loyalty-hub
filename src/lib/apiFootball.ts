@@ -1012,7 +1012,7 @@ interface ApiFootballStanding {
   form?: string;
 }
 
-interface ApiFootballStanding[] {
+interface ApiFootballStandingsResponse {
   league: {
     standings: ApiFootballStanding[][];
   };
