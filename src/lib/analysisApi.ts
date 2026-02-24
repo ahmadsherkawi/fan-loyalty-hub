@@ -83,64 +83,75 @@ export async function getActiveAnalysisRooms(options?: {
   mode?: AnalysisRoomMode;
   limit?: number;
 }): Promise<AnalysisRoomWithCreator[]> {
-  let query = supabase
-    .from('analysis_rooms')
-    .select(`
-      *,
-      profiles:created_by (id, full_name, avatar_url),
-      clubs (id, name, logo_url)
-    `)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('analysis_rooms')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-  if (options?.clubId) {
-    query = query.eq('club_id', options.clubId);
+    if (options?.clubId) {
+      query = query.eq('club_id', options.clubId);
+    }
+
+    if (options?.mode) {
+      query = query.eq('mode', options.mode);
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data: rooms, error } = await query;
+
+    if (error) {
+      console.error('[analysisApi] Error fetching rooms:', error);
+      throw error;
+    }
+
+    return (rooms || []) as AnalysisRoomWithCreator[];
+  } catch (err) {
+    console.error('[analysisApi] getActiveAnalysisRooms failed:', err);
+    throw err;
   }
-
-  if (options?.mode) {
-    query = query.eq('mode', options.mode);
-  }
-
-  if (options?.limit) {
-    query = query.limit(options.limit);
-  }
-
-  const { data: rooms, error } = await query;
-
-  if (error) throw error;
-
-  return rooms || [];
 }
 
 /**
  * Get rooms that the current user has joined
  */
 export async function getMyAnalysisRooms(): Promise<AnalysisRoomWithCreator[]> {
-  const { data: participations, error: partError } = await supabase
-    .from('analysis_room_participants')
-    .select('room_id')
-    .eq('is_active', true);
+  try {
+    const { data: participations, error: partError } = await supabase
+      .from('analysis_room_participants')
+      .select('room_id')
+      .eq('is_active', true);
 
-  if (partError) throw partError;
+    if (partError) {
+      console.error('[analysisApi] Error fetching participations:', partError);
+      throw partError;
+    }
 
-  if (!participations?.length) return [];
+    if (!participations?.length) return [];
 
-  const roomIds = participations.map((p) => p.room_id);
+    const roomIds = participations.map((p) => p.room_id);
 
-  const { data: rooms, error } = await supabase
-    .from('analysis_rooms')
-    .select(`
-      *,
-      profiles:created_by (id, full_name, avatar_url),
-      clubs (id, name, logo_url)
-    `)
-    .in('id', roomIds)
-    .eq('status', 'active')
-    .order('updated_at', { ascending: false });
+    const { data: rooms, error } = await supabase
+      .from('analysis_rooms')
+      .select('*')
+      .in('id', roomIds)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false });
 
-  if (error) throw error;
+    if (error) {
+      console.error('[analysisApi] Error fetching my rooms:', error);
+      throw error;
+    }
 
-  return rooms || [];
+    return (rooms || []) as AnalysisRoomWithCreator[];
+  } catch (err) {
+    console.error('[analysisApi] getMyAnalysisRooms failed:', err);
+    throw err;
+  }
 }
 
 /**

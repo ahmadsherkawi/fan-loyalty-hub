@@ -43,7 +43,7 @@ import FanChants from "./pages/fan/FanChants";
 import FanDiscover from "./pages/fan/FanDiscover";
 import FanCommunity from "./pages/fan/FanCommunity";
 import MatchCenterPage from "./pages/fan/MatchCenterPage";
-import AnalysisRoomsPage from "./pages/fan/AnalysisRoomsPage";
+import AnalysisMatchSelectPage from "./pages/fan/AnalysisMatchSelectPage";
 import AnalysisRoomPage from "./pages/fan/AnalysisRoomPage";
 import ClubChants from "./pages/club/ClubChants";
 import AdminReportedChants from "./pages/admin/AdminReportedChants";
@@ -105,8 +105,8 @@ const AnimatedRoutes = () => {
           <Route path="/fan/chants" element={<FanChants />} />
           <Route path="/fan/discover" element={<FanDiscover />} />
           <Route path="/fan/matches" element={<MatchCenterPage />} />
-          <Route path="/fan/analysis" element={<AnalysisRoomsPage />} />
-          <Route path="/fan/analysis/:roomId" element={<AnalysisRoomPage />} />
+          <Route path="/fan/analysis" element={<AnalysisMatchSelectPage />} />
+          <Route path="/fan/analysis/room/:roomId" element={<AnalysisRoomPage />} />
           <Route path="/fan/community/:clubId" element={<FanCommunity />} />
           {/* System Admin */}
           <Route path="/admin" element={<SystemAdmin />} />

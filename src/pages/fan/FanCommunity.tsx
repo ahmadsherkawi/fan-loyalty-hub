@@ -710,7 +710,7 @@ export default function FanCommunity() {
           <SpotlightCard 
             className="p-3 cursor-pointer"
             spotlightColor="hsl(var(--accent) / 0.08)"
-            onClick={() => navigate('/fan/analysis')}
+            onClick={() => navigate(`/fan/analysis?clubId=${clubId}`)}
           >
             <div className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-xl bg-blue-500/15 flex items-center justify-center">

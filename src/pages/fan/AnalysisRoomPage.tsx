@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,7 @@ import {
   Clock,
   MapPin,
   Loader2,
+  Share2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -37,7 +38,6 @@ import { getAlexAnalysisContext, getLeagueId } from '@/lib/alexContext';
 import type {
   AnalysisRoomWithCreator,
   AnalysisMessage,
-  AnalysisRoomMode,
 } from '@/types/database';
 
 // AI Avatar Component
@@ -53,10 +53,6 @@ function AIAvatar() {
 
 // Fan Avatar Component
 function FanAvatar({ name, avatarUrl }: { name: string | null; avatarUrl: string | null }) {
-  const initials = name
-    ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?';
-
   return (
     <Avatar className="w-8 h-8">
       <AvatarImage src={avatarUrl || undefined} />
@@ -109,12 +105,6 @@ function MessageBubble({ message, isAI }: { message: AnalysisMessage; isAI: bool
         <div className={`rounded-2xl px-4 py-2.5 ${getMessageTypeStyles()}`}>
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
-
-        {message.message_type === 'insight' && (
-          <Badge variant="outline" className="mt-1 text-xs bg-amber-500/10">
-            💡 Insight
-          </Badge>
-        )}
       </div>
     </div>
   );
@@ -122,9 +112,12 @@ function MessageBubble({ message, isAI }: { message: AnalysisMessage; isAI: bool
 
 export default function AnalysisRoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
+
+  const clubId = searchParams.get('clubId');
 
   const [room, setRoom] = useState<AnalysisRoomWithCreator | null>(null);
   const [messages, setMessages] = useState<AnalysisMessage[]>([]);
@@ -134,8 +127,8 @@ export default function AnalysisRoomPage() {
   const [isParticipant, setIsParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [aiTyping, setAiTyping] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch room data
@@ -151,7 +144,7 @@ export default function AnalysisRoomPage() {
             description: 'This analysis room does not exist.',
             variant: 'destructive',
           });
-          navigate('/fan/analysis');
+          navigate(-1);
           return;
         }
         setRoom(roomData);
@@ -186,12 +179,10 @@ export default function AnalysisRoomPage() {
 
     const subscription = subscribeToRoomMessages(roomId, (newMessage) => {
       setMessages((prev) => {
-        // Avoid duplicates
         if (prev.some((m) => m.id === newMessage.id)) return prev;
         return [...prev, newMessage];
       });
 
-      // If AI message, stop typing indicator
       if (newMessage.sender_type === 'ai_agent') {
         setAiTyping(false);
       }
@@ -216,15 +207,8 @@ export default function AnalysisRoomPage() {
       await joinAnalysisRoom(roomId);
       setIsParticipant(true);
 
-      // Fetch messages after joining
       const msgs = await getAnalysisMessages(roomId);
       setMessages(msgs);
-
-      // Add welcome message if no messages
-      if (msgs.length === 0 && room) {
-        const welcome = generateWelcomeMessage(room.mode, room.home_team, room.away_team);
-        // Welcome message will be created by the backend
-      }
 
       toast({
         title: 'Joined room',
@@ -251,13 +235,10 @@ export default function AnalysisRoomPage() {
     setSending(true);
 
     try {
-      // Send fan message
-      await sendAnalysisMessage(roomId, messageContent, user?.user_metadata?.full_name);
+      await sendAnalysisMessage(roomId, messageContent, profile?.full_name);
 
-      // Call AI for response
       setAiTyping(true);
 
-      // Fetch analysis context from API-Football (if configured)
       let analysisContext = null;
       if (apiFootball.isApiConfigured()) {
         try {
@@ -265,10 +246,7 @@ export default function AnalysisRoomPage() {
           analysisContext = await getAlexAnalysisContext(
             room.home_team,
             room.away_team,
-            {
-              leagueId,
-              fixtureId: room.match_id || undefined,
-            }
+            { leagueId, fixtureId: room.fixture_id || undefined }
           );
         } catch (ctxError) {
           console.warn('Could not fetch analysis context:', ctxError);
@@ -296,9 +274,6 @@ export default function AnalysisRoomPage() {
 
       if (response.ok) {
         const data = await response.json();
-        // AI response will come through realtime subscription
-        // But let's also store it in the database
-        const { supabase } = await import('@/integrations/supabase/client');
         await supabase.from('analysis_messages').insert({
           room_id: roomId,
           sender_id: null,
@@ -330,6 +305,61 @@ export default function AnalysisRoomPage() {
     }
   };
 
+  // Invite fans - post to chants
+  const handleInviteFans = async () => {
+    if (!room || !profile || !room.club_id) {
+      toast({
+        title: 'Cannot invite',
+        description: 'Room must be associated with a club to invite fans.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setInviting(true);
+    try {
+      // Post to chants
+      const { error } = await supabase.from('chants').insert({
+        fan_id: profile.id,
+        club_id: room.club_id,
+        content: `🏟️ I've started an AI Analysis Room for ${room.home_team} vs ${room.away_team}! Join me to discuss the match with Alex the AI expert.`,
+        post_type: 'analysis_invite',
+        match_data: {
+          homeTeam: room.home_team,
+          awayTeam: room.away_team,
+          matchDate: room.match_datetime,
+          league: room.league_name,
+          roomId: room.id,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Invitation posted!',
+        description: 'Fans will see your invitation in the community chants.',
+      });
+    } catch (error) {
+      console.error('Error inviting fans:', error);
+      toast({
+        title: 'Failed to invite',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  // Handle back navigation
+  const handleBack = () => {
+    if (clubId) {
+      navigate(`/fan/community/${clubId}`);
+    } else {
+      navigate(-1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background p-4">
@@ -354,7 +384,8 @@ export default function AnalysisRoomPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/fan/analysis')}
+              onClick={handleBack}
+              className="rounded-full"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -384,18 +415,26 @@ export default function AnalysisRoomPage() {
                     {format(new Date(room.match_datetime), 'EEE d MMM, HH:mm')}
                   </span>
                 )}
-                {room.venue && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {room.venue}
-                  </span>
-                )}
                 <span className="flex items-center gap-1">
                   <Users className="h-3 w-3" />
                   {room.participant_count} fans
                 </span>
               </div>
             </div>
+
+            {/* Invite Button */}
+            {room.club_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleInviteFans}
+                disabled={inviting}
+                className="rounded-full text-xs gap-1"
+              >
+                <Share2 className="h-3 w-3" />
+                Invite
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -407,7 +446,6 @@ export default function AnalysisRoomPage() {
           <div className="flex-1 flex items-center justify-center p-4">
             <Card className="w-full max-w-md text-center">
               <CardContent className="p-6">
-                <AIAvatar />
                 <div className="flex justify-center mb-4">
                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
                     <Bot className="h-8 w-8 text-primary-foreground" />
@@ -417,8 +455,7 @@ export default function AnalysisRoomPage() {
                   {room.home_team} vs {room.away_team}
                 </h2>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Join this analysis room to discuss the match with Alex, our AI football analyst,
-                  and other fans.
+                  Join this analysis room to discuss the match with Alex, our AI football analyst.
                 </p>
                 <Button onClick={handleJoin} disabled={joining} className="w-full">
                   {joining ? (
@@ -439,7 +476,7 @@ export default function AnalysisRoomPage() {
         ) : (
           <>
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {/* AI Welcome message */}
                 {messages.length === 0 && (
