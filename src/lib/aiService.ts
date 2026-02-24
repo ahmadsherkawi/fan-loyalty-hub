@@ -14,6 +14,17 @@ import type {
   FanInsights,
 } from '@/types/football';
 import { supabase } from '@/integrations/supabase/client';
+import ZAI from 'z-ai-web-dev-sdk';
+
+// Initialize ZAI for frontend use
+let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+
+async function getZAI() {
+  if (!zaiInstance) {
+    zaiInstance = await ZAI.create();
+  }
+  return zaiInstance;
+}
 
 // ================= CHANT GENERATION =================
 
@@ -386,4 +397,147 @@ export const aiService = {
   generatePrediction,
   generateRecommendations,
   generateFanInsights,
+  alexChat,
 };
+
+// ================= ALEX AI CHAT =================
+
+const ALEX_SYSTEM_PROMPTS: Record<string, string> = {
+  pre_match: `You are Alex, an expert football analyst AI assistant. You have deep knowledge of:
+- Football tactics and formations (4-3-3, 4-4-2, 3-5-2, etc.)
+- Player statistics and performance analysis
+- Team strategies and playing styles
+- Historical match data and head-to-head records
+- League standings and competition contexts
+- Injury reports and squad depth analysis
+
+For pre-match analysis, provide:
+1. Team form analysis (based on the data provided)
+2. Key player matchups to watch
+3. Tactical battles and likely formations
+4. Head-to-head history insights
+5. Prediction with reasoning based on the data
+
+Always use the STATISTICAL DATA provided to support your analysis. Reference specific numbers, positions, and form guides. Be concise but thorough. Format insights clearly with bullet points when appropriate.`,
+
+  live: `You are Alex, an expert football analyst AI assistant watching a LIVE match.
+You provide real-time analysis including:
+- Tactical adjustments and their impact
+- Key moments and turning points explanation
+- Player performance observations
+- Statistical insights during the game
+- Prediction updates as the match progresses
+
+React to events naturally. Be engaging. Explain WHY things happen, not just WHAT happened.
+Keep responses concise since fans are watching live.`,
+
+  post_match: `You are Alex, an expert football analyst AI assistant for post-match analysis.
+After the final whistle, provide:
+1. Match summary and key turning points
+2. Player ratings and standout performances
+3. Tactical analysis - what worked, what didn't
+4. Statistical breakdown using the data
+5. Implications for upcoming fixtures
+
+Be thorough but engaging. Answer fans' questions about specific moments or decisions.`
+};
+
+interface AlexChatParams {
+  message: string;
+  mode: 'pre_match' | 'live' | 'post_match';
+  homeTeam: string;
+  awayTeam: string;
+  matchData?: {
+    home_score?: number;
+    away_score?: number;
+    league_name?: string;
+    venue?: string;
+  };
+  analysisContext?: {
+    homeTeamForm?: string;
+    awayTeamForm?: string;
+    headToHead?: string;
+    standings?: string;
+    injuries?: string;
+    teamStats?: string;
+    liveEvents?: string;
+    lineups?: string;
+  };
+}
+
+export async function alexChat(params: AlexChatParams): Promise<string> {
+  const { message, mode, homeTeam, awayTeam, matchData, analysisContext } = params;
+  
+  console.log('[Alex] Chat request:', message.substring(0, 50));
+  
+  try {
+    const zai = await getZAI();
+
+    // Build context
+    let matchContext = `Current Match: ${homeTeam} vs ${awayTeam}`;
+    
+    if (matchData?.league_name) matchContext += `\nCompetition: ${matchData.league_name}`;
+    if (matchData?.venue) matchContext += `\nVenue: ${matchData.venue}`;
+    if (matchData?.home_score !== undefined) {
+      matchContext += `\nScore: ${homeTeam} ${matchData.home_score} - ${matchData.away_score} ${awayTeam}`;
+    }
+    
+    matchContext += `\nAnalysis Mode: ${mode === 'pre_match' ? 'Pre-Match' : mode === 'live' ? 'Live Match' : 'Post-Match'}`;
+
+    // Add rich context if provided
+    if (analysisContext) {
+      matchContext += '\n\n=== STATISTICAL DATA ===';
+      if (analysisContext.homeTeamForm) matchContext += `\n\nHome Team Form:\n${analysisContext.homeTeamForm}`;
+      if (analysisContext.awayTeamForm) matchContext += `\n\nAway Team Form:\n${analysisContext.awayTeamForm}`;
+      if (analysisContext.headToHead) matchContext += `\n\nHead-to-Head:\n${analysisContext.headToHead}`;
+      if (analysisContext.standings) matchContext += `\n\nStandings:\n${analysisContext.standings}`;
+      if (analysisContext.injuries) matchContext += `\n\nInjuries:\n${analysisContext.injuries}`;
+      if (analysisContext.teamStats) matchContext += `\n\nTeam Stats:\n${analysisContext.teamStats}`;
+      if (analysisContext.liveEvents) matchContext += `\n\nMatch Events:\n${analysisContext.liveEvents}`;
+      if (analysisContext.lineups) matchContext += `\n\nLineups:\n${analysisContext.lineups}`;
+    }
+
+    const systemPrompt = ALEX_SYSTEM_PROMPTS[mode] || ALEX_SYSTEM_PROMPTS.pre_match;
+    const userPrompt = `Match Context:\n${matchContext}\n\nFan's question: ${message}`;
+
+    const completion = await zai.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 800
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    
+    if (response) {
+      console.log('[Alex] Response generated');
+      return response;
+    }
+    
+    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode);
+    
+  } catch (error) {
+    console.error('[Alex] Chat error:', error);
+    return generateFallbackAlexResponse(message, homeTeam, awayTeam, mode);
+  }
+}
+
+function generateFallbackAlexResponse(message: string, homeTeam: string, awayTeam: string, mode: string): string {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('prediction') || lowerMessage.includes('who will win')) {
+    return `Based on my analysis of ${homeTeam} vs ${awayTeam}, this looks like a closely contested match. ${homeTeam} will have home advantage, but ${awayTeam} has shown good form recently. I'd say it could go either way, with a likely score of 1-1 or 2-1 to the home side. What aspects of the match are you most interested in?`;
+  }
+  
+  if (lowerMessage.includes('tactic') || lowerMessage.includes('formation')) {
+    return `${homeTeam} typically plays with a balanced approach, looking to control possession. ${awayTeam} often employs a counter-attacking style. The tactical battle will likely be won in midfield. Would you like me to analyze any specific players?`;
+  }
+  
+  if (lowerMessage.includes('player') || lowerMessage.includes('key')) {
+    return `Key players to watch in this ${homeTeam} vs ${awayTeam} match would be the creative midfielders and the strikers on both sides. Their individual battles could determine the outcome. Is there a specific player you'd like me to focus on?`;
+  }
+  
+  return `Great question about the ${homeTeam} vs ${awayTeam} match! This ${mode === 'pre_match' ? 'upcoming fixture' : mode === 'live' ? 'ongoing match' : 'completed match'} has several interesting aspects to analyze. What specific aspect would you like me to dive into - tactics, players, or predictions?`;
+}

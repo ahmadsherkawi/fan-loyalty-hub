@@ -35,6 +35,7 @@ import {
 } from '@/lib/analysisApi';
 import { apiFootball } from '@/lib/apiFootball';
 import { getAlexAnalysisContext, getLeagueId } from '@/lib/alexContext';
+import { alexChat } from '@/lib/aiService';
 import type {
   AnalysisRoomWithCreator,
   AnalysisMessage,
@@ -253,36 +254,31 @@ export default function AnalysisRoomPage() {
         }
       }
 
-      const response = await fetch('http://localhost:3001/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageContent,
-          mode: room.mode,
-          homeTeam: room.home_team,
-          awayTeam: room.away_team,
-          matchData: {
-            home_score: room.home_score,
-            away_score: room.away_score,
-            league_name: room.league_name,
-            venue: room.venue,
-          },
-          analysisContext: analysisContext || undefined,
-        }),
+      // Call Alex AI using aiService
+      const response = await alexChat({
+        message: messageContent,
+        mode: room.mode,
+        homeTeam: room.home_team,
+        awayTeam: room.away_team,
+        matchData: {
+          home_score: room.home_score,
+          away_score: room.away_score,
+          league_name: room.league_name,
+          venue: room.venue,
+        },
+        analysisContext: analysisContext || undefined,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        await supabase.from('analysis_messages').insert({
-          room_id: roomId,
-          sender_id: null,
-          sender_type: 'ai_agent',
-          sender_name: 'Alex (AI Analyst)',
-          content: data.response,
-          message_type: 'chat',
-          metadata: {},
-        });
-      }
+      // Save AI response to database
+      await supabase.from('analysis_messages').insert({
+        room_id: roomId,
+        sender_id: null,
+        sender_type: 'ai_agent',
+        sender_name: 'Alex (AI Analyst)',
+        content: response,
+        message_type: 'chat',
+        metadata: {},
+      });
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
