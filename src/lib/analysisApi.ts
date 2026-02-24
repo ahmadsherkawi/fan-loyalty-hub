@@ -36,14 +36,28 @@ export async function createAnalysisRoom(
   const { data: room, error } = await supabase
     .from('analysis_rooms')
     .insert({
-      ...data,
+      club_id: data.club_id || null,
+      fixture_id: data.fixture_id || null,
+      home_team: data.home_team,
+      away_team: data.away_team,
+      home_team_logo: data.home_team_logo || null,
+      away_team_logo: data.away_team_logo || null,
+      home_team_id: data.home_team_id || null,
+      away_team_id: data.away_team_id || null,
+      match_datetime: data.match_datetime || null,
+      league_name: data.league_name || null,
+      league_id: data.league_id || null,
+      title: data.title || null,
       mode,
       status: 'active',
     })
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[analysisApi] Error creating room:', error);
+    throw error;
+  }
 
   // Auto-join creator to the room
   await joinAnalysisRoom(room.id);

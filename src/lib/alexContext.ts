@@ -163,14 +163,16 @@ function formatContextForAlex(context: AnalysisContext): FormattedAnalysisContex
   // Format team statistics
   if (context.homeTeamStats && context.awayTeamStats) {
     result.teamStats = `${context.homeTeamStats.teamName}:\n`;
-    result.teamStats += `- Goals per game: ${context.homeTeamStats.goals.average.home.toFixed(2)} (home)\n`;
-    result.teamStats += `- Clean sheets: ${context.homeTeamStats.cleanSheet}\n`;
-    result.teamStats += `- Failed to score: ${context.homeTeamStats.failedToScore} times\n\n`;
+    const homeGoals = Number(context.homeTeamStats.goals?.average?.home) || 0;
+    result.teamStats += `- Goals per game: ${homeGoals.toFixed(2)} (home)\n`;
+    result.teamStats += `- Clean sheets: ${context.homeTeamStats.cleanSheet || 0}\n`;
+    result.teamStats += `- Failed to score: ${context.homeTeamStats.failedToScore || 0} times\n\n`;
 
     result.teamStats += `${context.awayTeamStats.teamName}:\n`;
-    result.teamStats += `- Goals per game: ${context.awayTeamStats.goals.average.away.toFixed(2)} (away)\n`;
-    result.teamStats += `- Clean sheets: ${context.awayTeamStats.cleanSheet}\n`;
-    result.teamStats += `- Failed to score: ${context.awayTeamStats.failedToScore} times`;
+    const awayGoals = Number(context.awayTeamStats.goals?.average?.away) || 0;
+    result.teamStats += `- Goals per game: ${awayGoals.toFixed(2)} (away)\n`;
+    result.teamStats += `- Clean sheets: ${context.awayTeamStats.cleanSheet || 0}\n`;
+    result.teamStats += `- Failed to score: ${context.awayTeamStats.failedToScore || 0} times`;
   }
 
   // Format live events (if match is live)

@@ -434,28 +434,28 @@ export type SenderType = 'fan' | 'ai_agent';
 
 export interface AnalysisRoom {
   id: string;
-  created_by: string;
+  created_by: string | null;
   club_id: string | null;
   
   // Match Context
-  match_id: string | null;
+  fixture_id: string | null;
   home_team: string;
   away_team: string;
   home_team_logo: string | null;
   away_team_logo: string | null;
-  home_score: number;
-  away_score: number;
+  home_team_id: number | null;
+  away_team_id: number | null;
+  home_score: number | null;
+  away_score: number | null;
   match_datetime: string | null;
-  match_status: MatchStatus;
   league_name: string | null;
-  league_id: string | null;
+  league_id: number | null;
   venue: string | null;
   
   // Room Settings
   mode: AnalysisRoomMode;
   status: AnalysisRoomStatus;
   title: string | null;
-  description: string | null;
   
   // Stats
   participant_count: number;
@@ -531,16 +531,17 @@ export interface AnalysisMessageWithSender extends AnalysisMessage {
 
 // Create room request
 export interface CreateAnalysisRoomRequest {
-  club_id?: string;
-  match_id?: string;
+  club_id?: string | null;
+  fixture_id?: string;
   home_team: string;
   away_team: string;
-  home_team_logo?: string;
-  away_team_logo?: string;
+  home_team_logo?: string | null;
+  away_team_logo?: string | null;
+  home_team_id?: number;
+  away_team_id?: number;
   match_datetime?: string;
   league_name?: string;
-  league_id?: string;
+  league_id?: number;
   venue?: string;
   title?: string;
-  description?: string;
 }
