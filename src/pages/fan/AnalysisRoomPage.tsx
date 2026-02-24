@@ -254,13 +254,18 @@ export default function AnalysisRoomPage() {
         }
       }
 
-      // Call Alex AI using aiService
+      // Call Alex AI using aiService with live data fetching
       const response = await alexChat({
         message: messageContent,
         mode: room.mode,
         homeTeam: room.home_team,
         awayTeam: room.away_team,
         roomId: roomId, // Pass roomId for conversation history
+        // Pass IDs for dynamic data fetching
+        fixtureId: room.fixture_id || undefined,
+        homeTeamId: room.home_team_id || undefined,
+        awayTeamId: room.away_team_id || undefined,
+        leagueId: room.league_name ? getLeagueId(room.league_name) : undefined,
         matchData: {
           home_score: room.home_score,
           away_score: room.away_score,
