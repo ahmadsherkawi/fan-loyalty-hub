@@ -427,7 +427,7 @@ export interface ClubAnalyticsData {
 // ============================================================
 
 export type AnalysisRoomMode = 'pre_match' | 'live' | 'post_match';
-export type AnalysisRoomStatus = 'active' | 'archived';
+export type AnalysisRoomStatus = 'active' | 'archived' | 'terminated';
 export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
 export type AnalysisMessageType = 'chat' | 'insight' | 'event' | 'summary' | 'system';
 export type SenderType = 'fan' | 'ai_agent';
@@ -456,6 +456,7 @@ export interface AnalysisRoom {
   mode: AnalysisRoomMode;
   status: AnalysisRoomStatus;
   title: string | null;
+  alex_enabled: boolean;
   
   // Stats
   participant_count: number;
@@ -472,6 +473,7 @@ export interface AnalysisRoomParticipant {
   joined_at: string;
   last_read_at: string;
   is_active: boolean;
+  is_admin: boolean;
 }
 
 export interface AnalysisMessage {

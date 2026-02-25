@@ -59,8 +59,8 @@ export async function createAnalysisRoom(
     throw error;
   }
 
-  // Auto-join creator to the room
-  await joinAnalysisRoom(room.id);
+  // Auto-join creator to the room as admin
+  await joinAnalysisRoom(room.id, true);
 
   return room;
 }
@@ -209,12 +209,13 @@ export async function archiveAnalysisRoom(roomId: string): Promise<void> {
 /**
  * Join an analysis room
  */
-export async function joinAnalysisRoom(roomId: string): Promise<AnalysisRoomParticipant> {
+export async function joinAnalysisRoom(roomId: string, isAdmin: boolean = false): Promise<AnalysisRoomParticipant> {
   const { data: participant, error } = await supabase
     .from('analysis_room_participants')
     .insert({
       room_id: roomId,
       is_active: true,
+      is_admin: isAdmin,
     })
     .select()
     .single();
@@ -222,6 +223,69 @@ export async function joinAnalysisRoom(roomId: string): Promise<AnalysisRoomPart
   if (error) throw error;
 
   return participant;
+}
+
+/**
+ * Check if current user is admin of a room
+ */
+export async function isRoomAdmin(roomId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('analysis_room_participants')
+    .select('is_admin')
+    .eq('room_id', roomId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data?.is_admin || false;
+}
+
+/**
+ * Kick a participant from the room (admin only)
+ */
+export async function kickParticipant(roomId: string, participantId: string): Promise<void> {
+  const { error } = await supabase
+    .from('analysis_room_participants')
+    .update({ is_active: false })
+    .eq('id', participantId)
+    .eq('room_id', roomId);
+
+  if (error) throw error;
+}
+
+/**
+ * Toggle Alex AI on/off for the room (admin only)
+ */
+export async function toggleAlexAI(roomId: string, enabled: boolean): Promise<AnalysisRoom> {
+  const { data: room, error } = await supabase
+    .from('analysis_rooms')
+    .update({ 
+      alex_enabled: enabled,
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', roomId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return room;
+}
+
+/**
+ * Terminate/close an analysis room (admin only)
+ */
+export async function terminateRoom(roomId: string): Promise<void> {
+  const { error } = await supabase
+    .from('analysis_rooms')
+    .update({ 
+      status: 'terminated',
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', roomId);
+
+  if (error) throw error;
 }
 
 /**
