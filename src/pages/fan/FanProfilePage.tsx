@@ -364,10 +364,10 @@ export default function FanProfilePage() {
 
       <main className="container py-6 space-y-6">
         {/* USER HERO CARD */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center gap-6">

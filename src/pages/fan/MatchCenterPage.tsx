@@ -340,16 +340,24 @@ export default function MatchCenterPage() {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="rounded-full text-muted-foreground hover:text-foreground h-8 hidden sm:flex"
+            >
+              Home
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="container py-6 space-y-6">
         {/* HERO */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-6 md:p-10 flex justify-between items-center gap-4 flex-wrap">
             <div>

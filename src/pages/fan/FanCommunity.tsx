@@ -607,11 +607,13 @@ export default function FanCommunity() {
 
       <main className="container py-6 max-w-2xl space-y-6">
         {/* Community Header */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
           <div
             className="absolute inset-0 opacity-20"
             style={{ backgroundColor: community.primary_color || "#16a34a" }}
           />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-20" />
           <div className="relative p-6 flex items-center gap-4">
             {/* Logo */}
             <div

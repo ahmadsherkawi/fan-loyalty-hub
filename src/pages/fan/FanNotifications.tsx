@@ -326,10 +326,10 @@ export default function FanNotifications() {
 
       <main className="container py-8 space-y-8">
         {/* HERO */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-6 md:p-10 flex justify-between items-center gap-4 flex-wrap">
             <div>

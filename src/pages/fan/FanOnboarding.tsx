@@ -313,10 +313,10 @@ export default function FanOnboarding() {
 
       <main className="container py-8 max-w-4xl space-y-8">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-6 md:p-10 text-center">
             <div className="flex items-center justify-center gap-2 mb-3">

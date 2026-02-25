@@ -548,4 +548,199 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground));
   }
+
+  /* ========== SPORTY DESIGN ELEMENTS ========== */
+
+  /* Scoreboard divider — horizontal line with tick marks */
+  .scoreboard-divider {
+    @apply w-full h-px relative;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.15) 15%,
+      hsl(var(--primary) / 0.4) 50%,
+      hsl(var(--primary) / 0.15) 85%,
+      transparent 100%
+    );
+  }
+  .scoreboard-divider::before,
+  .scoreboard-divider::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: hsl(var(--primary) / 0.3);
+  }
+  .scoreboard-divider::before { left: 20%; }
+  .scoreboard-divider::after { right: 20%; }
+
+  /* Corner flag accent — decorative triangle */
+  .corner-flag {
+    @apply relative;
+  }
+  .corner-flag::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 40px 40px 0;
+    border-color: transparent hsl(var(--primary) / 0.08) transparent transparent;
+    pointer-events: none;
+  }
+
+  /* Stadium arc — curved top accent line */
+  .stadium-arc {
+    @apply relative overflow-hidden;
+  }
+  .stadium-arc::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    border-radius: 50%;
+    border: 1px solid hsl(var(--primary) / 0.06);
+    pointer-events: none;
+  }
+
+  /* Center circle — football field center circle overlay */
+  .center-circle {
+    @apply relative overflow-hidden;
+  }
+  .center-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: 1px solid hsl(var(--primary) / 0.04);
+    pointer-events: none;
+  }
+
+  /* Half-line accent — vertical center line */
+  .halfline-accent {
+    @apply relative overflow-hidden;
+  }
+  .halfline-accent::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--primary) / 0.06) 30%,
+      hsl(var(--primary) / 0.06) 70%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* Trophy stripe — subtle diagonal stripe pattern */
+  .trophy-stripe {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 20px,
+      hsl(var(--accent) / 0.015) 20px,
+      hsl(var(--accent) / 0.015) 22px
+    );
+  }
+
+  /* Goal-post frame — decorative border with post-like corners */
+  .goal-post {
+    @apply relative;
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+  .goal-post::before,
+  .goal-post::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border: 2px solid hsl(var(--primary) / 0.15);
+    pointer-events: none;
+  }
+  .goal-post::before {
+    top: -1px;
+    left: -1px;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 4px 0 0 0;
+  }
+  .goal-post::after {
+    top: -1px;
+    right: -1px;
+    border-left: none;
+    border-bottom: none;
+    border-radius: 0 4px 0 0;
+  }
+
+  /* Kick-off dot — decorative center dot */
+  .kickoff-dot {
+    @apply relative;
+  }
+  .kickoff-dot::after {
+    content: '';
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--primary) / 0.15);
+    pointer-events: none;
+  }
+
+  /* Penalty box — subtle box outline accent */
+  .penalty-box {
+    @apply relative overflow-hidden;
+  }
+  .penalty-box::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 40px;
+    border: 1px solid hsl(var(--primary) / 0.04);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
+  }
+
+  /* Ticket stub edge — perforated edge effect */
+  .ticket-edge {
+    @apply relative;
+  }
+  .ticket-edge::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 10%;
+    height: 80%;
+    width: 2px;
+    background: repeating-linear-gradient(
+      180deg,
+      hsl(var(--border)),
+      hsl(var(--border)) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    pointer-events: none;
+  }
 }

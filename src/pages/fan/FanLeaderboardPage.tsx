@@ -194,10 +194,10 @@ export default function FanLeaderboardPage() {
       </header>
 
       <main className="container py-8 space-y-8">
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
-          <div className="absolute inset-0 gradient-hero" />
-          <div className="absolute inset-0 stadium-pattern" />
-          <div className="absolute inset-0 pitch-lines opacity-30" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
+            <div className="absolute inset-0 gradient-hero" />
+            <div className="absolute inset-0 stadium-pattern" />
+            <div className="absolute inset-0 pitch-lines opacity-30" />
 
           <div className="relative z-10 p-6 md:p-10">
             <div className="flex items-center gap-2 mb-2">
