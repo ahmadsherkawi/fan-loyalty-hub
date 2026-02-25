@@ -500,7 +500,7 @@ export default function FanChants() {
 
       <main className="container py-6 max-w-2xl space-y-6">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="absolute inset-0 pitch-lines opacity-30" />

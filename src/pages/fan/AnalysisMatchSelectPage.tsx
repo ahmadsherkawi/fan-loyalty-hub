@@ -284,15 +284,29 @@ export default function AnalysisMatchSelectPage() {
             >
               <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
+            <div className="h-5 w-px bg-border/40 hidden sm:block" />
             <Logo size="sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { navigate("/"); }}
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Home</span>
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="container py-6 space-y-6">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
           <div className="absolute inset-0 gradient-hero" />
+          <div className="absolute inset-0 stadium-pattern" />
+          <div className="absolute inset-0 pitch-lines opacity-30" />
           <div className="relative z-10 p-6 md:p-8 flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-blue-500/20 flex items-center justify-center">
               <Brain className="h-7 w-7 text-blue-400" />

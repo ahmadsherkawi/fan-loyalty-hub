@@ -547,17 +547,21 @@ export default function AnalysisRoomPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="max-w-3xl mx-auto p-4">
+      <header className="sticky top-0 z-10 border-b border-border/40 overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-40" />
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" />
+        <div className="relative max-w-3xl mx-auto p-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={handleBack}
-              className="rounded-full"
+              className="rounded-full text-muted-foreground hover:text-foreground h-9"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
+            <div className="h-5 w-px bg-border/40 hidden sm:block" />
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">

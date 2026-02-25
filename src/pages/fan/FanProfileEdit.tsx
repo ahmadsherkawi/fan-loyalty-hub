@@ -401,7 +401,7 @@ export default function FanProfileEditPage() {
 
       <main className="container py-8 max-w-3xl space-y-6">
         {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/40">
+        <div className="relative overflow-hidden rounded-3xl border border-border/40 trophy-stripe">
           <div className="absolute inset-0 gradient-hero" />
           <div className="absolute inset-0 stadium-pattern" />
           <div className="relative z-10 p-6 md:p-8 flex items-center gap-6">
