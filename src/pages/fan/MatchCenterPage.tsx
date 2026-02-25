@@ -525,7 +525,40 @@ export default function MatchCenterPage() {
                 </Button>
               </div>
               <div className="p-4">
-                <AIPredictionCard match={selectedMatch} />
+                {/* Only show prediction for upcoming matches */}
+                {selectedMatch.status !== 'finished' && !filteredPast.some(m => m.id === selectedMatch.id) && (
+                  <AIPredictionCard match={selectedMatch} />
+                )}
+                
+                {/* Show match result for finished matches */}
+                {(selectedMatch.status === 'finished' || filteredPast.some(m => m.id === selectedMatch.id)) && (
+                  <div className="text-center py-4">
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 mb-3">Full Time</Badge>
+                    <div className="flex items-center justify-center gap-6">
+                      <div className="text-center">
+                        {selectedMatch.homeTeam.logo && (
+                          <img src={selectedMatch.homeTeam.logo} alt="" className="w-12 h-12 object-contain mx-auto mb-2" />
+                        )}
+                        <p className="font-semibold">{selectedMatch.homeTeam.name}</p>
+                      </div>
+                      <div className="text-3xl font-display font-bold">
+                        {selectedMatch.homeTeam.score ?? 0} - {selectedMatch.awayTeam.score ?? 0}
+                      </div>
+                      <div className="text-center">
+                        {selectedMatch.awayTeam.logo && (
+                          <img src={selectedMatch.awayTeam.logo} alt="" className="w-12 h-12 object-contain mx-auto mb-2" />
+                        )}
+                        <p className="font-semibold">{selectedMatch.awayTeam.name}</p>
+                      </div>
+                    </div>
+                    {selectedMatch.venue.name && (
+                      <p className="text-sm text-muted-foreground mt-4">
+                        <MapPin className="h-3 w-3 inline mr-1" />
+                        {selectedMatch.venue.name}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="p-4 pt-0 flex gap-2">
                 <Button
@@ -535,17 +568,20 @@ export default function MatchCenterPage() {
                 >
                   Close
                 </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={() => {
-                    setAttendMatch(selectedMatch);
-                    setShowAttendModal(true);
-                    setSelectedMatch(null);
-                  }}
-                >
-                  <Ticket className="h-4 w-4" />
-                  Attend Match
-                </Button>
+                {/* Only show Attend button for upcoming/live matches */}
+                {selectedMatch.status !== 'finished' && !filteredPast.some(m => m.id === selectedMatch.id) && (
+                  <Button
+                    className="flex-1 gap-2"
+                    onClick={() => {
+                      setAttendMatch(selectedMatch);
+                      setShowAttendModal(true);
+                      setSelectedMatch(null);
+                    }}
+                  >
+                    <Ticket className="h-4 w-4" />
+                    Attend Match
+                  </Button>
+                )}
               </div>
             </div>
           </div>
