@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, LayoutDashboard, Compass, Shield, Sparkles } from 'lucide-react';
+import { LogOut, LayoutDashboard, Compass, Shield, Bot } from 'lucide-react';
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -25,6 +25,28 @@ export function Navbar() {
         >
           <Logo />
         </button>
+
+        {/* Center navigation for non-authenticated users */}
+        {!user && (
+          <div className="hidden md:flex items-center gap-1">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/explore')}
+              className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
+            >
+              <Compass className="h-4 w-4" />
+              Explore Clubs
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/auth?role=fan')}
+              className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
+            >
+              <Bot className="h-4 w-4" />
+              AI Analysis
+            </Button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           {user ? (
@@ -50,26 +72,16 @@ export function Navbar() {
             <>
               <Button
                 variant="ghost"
-                onClick={() => navigate('/explore')}
-                className="gap-2 rounded-full"
-              >
-                <Compass className="h-4 w-4" />
-                <span className="hidden sm:inline">Explore</span>
-              </Button>
-              <Button
-                variant="ghost"
                 onClick={() => navigate('/auth')}
                 className="rounded-full"
               >
                 Sign In
               </Button>
               <Button
-                variant="primary"
-                onClick={() => navigate('/auth?role=club_admin')}
-                className="gradient-stadium rounded-full shadow-stadium font-semibold"
+                onClick={() => navigate('/auth?role=fan')}
+                className="gradient-stadium rounded-full shadow-stadium font-semibold text-white"
               >
-                <Sparkles className="h-4 w-4 mr-1" />
-                Register Club
+                Get Started
               </Button>
               <Button
                 variant="ghost"

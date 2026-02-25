@@ -1,4 +1,5 @@
 import { Logo } from '@/components/ui/Logo';
+import { Bot, Radio, Users, Trophy } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -11,9 +12,25 @@ export function Footer() {
             <Logo size="sm" />
           </div>
           
-          <p className="text-sm text-muted/60 font-medium">
-            The open football loyalty platform. Free forever.
+          <p className="text-sm text-muted/60 font-medium text-center">
+            The AI-powered football fan engagement platform. Free forever.
           </p>
+
+          {/* Feature icons */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-1.5 text-muted/40" title="AI Analysis">
+              <Bot className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-1.5 text-muted/40" title="Live Match Center">
+              <Radio className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-1.5 text-muted/40" title="Communities">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-1.5 text-muted/40" title="Rewards">
+              <Trophy className="h-4 w-4" />
+            </div>
+          </div>
 
           <div className="flex items-center gap-8">
             {['Privacy', 'Terms', 'Contact'].map((link) => (
