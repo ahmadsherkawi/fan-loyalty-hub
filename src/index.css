@@ -59,6 +59,7 @@
   }
 
   * { @apply border-border; }
+  html, body { overflow-x: clip; }
   body { @apply bg-background text-foreground font-sans antialiased; }
   h1, h2, h3, h4 { @apply font-display tracking-tight; }
   html[lang="ar"] body, html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4 {

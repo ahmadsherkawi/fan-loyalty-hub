@@ -29,7 +29,7 @@ function MatchDay() {
   const { data: next, isLoading: nextLoading } = useNextTeamFixture(profile?.favorite_team_id);
   const { data: nextParties } = usePartiesForFixture(next?.id);
   const { data: memberships } = useMyMemberships(user?.id);
-  const { data: upcoming, isLoading: upLoading } = useUpcomingParties(10);
+  const { data: upcoming, isLoading: upLoading } = useUpcomingParties(21);
   const [city, setCity] = useState<string>("all");
   const myCity = profile?.city && profile.city !== "Other" ? profile.city : "Dubai";
   const { data: cityBoard } = useCityLeaderboard(myCity);

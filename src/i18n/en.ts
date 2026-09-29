@@ -62,7 +62,7 @@ export const en = {
 
   "home.welcome": "Welcome back",
   "home.tonight": "Tonight near you",
-  "home.tonightEmpty": "No watch parties this week yet.",
+  "home.tonightEmpty": "No watch parties coming up yet.",
   "home.localTime": "Times shown in your local time",
   "home.nextUp": "Next up for you",
   "home.noPartyYet": "No watch party for this match yet. Ask your group organiser to set one up.",
@@ -74,7 +74,7 @@ export const en = {
   "home.findGroup": "Find a group",
   "home.nextParty": "Next watch party",
   "home.noUpcoming": "No watch party scheduled yet.",
-  "home.thisWeek": "Watch parties this week",
+  "home.thisWeek": "Upcoming watch parties",
   "home.cityLeague": "Group league in {city}",
   "home.members": "{n} members",
   "home.avgPts": "avg pts",

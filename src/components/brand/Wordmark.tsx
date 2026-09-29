@@ -21,7 +21,7 @@ export function Wordmark({ className, compact }: { className?: string; compact?:
       <JamhoorMark />
       <span className="flex items-baseline gap-1.5 leading-none">
         <span className="font-display text-xl font-bold tracking-tight">Jamhoor</span>
-        {!compact && <span className="font-arabic text-base font-semibold text-accent">جمهور</span>}
+        {!compact && <span className="hidden min-[400px]:inline font-arabic text-base font-semibold text-accent">جمهور</span>}
       </span>
     </span>
   );

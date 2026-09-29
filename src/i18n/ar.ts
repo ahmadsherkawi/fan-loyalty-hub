@@ -64,7 +64,7 @@ export const ar: Record<TKey, string> = {
 
   "home.welcome": "أهلاً بعودتك",
   "home.tonight": "الليلة بالقرب منك",
-  "home.tonightEmpty": "لا توجد حفلات مشاهدة هذا الأسبوع بعد.",
+  "home.tonightEmpty": "لا توجد حفلات مشاهدة قادمة بعد.",
   "home.localTime": "الأوقات بتوقيتك المحلي",
   "home.nextUp": "مباراتك القادمة",
   "home.noPartyYet": "لا يوجد حفل مشاهدة لهذه المباراة بعد. اطلب من منظّم رابطتك إنشاء واحد.",
@@ -76,7 +76,7 @@ export const ar: Record<TKey, string> = {
   "home.findGroup": "ابحث عن رابطة",
   "home.nextParty": "حفل المشاهدة القادم",
   "home.noUpcoming": "لا يوجد حفل مشاهدة مجدول بعد.",
-  "home.thisWeek": "حفلات المشاهدة هذا الأسبوع",
+  "home.thisWeek": "حفلات المشاهدة القادمة",
   "home.cityLeague": "دوري الروابط في {city}",
   "home.members": "{n} عضو",
   "home.avgPts": "متوسط النقاط",

@@ -42,8 +42,8 @@ export function Header() {
   const { user } = useAuth();
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="container flex h-14 items-center gap-4">
-        <Link to="/" aria-label="Jamhoor"><Wordmark /></Link>
+      <div className="container flex h-14 items-center gap-2 sm:gap-4">
+        <Link to="/" aria-label="Jamhoor" className="min-w-0 shrink"><Wordmark /></Link>
         {user && (
           <nav className="ms-6 hidden items-center gap-1 md:flex">
             {NAV.map(({ to, key }) => (
@@ -53,7 +53,7 @@ export function Header() {
             ))}
           </nav>
         )}
-        <div className="ms-auto flex items-center gap-2">
+        <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           {user && (
             <Button asChild size="sm" variant="outline" className="hidden rounded-full md:inline-flex">
               <Link to="/checkin"><QrCode className="me-1.5 h-4 w-4" />{t("nav.checkin")}</Link>
