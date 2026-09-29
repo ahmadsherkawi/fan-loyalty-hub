@@ -1,746 +1,89 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Syne:wght@600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ClubPass 2025 — Bold Dark Luxury Design System */
-
 @layer base {
+  /* Light (daytime pitch) */
   :root {
-    /* Core palette — Deep noir with electric emerald + warm gold */
-    --background: 220 20% 97%;
-    --foreground: 220 25% 10%;
-
+    --background: 90 14% 96%;
+    --surface: 0 0% 100%;
+    --foreground: 150 20% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 220 25% 10%;
-
+    --card-foreground: 150 20% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 10%;
-
-    /* Primary — Electric Emerald */
-    --primary: 152 68% 38%;
+    --popover-foreground: 150 20% 7%;
+    --primary: 145 72% 34%;
     --primary-foreground: 0 0% 100%;
-
-    /* Secondary — Cool slate */
-    --secondary: 220 14% 93%;
-    --secondary-foreground: 220 20% 20%;
-
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 10% 46%;
-
-    /* Accent — Warm Trophy Gold */
-    --accent: 40 95% 54%;
-    --accent-foreground: 40 95% 12%;
-
-    /* Success */
-    --success: 152 68% 42%;
-    --success-foreground: 0 0% 100%;
-
-    /* Warning */
-    --warning: 40 95% 54%;
-    --warning-foreground: 40 95% 12%;
-
-    --destructive: 0 72% 51%;
+    --secondary: 140 12% 90%;
+    --secondary-foreground: 150 20% 10%;
+    --muted: 140 10% 91%;
+    --muted-foreground: 145 6% 38%;
+    --accent: 43 98% 46%;
+    --accent-foreground: 150 30% 6%;
+    --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 220 14% 90%;
-    --input: 220 14% 90%;
-    --ring: 152 68% 38%;
-
+    --border: 140 10% 86%;
+    --input: 140 10% 86%;
+    --ring: 145 72% 34%;
     --radius: 1rem;
-
-    /* Extended palette */
-    --gradient-primary: linear-gradient(135deg, hsl(152 68% 38%) 0%, hsl(170 60% 30%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(40 95% 54%) 0%, hsl(30 90% 58%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(220 30% 6%) 0%, hsl(220 25% 12%) 40%, hsl(152 40% 14%) 100%);
-    --gradient-mesh: radial-gradient(at 20% 30%, hsl(152 68% 38% / 0.15) 0%, transparent 60%),
-                     radial-gradient(at 80% 60%, hsl(40 95% 54% / 0.1) 0%, transparent 60%),
-                     radial-gradient(at 50% 90%, hsl(260 60% 50% / 0.08) 0%, transparent 50%);
-
-    /* Shadows */
-    --shadow-sm: 0 1px 3px 0 hsl(220 25% 10% / 0.04);
-    --shadow-md: 0 4px 16px -2px hsl(220 25% 10% / 0.08);
-    --shadow-lg: 0 12px 32px -4px hsl(220 25% 10% / 0.12);
-    --shadow-glow-primary: 0 0 40px -8px hsl(152 68% 38% / 0.35);
-    --shadow-glow-accent: 0 0 40px -8px hsl(40 95% 54% / 0.35);
-
-    /* Sidebar */
-    --sidebar-background: 220 30% 6%;
-    --sidebar-foreground: 220 10% 92%;
-    --sidebar-primary: 152 68% 42%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 12%;
-    --sidebar-accent-foreground: 220 10% 92%;
-    --sidebar-border: 220 20% 15%;
-    --sidebar-ring: 152 68% 42%;
+    --chalk: 150 20% 7% / 0.06;
+    --glow: 43 98% 50% / 0.12;
   }
 
+  /* Dark — stadium at night (default) */
   .dark {
-    --background: 220 30% 4%;
-    --foreground: 220 10% 94%;
-
-    --card: 220 25% 7%;
-    --card-foreground: 220 10% 94%;
-
-    --popover: 220 25% 7%;
-    --popover-foreground: 220 10% 94%;
-
-    --primary: 152 68% 48%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 20% 12%;
-    --secondary-foreground: 220 10% 88%;
-
-    --muted: 220 20% 14%;
-    --muted-foreground: 220 10% 55%;
-
-    --accent: 40 95% 58%;
-    --accent-foreground: 40 95% 8%;
-
-    --success: 152 68% 48%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 40 95% 54%;
-    --warning-foreground: 40 95% 8%;
-
-    --destructive: 0 62% 45%;
+    --background: 150 20% 5%;
+    --surface: 150 18% 9%;
+    --foreground: 100 10% 95%;
+    --card: 150 18% 9%;
+    --card-foreground: 100 10% 95%;
+    --popover: 150 18% 9%;
+    --popover-foreground: 100 10% 95%;
+    --primary: 145 72% 42%;
+    --primary-foreground: 150 30% 5%;
+    --secondary: 150 14% 14%;
+    --secondary-foreground: 100 10% 95%;
+    --muted: 150 12% 13%;
+    --muted-foreground: 145 5% 57%;
+    --accent: 43 98% 48%;
+    --accent-foreground: 150 30% 5%;
+    --destructive: 0 70% 52%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 220 20% 14%;
-    --input: 220 20% 14%;
-    --ring: 152 68% 48%;
-
-    --sidebar-background: 220 30% 3%;
-    --sidebar-foreground: 220 10% 92%;
-    --sidebar-primary: 152 68% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 10%;
-    --sidebar-accent-foreground: 220 10% 92%;
-    --sidebar-border: 220 20% 10%;
-    --sidebar-ring: 152 68% 48%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
+    --border: 150 12% 16%;
+    --input: 150 12% 18%;
+    --ring: 145 72% 42%;
+    --chalk: 100 10% 95% / 0.05;
+    --glow: 43 98% 50% / 0.14;
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-  }
-}
-
-@layer components {
-  /* Gradient utilities */
-  .gradient-stadium {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-golden {
-    background: var(--gradient-accent);
-  }
-
-  .gradient-hero {
-    background: var(--gradient-hero);
-  }
-
-  .gradient-mesh {
-    background: var(--gradient-mesh);
-  }
-
-  /* Glow shadows */
-  .shadow-stadium {
-    box-shadow: var(--shadow-glow-primary);
-  }
-
-  .shadow-golden {
-    box-shadow: var(--shadow-glow-accent);
-  }
-
-  /* Stadium pattern overlay */
-  .stadium-pattern {
-    background-image: 
-      radial-gradient(circle at 20% 30%, hsl(152 68% 45% / 0.08) 0%, transparent 50%),
-      radial-gradient(circle at 80% 70%, hsl(40 95% 54% / 0.06) 0%, transparent 50%);
-  }
-
-  /* Pitch lines effect */
-  .pitch-lines {
-    background-image: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 40px,
-      hsl(152 68% 38% / 0.02) 40px,
-      hsl(152 68% 38% / 0.02) 42px
-    );
-  }
-
-  /* Glass effect — refined */
-  .glass {
-    @apply bg-white/70 backdrop-blur-xl border border-white/30 shadow-sm;
-  }
-
-  .glass-dark {
-    @apply bg-black/30 backdrop-blur-xl border border-white/10;
-  }
-
-  .glass-card {
-    @apply bg-white/60 backdrop-blur-lg border border-white/40 shadow-md rounded-2xl;
-  }
-
-  /* Card hover effect */
-  .card-hover {
-    @apply transition-all duration-500 hover:shadow-lg hover:-translate-y-1.5 hover:border-primary/20;
-  }
-
-  /* Activity card states */
-  .activity-available {
-    @apply border-l-4 border-l-primary;
-  }
-
-  .activity-completed {
-    @apply border-l-4 border-l-success opacity-75;
-  }
-
-  .activity-cooldown {
-    @apply border-l-4 border-l-warning opacity-60;
-  }
-
-  /* Badge variants */
-  .badge-verified {
-    @apply bg-primary/10 text-primary border border-primary/20;
-  }
-
-  .badge-unverified {
-    @apply bg-warning/10 text-warning border border-warning/20;
-  }
-
-  .badge-official {
-    @apply bg-accent/10 text-accent border border-accent/20;
-  }
-
-  /* Points display */
-  .points-display {
-    @apply font-display text-2xl font-bold bg-gradient-to-r from-accent to-yellow-400 bg-clip-text text-transparent;
-  }
-
-  /* Hero section — dark dramatic */
-  .hero-gradient {
-    background: linear-gradient(180deg, 
-      hsl(220 30% 6%) 0%, 
-      hsl(220 25% 10%) 40%,
-      hsl(152 35% 12%) 100%
-    );
-  }
-
-  /* Noise/grain overlay */
-  .grain::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  /* Bento card */
-  .bento-card {
-    @apply relative overflow-hidden rounded-2xl bg-card border border-border p-6 transition-all duration-500;
-  }
-  .bento-card:hover {
-    @apply border-primary/30 shadow-lg;
-  }
-
-  /* Pill button */
-  .btn-pill {
-    @apply rounded-full px-6 py-3 font-semibold transition-all duration-300;
-  }
-
-  /* Stat card */
-  .stat-card {
-    @apply relative overflow-hidden rounded-2xl bg-card border border-border p-6;
-  }
-  .stat-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gradient-mesh);
-    opacity: 0.5;
-    pointer-events: none;
-  }
-
-  /* Section divider */
-  .section-divider {
-    @apply w-full h-px bg-gradient-to-r from-transparent via-border to-transparent;
-  }
-
-  /* Animated border */
-  .animated-border {
-    @apply relative;
-    background: linear-gradient(var(--card), var(--card)) padding-box,
-                linear-gradient(135deg, hsl(152 68% 38%), hsl(40 95% 54%), hsl(260 60% 50%)) border-box;
-    border: 1px solid transparent;
-    border-radius: var(--radius);
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+  h1, h2, h3, h4 { @apply font-display tracking-tight; }
+  html[lang="ar"] body, html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4 {
+    font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+    letter-spacing: 0;
   }
 }
 
 @layer utilities {
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
-  .animate-pulse-slow {
-    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  .animate-glow {
-    animation: glow 2s ease-in-out infinite alternate;
-  }
-
-  .animate-shimmer {
-    animation: shimmer 2s linear infinite;
-    background-size: 200% 100%;
-  }
-
-  .animate-gradient {
-    animation: gradient-shift 8s ease-in-out infinite;
-    background-size: 300% 300%;
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-12px); }
-  }
-
-  @keyframes glow {
-    from { box-shadow: 0 0 20px hsl(152 68% 38% / 0.2); }
-    to { box-shadow: 0 0 50px hsl(152 68% 38% / 0.4); }
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  @keyframes gradient-shift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
-  /* Text gradient utility */
-  .text-gradient-primary {
-    @apply bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent;
-  }
-
-  .text-gradient-accent {
-    @apply bg-gradient-to-r from-accent to-amber-300 bg-clip-text text-transparent;
-  }
-
-  .text-gradient-hero {
-    @apply bg-gradient-to-r from-primary via-emerald-400 to-accent bg-clip-text text-transparent;
-  }
-
-  /* ========== ENHANCED DESIGN SYSTEM ========== */
-
-  /* Typography */
-  .title-page {
-    @apply text-3xl md:text-4xl lg:text-5xl font-display font-bold tracking-tight leading-tight;
-  }
-
-  .title-section {
-    @apply text-sm font-bold uppercase tracking-widest;
-  }
-
-  .title-card {
-    @apply text-base font-display font-semibold leading-snug;
-  }
-
-  .text-body {
-    @apply text-sm leading-relaxed;
-  }
-
-  .text-label {
-    @apply text-xs font-medium uppercase tracking-wide;
-  }
-
-  .text-caption {
-    @apply text-xs text-muted-foreground;
-  }
-
-  .title-hero {
-    @apply text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[0.95];
-  }
-
-  .text-stat {
-    @apply text-3xl font-display font-bold tracking-tight tabular-nums;
-  }
-
-  /* Badges */
-  .badge-hero {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-full;
-    @apply bg-white/5 backdrop-blur-md border border-white/10;
-    @apply text-xs font-semibold uppercase tracking-widest;
-  }
-
-  .badge-section {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full;
-    @apply bg-primary/10 text-primary border border-primary/20;
-    @apply text-[11px] font-semibold uppercase tracking-wider;
-  }
-
-  .badge-success {
-    @apply bg-green-500/10 text-green-400 border-green-500/20;
-  }
-
-  .badge-warning {
-    @apply bg-yellow-500/10 text-yellow-400 border-yellow-500/20;
-  }
-
-  .badge-error {
-    @apply bg-red-500/10 text-red-400 border-red-500/20;
-  }
-
-  .badge-info {
-    @apply bg-blue-500/10 text-blue-400 border-blue-500/20;
-  }
-
-  /* Hover Effects */
-  .hover-scale-glow {
-    @apply transition-all duration-300;
-  }
-  .hover-scale-glow:hover {
-    @apply scale-105;
-    box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.4);
-  }
-
-  .hover-lift {
-    @apply transition-all duration-500;
-  }
-  .hover-lift:hover {
-    @apply -translate-y-1.5 shadow-lg;
-  }
-
-  .hover-border-glow {
-    @apply transition-all duration-300;
-  }
-  .hover-border-glow:hover {
-    @apply border-primary/40;
-    box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.3);
-  }
-
-  /* Navigation Pills */
-  .nav-pill-container {
-    @apply relative flex items-center gap-1 p-1 rounded-full;
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
-  }
-
-  .nav-pill-item {
-    @apply relative z-10 px-5 py-2 text-sm font-medium rounded-full;
-    @apply transition-colors duration-200;
-  }
-
-  .nav-pill-item-inactive {
-    @apply text-white/60 hover:text-white;
-  }
-
-  .nav-pill-item-active {
-    @apply text-white;
-  }
-
-  .nav-pill-background {
-    @apply absolute h-8 rounded-full bg-primary/20 border border-primary/30;
-  }
-
-  /* Floating Dock */
-  .floating-dock {
-    @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-40;
-    @apply flex items-end gap-2 p-2 rounded-2xl;
-    @apply bg-black/30 backdrop-blur-xl border border-white/10;
-    box-shadow: 0 8px 32px hsl(var(--background) / 0.6);
-  }
-
-  .dock-item {
-    @apply w-12 h-12 rounded-xl;
-    @apply flex items-center justify-center;
-    @apply transition-all duration-200;
-    background: hsl(220 20% 10%);
-  }
-
-  .dock-item:hover {
-    @apply scale-110 -translate-y-1;
-  }
-
-  /* Status Indicators */
-  .status-dot {
-    @apply h-2 w-2 rounded-full;
-  }
-
-  .status-dot-success {
-    @apply bg-green-500;
-    box-shadow: 0 0 8px hsl(152 68% 42% / 0.6);
-  }
-
-  .status-dot-warning {
-    @apply bg-yellow-500;
-    box-shadow: 0 0 8px hsl(40 95% 54% / 0.6);
-  }
-
-  .status-dot-error {
-    @apply bg-red-500;
-    box-shadow: 0 0 8px hsl(0 72% 51% / 0.6);
-  }
-
-  /* Animations */
-  @keyframes slide-down {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes slide-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes pop-in {
-    0% { opacity: 0; transform: scale(0.9); }
-    70% { transform: scale(1.02); }
-    100% { opacity: 1; transform: scale(1); }
-  }
-
-  .animate-slide-down {
-    animation: slide-down 0.3s ease-out forwards;
-  }
-
-  .animate-slide-up {
-    animation: slide-up 0.3s ease-out forwards;
-  }
-
-  .animate-pop-in {
-    animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-
-  /* Scrollbar Styling */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border-radius: 3px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
-  }
-
-  /* ========== SPORTY DESIGN ELEMENTS ========== */
-
-  /* Scoreboard divider — horizontal line with tick marks */
-  .scoreboard-divider {
-    @apply w-full h-px relative;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      hsl(var(--primary) / 0.15) 15%,
-      hsl(var(--primary) / 0.4) 50%,
-      hsl(var(--primary) / 0.15) 85%,
-      transparent 100%
-    );
-  }
-  .scoreboard-divider::before,
-  .scoreboard-divider::after {
-    content: '';
-    position: absolute;
-    top: -3px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: hsl(var(--primary) / 0.3);
-  }
-  .scoreboard-divider::before { left: 20%; }
-  .scoreboard-divider::after { right: 20%; }
-
-  /* Corner flag accent — decorative triangle */
-  .corner-flag {
-    @apply relative;
-  }
-  .corner-flag::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-style: solid;
-    border-width: 0 40px 40px 0;
-    border-color: transparent hsl(var(--primary) / 0.08) transparent transparent;
-    pointer-events: none;
-  }
-
-  /* Stadium arc — curved top accent line */
-  .stadium-arc {
-    @apply relative overflow-hidden;
-  }
-  .stadium-arc::before {
-    content: '';
-    position: absolute;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 600px;
-    height: 400px;
-    border-radius: 50%;
-    border: 1px solid hsl(var(--primary) / 0.06);
-    pointer-events: none;
-  }
-
-  /* Center circle — football field center circle overlay */
-  .center-circle {
-    @apply relative overflow-hidden;
-  }
-  .center-circle::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    border: 1px solid hsl(var(--primary) / 0.04);
-    pointer-events: none;
-  }
-
-  /* Half-line accent — vertical center line */
-  .halfline-accent {
-    @apply relative overflow-hidden;
-  }
-  .halfline-accent::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 1px;
-    height: 100%;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      hsl(var(--primary) / 0.06) 30%,
-      hsl(var(--primary) / 0.06) 70%,
-      transparent
-    );
-    pointer-events: none;
-  }
-
-  /* Trophy stripe — subtle diagonal stripe pattern */
-  .trophy-stripe {
-    background-image: repeating-linear-gradient(
-      135deg,
-      transparent,
-      transparent 20px,
-      hsl(var(--accent) / 0.015) 20px,
-      hsl(var(--accent) / 0.015) 22px
-    );
-  }
-
-  /* Goal-post frame — decorative border with post-like corners */
-  .goal-post {
-    @apply relative;
-    border: 1px solid hsl(var(--border) / 0.5);
-  }
-  .goal-post::before,
-  .goal-post::after {
-    content: '';
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border: 2px solid hsl(var(--primary) / 0.15);
-    pointer-events: none;
-  }
-  .goal-post::before {
-    top: -1px;
-    left: -1px;
-    border-right: none;
-    border-bottom: none;
-    border-radius: 4px 0 0 0;
-  }
-  .goal-post::after {
-    top: -1px;
-    right: -1px;
-    border-left: none;
-    border-bottom: none;
-    border-radius: 0 4px 0 0;
-  }
-
-  /* Kick-off dot — decorative center dot */
-  .kickoff-dot {
-    @apply relative;
-  }
-  .kickoff-dot::after {
-    content: '';
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: hsl(var(--primary) / 0.15);
-    pointer-events: none;
-  }
-
-  /* Penalty box — subtle box outline accent */
-  .penalty-box {
-    @apply relative overflow-hidden;
-  }
-  .penalty-box::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60%;
-    height: 40px;
-    border: 1px solid hsl(var(--primary) / 0.04);
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
-    pointer-events: none;
-  }
-
-  /* Ticket stub edge — perforated edge effect */
-  .ticket-edge {
-    @apply relative;
-  }
-  .ticket-edge::after {
-    content: '';
-    position: absolute;
-    right: -1px;
-    top: 10%;
-    height: 80%;
-    width: 2px;
-    background: repeating-linear-gradient(
-      180deg,
-      hsl(var(--border)),
-      hsl(var(--border)) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-    pointer-events: none;
-  }
+  /* Floodlight glow from the top corners */
+  .bg-floodlight {
+    background-image:
+      radial-gradient(60% 40% at 15% -5%, hsl(var(--glow)), transparent 70%),
+      radial-gradient(60% 40% at 85% -5%, hsl(var(--glow)), transparent 70%);
+  }
+  /* Chalk pitch lines: halfway line + centre circle */
+  .bg-pitch-lines {
+    background-image:
+      radial-gradient(circle at 50% 50%, transparent 79px, hsl(var(--chalk)) 80px, hsl(var(--chalk)) 81px, transparent 82px),
+      linear-gradient(90deg, transparent calc(50% - 0.5px), hsl(var(--chalk)) calc(50% - 0.5px), hsl(var(--chalk)) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  }
+  .bg-pitch-stripes {
+    background-image: repeating-linear-gradient(90deg, hsl(var(--chalk)) 0 48px, transparent 48px 96px);
+  }
+  .scoreboard { font-family: "Space Grotesk", monospace; font-variant-numeric: tabular-nums; }
+  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem); }
+  @media (min-width: 768px) { .pb-safe { padding-bottom: 2rem; } }
 }

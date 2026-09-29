@@ -1,746 +1,140 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+// Generated from the Jamhoor public schema (see project knowledge).
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
-      activities: {
-        Row: {
-          created_at: string
-          description: string | null
-          frequency: Database["public"]["Enums"]["activity_frequency"]
-          id: string
-          in_app_config: Json | null
-          is_active: boolean | null
-          location_lat: number | null
-          location_lng: number | null
-          location_radius_meters: number | null
-          name: string
-          points_awarded: number
-          program_id: string
-          qr_code_data: string | null
-          time_window_end: string | null
-          time_window_start: string | null
-          updated_at: string
-          verification_method: Database["public"]["Enums"]["verification_method"]
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          frequency: Database["public"]["Enums"]["activity_frequency"]
-          id?: string
-          in_app_config?: Json | null
-          is_active?: boolean | null
-          location_lat?: number | null
-          location_lng?: number | null
-          location_radius_meters?: number | null
-          name: string
-          points_awarded: number
-          program_id: string
-          qr_code_data?: string | null
-          time_window_end?: string | null
-          time_window_start?: string | null
-          updated_at?: string
-          verification_method: Database["public"]["Enums"]["verification_method"]
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          frequency?: Database["public"]["Enums"]["activity_frequency"]
-          id?: string
-          in_app_config?: Json | null
-          is_active?: boolean | null
-          location_lat?: number | null
-          location_lng?: number | null
-          location_radius_meters?: number | null
-          name?: string
-          points_awarded?: number
-          program_id?: string
-          qr_code_data?: string | null
-          time_window_end?: string | null
-          time_window_start?: string | null
-          updated_at?: string
-          verification_method?: Database["public"]["Enums"]["verification_method"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "activities_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "loyalty_programs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      activity_completions: {
-        Row: {
-          activity_id: string
-          completed_at: string
-          fan_id: string
-          id: string
-          membership_id: string
-          metadata: Json | null
-          points_earned: number
-        }
-        Insert: {
-          activity_id: string
-          completed_at?: string
-          fan_id: string
-          id?: string
-          membership_id: string
-          metadata?: Json | null
-          points_earned: number
-        }
-        Update: {
-          activity_id?: string
-          completed_at?: string
-          fan_id?: string
-          id?: string
-          membership_id?: string
-          metadata?: Json | null
-          points_earned?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "activity_completions_activity_id_fkey"
-            columns: ["activity_id"]
-            isOneToOne: false
-            referencedRelation: "activities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_completions_fan_id_fkey"
-            columns: ["fan_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_completions_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "fan_memberships"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_verifications: {
-        Row: {
-          authority_declaration: boolean | null
-          club_id: string
-          created_at: string
-          id: string
-          official_email_domain: string | null
-          public_link: string | null
-          updated_at: string
-          verified_at: string | null
-        }
-        Insert: {
-          authority_declaration?: boolean | null
-          club_id: string
-          created_at?: string
-          id?: string
-          official_email_domain?: string | null
-          public_link?: string | null
-          updated_at?: string
-          verified_at?: string | null
-        }
-        Update: {
-          authority_declaration?: boolean | null
-          club_id?: string
-          created_at?: string
-          id?: string
-          official_email_domain?: string | null
-          public_link?: string | null
-          updated_at?: string
-          verified_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_verifications_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: true
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      clubs: {
-        Row: {
-          admin_id: string
-          city: string
-          country: string
-          created_at: string
-          id: string
-          logo_url: string | null
-          name: string
-          primary_color: string | null
-          season_end: string | null
-          season_start: string | null
-          stadium_name: string | null
-          status: Database["public"]["Enums"]["club_status"]
-          updated_at: string
-        }
-        Insert: {
-          admin_id: string
-          city: string
-          country: string
-          created_at?: string
-          id?: string
-          logo_url?: string | null
-          name: string
-          primary_color?: string | null
-          season_end?: string | null
-          season_start?: string | null
-          stadium_name?: string | null
-          status?: Database["public"]["Enums"]["club_status"]
-          updated_at?: string
-        }
-        Update: {
-          admin_id?: string
-          city?: string
-          country?: string
-          created_at?: string
-          id?: string
-          logo_url?: string | null
-          name?: string
-          primary_color?: string | null
-          season_end?: string | null
-          season_start?: string | null
-          stadium_name?: string | null
-          status?: Database["public"]["Enums"]["club_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "clubs_admin_id_fkey"
-            columns: ["admin_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fan_memberships: {
-        Row: {
-          club_id: string
-          fan_id: string
-          id: string
-          joined_at: string
-          points_balance: number
-          program_id: string
-          updated_at: string
-        }
-        Insert: {
-          club_id: string
-          fan_id: string
-          id?: string
-          joined_at?: string
-          points_balance?: number
-          program_id: string
-          updated_at?: string
-        }
-        Update: {
-          club_id?: string
-          fan_id?: string
-          id?: string
-          joined_at?: string
-          points_balance?: number
-          program_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fan_memberships_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fan_memberships_fan_id_fkey"
-            columns: ["fan_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fan_memberships_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "loyalty_programs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      loyalty_programs: {
-        Row: {
-          club_id: string
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          points_currency_name: string
-          updated_at: string
-        }
-        Insert: {
-          club_id: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          points_currency_name?: string
-          updated_at?: string
-        }
-        Update: {
-          club_id?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          points_currency_name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "loyalty_programs_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: true
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      manual_claims: {
-        Row: {
-          activity_id: string
-          created_at: string
-          fan_id: string
-          id: string
-          membership_id: string
-          proof_description: string | null
-          proof_url: string | null
-          rejection_reason: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: Database["public"]["Enums"]["claim_status"]
-          updated_at: string
-        }
-        Insert: {
-          activity_id: string
-          created_at?: string
-          fan_id: string
-          id?: string
-          membership_id: string
-          proof_description?: string | null
-          proof_url?: string | null
-          rejection_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: Database["public"]["Enums"]["claim_status"]
-          updated_at?: string
-        }
-        Update: {
-          activity_id?: string
-          created_at?: string
-          fan_id?: string
-          id?: string
-          membership_id?: string
-          proof_description?: string | null
-          proof_url?: string | null
-          rejection_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: Database["public"]["Enums"]["claim_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manual_claims_activity_id_fkey"
-            columns: ["activity_id"]
-            isOneToOne: false
-            referencedRelation: "activities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "manual_claims_fan_id_fkey"
-            columns: ["fan_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "manual_claims_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "fan_memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "manual_claims_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
-        Row: {
-          created_at: string
-          email: string
-          full_name: string | null
-          id: string
-          role: Database["public"]["Enums"]["user_role"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          full_name?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          full_name?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-          user_id?: string
-        }
+        Row: { user_id: string; full_name: string | null; username: string | null; avatar_url: string | null; bio: string | null; city: string | null; country: string | null; preferred_language: "en" | "ar" | null; favorite_team_id: string | null; role: "fan" | "club_admin" | "system_admin"; onboarding_completed: boolean; onboarding_step: number | null; created_at: string; updated_at: string }
+        Insert: { user_id: string; full_name?: string | null; username?: string | null; avatar_url?: string | null; bio?: string | null; city?: string | null; country?: string | null; preferred_language?: "en" | "ar" | null; favorite_team_id?: string | null; role?: "fan" | "club_admin" | "system_admin"; onboarding_completed?: boolean; onboarding_step?: number | null; created_at?: string; updated_at?: string }
+        Update: { user_id?: string; full_name?: string | null; username?: string | null; avatar_url?: string | null; bio?: string | null; city?: string | null; country?: string | null; preferred_language?: "en" | "ar" | null; favorite_team_id?: string | null; role?: "fan" | "club_admin" | "system_admin"; onboarding_completed?: boolean; onboarding_step?: number | null; created_at?: string; updated_at?: string }
         Relationships: []
       }
-      reward_redemptions: {
-        Row: {
-          fan_id: string
-          fulfilled_at: string | null
-          id: string
-          membership_id: string
-          points_spent: number
-          redeemed_at: string
-          redemption_code: string | null
-          reward_id: string
-        }
-        Insert: {
-          fan_id: string
-          fulfilled_at?: string | null
-          id?: string
-          membership_id: string
-          points_spent: number
-          redeemed_at?: string
-          redemption_code?: string | null
-          reward_id: string
-        }
-        Update: {
-          fan_id?: string
-          fulfilled_at?: string | null
-          id?: string
-          membership_id?: string
-          points_spent?: number
-          redeemed_at?: string
-          redemption_code?: string | null
-          reward_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reward_redemptions_fan_id_fkey"
-            columns: ["fan_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reward_redemptions_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "fan_memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reward_redemptions_reward_id_fkey"
-            columns: ["reward_id"]
-            isOneToOne: false
-            referencedRelation: "rewards"
-            referencedColumns: ["id"]
-          },
-        ]
+      profile_private: {
+        Row: { user_id: string; email: string | null; phone: string | null; date_of_birth: string | null; address: string | null }
+        Insert: { user_id: string; email?: string | null; phone?: string | null; date_of_birth?: string | null; address?: string | null }
+        Update: { user_id?: string; email?: string | null; phone?: string | null; date_of_birth?: string | null; address?: string | null }
+        Relationships: []
       }
-      rewards: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          points_cost: number
-          program_id: string
-          quantity_limit: number | null
-          quantity_redeemed: number | null
-          redemption_method: Database["public"]["Enums"]["redemption_method"]
-          updated_at: string
-          voucher_code: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          points_cost: number
-          program_id: string
-          quantity_limit?: number | null
-          quantity_redeemed?: number | null
-          redemption_method: Database["public"]["Enums"]["redemption_method"]
-          updated_at?: string
-          voucher_code?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          points_cost?: number
-          program_id?: string
-          quantity_limit?: number | null
-          quantity_redeemed?: number | null
-          redemption_method?: Database["public"]["Enums"]["redemption_method"]
-          updated_at?: string
-          voucher_code?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rewards_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "loyalty_programs"
-            referencedColumns: ["id"]
-          },
-        ]
+      teams: {
+        Row: { id: string; name: string; name_ar: string | null; short_name: string; league: string | null; country: string | null; primary_color: string | null; secondary_color: string | null; football_data_id: number | null }
+        Insert: { id?: string; name: string; name_ar?: string | null; short_name: string; league?: string | null; country?: string | null; primary_color?: string | null; secondary_color?: string | null; football_data_id?: number | null }
+        Update: { id?: string; name?: string; name_ar?: string | null; short_name?: string; league?: string | null; country?: string | null; primary_color?: string | null; secondary_color?: string | null; football_data_id?: number | null }
+        Relationships: []
       }
-      user_roles: {
-        Row: {
-          created_at: string
-          role: Database["public"]["Enums"]["user_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          role: Database["public"]["Enums"]["user_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          role?: Database["public"]["Enums"]["user_role"]
-          user_id?: string
-        }
+      venues: {
+        Row: { id: string; name: string; name_ar: string | null; venue_type: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area: string | null; city: string | null; address: string | null; lat: number | null; lng: number | null; capacity: number | null; screens: number | null; has_sound: boolean | null; alcohol_free: boolean | null; family_friendly: boolean | null; instagram: string | null; phone: string | null; description: string | null; description_ar: string | null; owner_user_id: string | null; is_pro: boolean; is_demo: boolean; created_at: string }
+        Insert: { id?: string; name: string; name_ar?: string | null; venue_type?: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area?: string | null; city?: string | null; address?: string | null; lat?: number | null; lng?: number | null; capacity?: number | null; screens?: number | null; has_sound?: boolean | null; alcohol_free?: boolean | null; family_friendly?: boolean | null; instagram?: string | null; phone?: string | null; description?: string | null; description_ar?: string | null; owner_user_id?: string | null; is_pro?: boolean; is_demo?: boolean; created_at?: string }
+        Update: { id?: string; name?: string; name_ar?: string | null; venue_type?: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area?: string | null; city?: string | null; address?: string | null; lat?: number | null; lng?: number | null; capacity?: number | null; screens?: number | null; has_sound?: boolean | null; alcohol_free?: boolean | null; family_friendly?: boolean | null; instagram?: string | null; phone?: string | null; description?: string | null; description_ar?: string | null; owner_user_id?: string | null; is_pro?: boolean; is_demo?: boolean; created_at?: string }
+        Relationships: []
+      }
+      venue_offers: {
+        Row: { id: string; venue_id: string; title: string; title_ar: string | null; details: string | null; details_ar: string | null; members_only: boolean; active: boolean }
+        Insert: { id?: string; venue_id: string; title: string; title_ar?: string | null; details?: string | null; details_ar?: string | null; members_only?: boolean; active?: boolean }
+        Update: { id?: string; venue_id?: string; title?: string; title_ar?: string | null; details?: string | null; details_ar?: string | null; members_only?: boolean; active?: boolean }
+        Relationships: []
+      }
+      groups: {
+        Row: { id: string; slug: string; name: string; name_ar: string | null; team_id: string | null; city: string | null; description: string | null; description_ar: string | null; home_venue_id: string | null; instagram: string | null; whatsapp_link: string | null; is_official: boolean; dues_amount_aed: number | null; visibility: "public" | "private"; created_by: string | null; is_demo: boolean; created_at: string }
+        Insert: { id?: string; slug: string; name: string; name_ar?: string | null; team_id?: string | null; city?: string | null; description?: string | null; description_ar?: string | null; home_venue_id?: string | null; instagram?: string | null; whatsapp_link?: string | null; is_official?: boolean; dues_amount_aed?: number | null; visibility?: "public" | "private"; created_by?: string | null; is_demo?: boolean; created_at?: string }
+        Update: { id?: string; slug?: string; name?: string; name_ar?: string | null; team_id?: string | null; city?: string | null; description?: string | null; description_ar?: string | null; home_venue_id?: string | null; instagram?: string | null; whatsapp_link?: string | null; is_official?: boolean; dues_amount_aed?: number | null; visibility?: "public" | "private"; created_by?: string | null; is_demo?: boolean; created_at?: string }
+        Relationships: []
+      }
+      group_members: {
+        Row: { id: string; group_id: string; user_id: string; role: "owner" | "admin" | "member"; member_number: number | null; dues_status: "unpaid" | "paid" | "exempt"; dues_paid_until: string | null; joined_at: string }
+        Insert: { id?: string; group_id: string; user_id: string; role?: "owner" | "admin" | "member"; member_number?: number | null; dues_status?: "unpaid" | "paid" | "exempt"; dues_paid_until?: string | null; joined_at?: string }
+        Update: { id?: string; group_id?: string; user_id?: string; role?: "owner" | "admin" | "member"; member_number?: number | null; dues_status?: "unpaid" | "paid" | "exempt"; dues_paid_until?: string | null; joined_at?: string }
+        Relationships: []
+      }
+      announcements: {
+        Row: { id: string; group_id: string; author_id: string | null; title: string; body: string | null; body_ar: string | null; watch_party_id: string | null; created_at: string }
+        Insert: { id?: string; group_id: string; author_id?: string | null; title: string; body?: string | null; body_ar?: string | null; watch_party_id?: string | null; created_at?: string }
+        Update: { id?: string; group_id?: string; author_id?: string | null; title?: string; body?: string | null; body_ar?: string | null; watch_party_id?: string | null; created_at?: string }
+        Relationships: []
+      }
+      fixtures: {
+        Row: { id: string; external_id: number | null; competition: string | null; competition_code: string | null; home_team_name: string; away_team_name: string; home_team_id: string | null; away_team_id: string | null; kickoff_at: string; status: string; home_score: number | null; away_score: number | null; halftime_home: number | null; halftime_away: number | null }
+        Insert: { id?: string; external_id?: number | null; competition?: string | null; competition_code?: string | null; home_team_name: string; away_team_name: string; home_team_id?: string | null; away_team_id?: string | null; kickoff_at: string; status?: string; home_score?: number | null; away_score?: number | null; halftime_home?: number | null; halftime_away?: number | null }
+        Update: { id?: string; external_id?: number | null; competition?: string | null; competition_code?: string | null; home_team_name?: string; away_team_name?: string; home_team_id?: string | null; away_team_id?: string | null; kickoff_at?: string; status?: string; home_score?: number | null; away_score?: number | null; halftime_home?: number | null; halftime_away?: number | null }
+        Relationships: []
+      }
+      watch_parties: {
+        Row: { id: string; group_id: string; venue_id: string | null; fixture_id: string | null; title: string | null; notes: string | null; notes_ar: string | null; capacity: number | null; starts_at: string | null; checkin_code: string | null; status: "scheduled" | "live" | "finished" | "cancelled"; created_by: string | null; is_demo: boolean; created_at: string }
+        Insert: { id?: string; group_id: string; venue_id?: string | null; fixture_id?: string | null; title?: string | null; notes?: string | null; notes_ar?: string | null; capacity?: number | null; starts_at?: string | null; checkin_code?: string | null; status?: "scheduled" | "live" | "finished" | "cancelled"; created_by?: string | null; is_demo?: boolean; created_at?: string }
+        Update: { id?: string; group_id?: string; venue_id?: string | null; fixture_id?: string | null; title?: string | null; notes?: string | null; notes_ar?: string | null; capacity?: number | null; starts_at?: string | null; checkin_code?: string | null; status?: "scheduled" | "live" | "finished" | "cancelled"; created_by?: string | null; is_demo?: boolean; created_at?: string }
+        Relationships: []
+      }
+      rsvps: {
+        Row: { id: string; watch_party_id: string; user_id: string; status: "going" | "waitlist" | "cancelled"; guests: number; created_at: string }
+        Insert: { id?: string; watch_party_id: string; user_id: string; status?: "going" | "waitlist" | "cancelled"; guests?: number; created_at?: string }
+        Update: { id?: string; watch_party_id?: string; user_id?: string; status?: "going" | "waitlist" | "cancelled"; guests?: number; created_at?: string }
+        Relationships: []
+      }
+      checkins: {
+        Row: { id: string; user_id: string; watch_party_id: string | null; venue_id: string | null; fixture_id: string | null; group_id: string | null; method: string | null; created_at: string }
+        Insert: { id?: string; user_id: string; watch_party_id?: string | null; venue_id?: string | null; fixture_id?: string | null; group_id?: string | null; method?: string | null; created_at?: string }
+        Update: { id?: string; user_id?: string; watch_party_id?: string | null; venue_id?: string | null; fixture_id?: string | null; group_id?: string | null; method?: string | null; created_at?: string }
+        Relationships: []
+      }
+      predictions: {
+        Row: { id: string; user_id: string; fixture_id: string; home_score: number; away_score: number; points: number | null; created_at: string }
+        Insert: { id?: string; user_id: string; fixture_id: string; home_score: number; away_score: number; points?: number | null; created_at?: string }
+        Update: { id?: string; user_id?: string; fixture_id?: string; home_score?: number; away_score?: number; points?: number | null; created_at?: string }
+        Relationships: []
+      }
+      motm_votes: {
+        Row: { id: string; watch_party_id: string; user_id: string; player_name: string }
+        Insert: { id?: string; watch_party_id: string; user_id: string; player_name: string }
+        Update: { id?: string; watch_party_id?: string; user_id?: string; player_name?: string }
+        Relationships: []
+      }
+      quizzes: {
+        Row: { id: string; fixture_id: string | null; language: string | null; questions: Json; sponsor_name: string | null; created_at: string }
+        Insert: { id?: string; fixture_id?: string | null; language?: string | null; questions: Json; sponsor_name?: string | null; created_at?: string }
+        Update: { id?: string; fixture_id?: string | null; language?: string | null; questions?: Json; sponsor_name?: string | null; created_at?: string }
+        Relationships: []
+      }
+      quiz_answers: {
+        Row: { id: string; quiz_id: string; user_id: string; answers: Json; score: number | null; created_at: string }
+        Insert: { id?: string; quiz_id: string; user_id: string; answers: Json; score?: number | null; created_at?: string }
+        Update: { id?: string; quiz_id?: string; user_id?: string; answers?: Json; score?: number | null; created_at?: string }
+        Relationships: []
+      }
+      ai_messages: {
+        Row: { id: string; user_id: string; fixture_id: string | null; watch_party_id: string | null; role: "user" | "assistant"; content: string; created_at: string }
+        Insert: { id?: string; user_id: string; fixture_id?: string | null; watch_party_id?: string | null; role: "user" | "assistant"; content: string; created_at?: string }
+        Update: { id?: string; user_id?: string; fixture_id?: string | null; watch_party_id?: string | null; role?: "user" | "assistant"; content?: string; created_at?: string }
+        Relationships: []
+      }
+      user_badges: {
+        Row: { id: string; user_id: string; badge_key: string; earned_at: string }
+        Insert: { id?: string; user_id: string; badge_key: string; earned_at?: string }
+        Update: { id?: string; user_id?: string; badge_key?: string; earned_at?: string }
         Relationships: []
       }
     }
-    Views: {
-      [_ in never]: never
-    }
+    Views: { [_ in never]: never }
     Functions: {
-      award_points: {
-        Args: { p_membership_id: string; p_points: number }
-        Returns: undefined
-      }
-      check_verification_requirements: {
-        Args: { p_club_id: string }
-        Returns: boolean
-      }
-      ensure_user_role: {
-        Args: {
-          p_role: Database["public"]["Enums"]["user_role"]
-          p_user_id: string
-        }
-        Returns: undefined
-      }
-      get_user_role: {
-        Args: { p_user_id: string }
-        Returns: Database["public"]["Enums"]["user_role"]
-      }
-      spend_points: {
-        Args: { p_membership_id: string; p_points: number }
-        Returns: boolean
-      }
+      join_group: { Args: { p_group: string }; Returns: Json }
+      leave_group: { Args: { p_group: string }; Returns: Json }
+      rsvp: { Args: { p_party: string; p_guests?: number }; Returns: Json }
+      cancel_rsvp: { Args: { p_party: string }; Returns: Json }
+      check_in: { Args: { p_code: string }; Returns: Json }
+      party_counts: { Args: { p_party: string }; Returns: Json }
+      group_leaderboard: { Args: { p_group: string }; Returns: { user_id: string; full_name: string | null; avatar_url: string | null; prediction_points: number; exact_scores: number; caps: number; quiz_points: number }[] }
+      city_leaderboard: { Args: { p_city?: string }; Returns: { group_id: string; name: string; name_ar: string | null; team_name: string | null; members: number; caps: number; avg_prediction_points: number }[] }
+      my_passport: { Args: Record<PropertyKey, never>; Returns: Json }
+      group_stats: { Args: { p_group: string }; Returns: Json }
+      venue_stats: { Args: { p_venue: string }; Returns: Json }
+      submit_quiz: { Args: { p_quiz: string; p_answers: Json }; Returns: Json }
+      is_group_admin: { Args: { p_group: string }; Returns: boolean }
     }
-    Enums: {
-      activity_frequency:
-        | "once_ever"
-        | "once_per_match"
-        | "once_per_day"
-        | "unlimited"
-      claim_status: "pending" | "approved" | "rejected"
-      club_status: "unverified" | "verified" | "official"
-      redemption_method: "voucher" | "manual_fulfillment" | "code_display"
-      user_role: "club_admin" | "fan"
-      verification_method:
-        | "qr_scan"
-        | "location_checkin"
-        | "in_app_completion"
-        | "manual_proof"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    Enums: { [_ in never]: never }
+    CompositeTypes: { [_ in never]: never }
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      activity_frequency: [
-        "once_ever",
-        "once_per_match",
-        "once_per_day",
-        "unlimited",
-      ],
-      claim_status: ["pending", "approved", "rejected"],
-      club_status: ["unverified", "verified", "official"],
-      redemption_method: ["voucher", "manual_fulfillment", "code_display"],
-      user_role: ["club_admin", "fan"],
-      verification_method: [
-        "qr_scan",
-        "location_checkin",
-        "in_app_completion",
-        "manual_proof",
-      ],
-    },
-  },
-} as const
+type PublicSchema = Database["public"]
+export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"]
+export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"]
+export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"]

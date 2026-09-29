@@ -1,30 +1,18 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/I18nContext";
 
-const NotFound = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
-  }, [location.pathname]);
-
+export default function NotFound() {
+  const { t } = useI18n();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background relative">
-      <div className="absolute inset-0 gradient-mesh opacity-30" />
-      <div className="text-center relative z-10 space-y-6">
-        <div className="text-8xl font-display font-bold text-gradient-primary">404</div>
-        <p className="text-xl text-muted-foreground">This page doesn't exist</p>
-        <Button asChild variant="outline" className="rounded-full">
-          <a href="/">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Return Home
-          </a>
-        </Button>
+    <AppShell>
+      <div className="mx-auto mt-10 max-w-md rounded-3xl border bg-card bg-pitch-lines p-10 text-center">
+        <p className="scoreboard text-6xl font-bold text-accent" dir="ltr">4 – 0 – 4</p>
+        <h1 className="mt-4 text-2xl font-bold">{t("notFound.title")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("notFound.body")}</p>
+        <Button asChild className="mt-6 rounded-full"><Link to="/">{t("notFound.home")}</Link></Button>
       </div>
-    </div>
+    </AppShell>
   );
-};
-
-export default NotFound;
+}

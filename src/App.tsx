@@ -1,141 +1,50 @@
-// Fan Loyalty Hub - Main App Router
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
-
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { I18nProvider } from "@/i18n/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { PreviewModeProvider } from "@/contexts/PreviewModeContext";
-
-// Core pages
-import Index from "./pages/Index";
+import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
-import ExplorePage from "./pages/ExplorePage";
-import PreviewHub from "./pages/PreviewHub";
+import Onboarding from "./pages/Onboarding";
+import CheckinPage from "./pages/CheckinPage";
+import ProfilePage from "./pages/ProfilePage";
+import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
-
-// Club pages
-import ClubOnboarding from "./pages/club/ClubOnboarding";
-import ClubClaim from "./pages/club/ClubClaim";
-import ClubDashboard from "./pages/club/ClubDashboard";
-import ClubVerification from "./pages/club/ClubVerification";
-import ActivityBuilder from "./pages/club/ActivityBuilder";
-import RewardsBuilder from "./pages/club/RewardsBuilder";
-import ClaimReview from "./pages/club/ClaimReview";
-import ClubAnalytics from "./pages/club/ClubAnalytics";
-import ClubSeasons from "./pages/club/ClubSeasons";
-import TierManagement from "./pages/club/TierManagement";
-import ClubProfileEdit from "./pages/club/ClubProfileEdit";
-
-// Fan pages
-import FanHome from "./pages/fan/FanHome";
-import FanOnboarding from "./pages/fan/FanOnboarding";
-import FanActivities from "./pages/fan/FanActivities";
-import FanRewards from "./pages/fan/FanRewards";
-import FanLeaderboardPage from "./pages/fan/FanLeaderboardPage";
-import FanProfilePage from "./pages/fan/FanProfilePage";
-import FanProfileEdit from "./pages/fan/FanProfileEdit";
-import JoinClub from "./pages/fan/JoinClub";
-import FanNotifications from "./pages/fan/FanNotifications";
-import FanChants from "./pages/fan/FanChants";
-import FanDiscover from "./pages/fan/FanDiscover";
-import FanCommunity from "./pages/fan/FanCommunity";
-import MatchCenterPage from "./pages/fan/MatchCenterPage";
-import AnalysisMatchSelectPage from "./pages/fan/AnalysisMatchSelectPage";
-import AnalysisRoomPage from "./pages/fan/AnalysisRoomPage";
-import ClubChants from "./pages/club/ClubChants";
-import AdminReportedChants from "./pages/admin/AdminReportedChants";
-import SystemAdmin from "./pages/SystemAdmin";
 
 const queryClient = new QueryClient();
 
-// Animated routes wrapper for page transitions
-import { motion } from "framer-motion";
-
-const pageVariants = {
-  initial: { opacity: 0, y: 12 },
-  enter: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as const } },
-  exit: { opacity: 0, y: -8, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const } },
-} as const;
-
-const AnimatedRoutes = () => {
-  const location = useLocation();
-  
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial="initial"
-        animate="enter"
-        exit="exit"
-        variants={pageVariants}
-      >
-        <Routes location={location}>
-          {/* Public */}
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/explore" element={<ExplorePage />} />
-          <Route path="/preview" element={<PreviewHub />} />
-          {/* ================= CLUB ADMIN ================= */}
-          <Route path="/club/claim" element={<ClubClaim />} />
-          <Route path="/club/onboarding" element={<ClubOnboarding />} />
-          <Route path="/club/dashboard" element={<ClubDashboard />} />
-          <Route path="/club/verification" element={<ClubVerification />} />
-          <Route path="/club/activities" element={<ActivityBuilder />} />
-          <Route path="/club/rewards" element={<RewardsBuilder />} />
-          <Route path="/club/claims" element={<ClaimReview />} />
-          <Route path="/club/analytics" element={<ClubAnalytics />} />
-          <Route path="/club/seasons" element={<ClubSeasons />} />
-          {/* ✅ Tier management */}
-          <Route path="/club/tiers" element={<TierManagement />} />
-          <Route path="/club/profile" element={<ClubProfileEdit />} />
-          <Route path="/club/chants" element={<ClubChants />} />
-          {/* ================= FAN ================= */}
-          <Route path="/fan/onboarding" element={<FanOnboarding />} />
-          <Route path="/fan/home" element={<FanHome />} />
-          <Route path="/fan/activities" element={<FanActivities />} />
-          <Route path="/fan/rewards" element={<FanRewards />} />
-          <Route path="/fan/leaderboard" element={<FanLeaderboardPage />} />
-          <Route path="/fan/profile" element={<FanProfilePage />} />
-          <Route path="/fan/profile/edit" element={<FanProfileEdit />} />
-          <Route path="/fan/join" element={<JoinClub />} />
-          <Route path="/fan/notifications" element={<FanNotifications />} />
-          <Route path="/fan/chants" element={<FanChants />} />
-          <Route path="/fan/discover" element={<FanDiscover />} />
-          <Route path="/fan/matches" element={<MatchCenterPage />} />
-          <Route path="/fan/analysis" element={<AnalysisMatchSelectPage />} />
-          <Route path="/fan/analysis/room/:roomId" element={<AnalysisRoomPage />} />
-          <Route path="/fan/community/:clubId" element={<FanCommunity />} />
-          {/* System Admin */}
-          <Route path="/admin" element={<SystemAdmin />} />
-          <Route path="/admin/reports" element={<AdminReportedChants />} />
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <I18nProvider>
       <AuthProvider>
-        <PreviewModeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-
-            <BrowserRouter>
-              <AnimatedRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
-        </PreviewModeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/groups" element={<Placeholder titleKey="page.groups" />} />
+              <Route path="/g/:slug" element={<Placeholder titleKey="page.group" />} />
+              <Route path="/party/:id" element={<Placeholder titleKey="page.party" />} />
+              <Route path="/checkin" element={<CheckinPage />} />
+              <Route path="/checkin/:code" element={<CheckinPage />} />
+              <Route path="/predict" element={<Placeholder titleKey="page.predict" />} />
+              <Route path="/passport" element={<Placeholder titleKey="page.passport" />} />
+              <Route path="/venues/:id" element={<Placeholder titleKey="page.venue" />} />
+              <Route path="/organiser/:slug" element={<Placeholder titleKey="page.organiser" />} />
+              <Route path="/venue-dashboard/:id" element={<Placeholder titleKey="page.venueDashboard" />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
       </AuthProvider>
-    </QueryClientProvider>
-  );
-};
+    </I18nProvider>
+  </QueryClientProvider>
+);
 
 export default App;
