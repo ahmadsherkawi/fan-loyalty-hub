@@ -24,7 +24,8 @@ export default function AuthPage() {
     if (params.get("error_description")?.toLowerCase().includes("provider")) toast.error(t("auth.googleUnavailable"));
   }, [params, t]);
 
-  if (!loading && user) return <Navigate to={profile && !profile.onboarding_completed ? "/onboarding" : "/"} replace />;
+  const next = params.get("next");
+  if (!loading && user) return <Navigate to={profile && !profile.onboarding_completed ? "/onboarding" : next && next.startsWith("/") ? next : "/"} replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

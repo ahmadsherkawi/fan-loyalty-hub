@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,12 +9,21 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import Onboarding from "./pages/Onboarding";
-import CheckinPage from "./pages/CheckinPage";
-import ProfilePage from "./pages/ProfilePage";
-import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const GroupsPage = lazy(() => import("./pages/GroupsPage"));
+const GroupPage = lazy(() => import("./pages/GroupPage"));
+const PartyPage = lazy(() => import("./pages/PartyPage"));
+const VenueScreen = lazy(() => import("./pages/VenueScreen"));
+const CheckinPage = lazy(() => import("./pages/CheckinPage"));
+const PredictPage = lazy(() => import("./pages/PredictPage"));
+const PassportPage = lazy(() => import("./pages/PassportPage"));
+const VenuePage = lazy(() => import("./pages/VenuePage"));
+const OrganiserPage = lazy(() => import("./pages/OrganiserPage"));
+const VenueDashboard = lazy(() => import("./pages/VenueDashboard"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } } });
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,23 +33,26 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/groups" element={<Placeholder titleKey="page.groups" />} />
-              <Route path="/g/:slug" element={<Placeholder titleKey="page.group" />} />
-              <Route path="/party/:id" element={<Placeholder titleKey="page.party" />} />
-              <Route path="/checkin" element={<CheckinPage />} />
-              <Route path="/checkin/:code" element={<CheckinPage />} />
-              <Route path="/predict" element={<Placeholder titleKey="page.predict" />} />
-              <Route path="/passport" element={<Placeholder titleKey="page.passport" />} />
-              <Route path="/venues/:id" element={<Placeholder titleKey="page.venue" />} />
-              <Route path="/organiser/:slug" element={<Placeholder titleKey="page.organiser" />} />
-              <Route path="/venue-dashboard/:id" element={<Placeholder titleKey="page.venueDashboard" />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<div className="min-h-screen bg-background" />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/groups" element={<GroupsPage />} />
+                <Route path="/g/:slug" element={<GroupPage />} />
+                <Route path="/party/:id" element={<PartyPage />} />
+                <Route path="/party/:id/screen" element={<VenueScreen />} />
+                <Route path="/checkin" element={<CheckinPage />} />
+                <Route path="/checkin/:code" element={<CheckinPage />} />
+                <Route path="/predict" element={<PredictPage />} />
+                <Route path="/passport" element={<PassportPage />} />
+                <Route path="/venues/:id" element={<VenuePage />} />
+                <Route path="/organiser/:slug" element={<OrganiserPage />} />
+                <Route path="/venue-dashboard/:id" element={<VenueDashboard />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

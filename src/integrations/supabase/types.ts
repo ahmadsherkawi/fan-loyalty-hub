@@ -1,140 +1,101 @@
-// Generated from the Jamhoor public schema (see project knowledge).
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+// Types for the Jamhoor public schema (Supabase project ohjhzmqcbprcybjlsusp).
+// Mirrors `supabase gen types typescript`; regenerate from the database when the schema changes.
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+type Rel = { foreignKeyName: string; columns: string[]; isOneToOne: boolean; referencedRelation: string; referencedColumns: string[] };
+
+/** Build Insert/Update shapes: `Req` keys are required on insert, everything else optional. */
+type Table<Row, Req extends keyof Row, Rels extends Rel[] = []> = {
+  Row: Row;
+  Insert: Pick<Row, Req> & Partial<Omit<Row, Req>>;
+  Update: Partial<Row>;
+  Relationships: Rels;
+};
+
+type FK<Name extends string, Col extends string, Ref extends string, One extends boolean = false> = {
+  foreignKeyName: Name; columns: [Col]; isOneToOne: One; referencedRelation: Ref; referencedColumns: ["id"];
+};
 
 export type Database = {
+  __InternalSupabase: { PostgrestVersion: "14.5" };
   public: {
     Tables: {
-      profiles: {
-        Row: { user_id: string; full_name: string | null; username: string | null; avatar_url: string | null; bio: string | null; city: string | null; country: string | null; preferred_language: "en" | "ar" | null; favorite_team_id: string | null; role: "fan" | "club_admin" | "system_admin"; onboarding_completed: boolean; onboarding_step: number | null; created_at: string; updated_at: string }
-        Insert: { user_id: string; full_name?: string | null; username?: string | null; avatar_url?: string | null; bio?: string | null; city?: string | null; country?: string | null; preferred_language?: "en" | "ar" | null; favorite_team_id?: string | null; role?: "fan" | "club_admin" | "system_admin"; onboarding_completed?: boolean; onboarding_step?: number | null; created_at?: string; updated_at?: string }
-        Update: { user_id?: string; full_name?: string | null; username?: string | null; avatar_url?: string | null; bio?: string | null; city?: string | null; country?: string | null; preferred_language?: "en" | "ar" | null; favorite_team_id?: string | null; role?: "fan" | "club_admin" | "system_admin"; onboarding_completed?: boolean; onboarding_step?: number | null; created_at?: string; updated_at?: string }
-        Relationships: []
-      }
-      profile_private: {
-        Row: { user_id: string; email: string | null; phone: string | null; date_of_birth: string | null; address: string | null }
-        Insert: { user_id: string; email?: string | null; phone?: string | null; date_of_birth?: string | null; address?: string | null }
-        Update: { user_id?: string; email?: string | null; phone?: string | null; date_of_birth?: string | null; address?: string | null }
-        Relationships: []
-      }
-      teams: {
-        Row: { id: string; name: string; name_ar: string | null; short_name: string; league: string | null; country: string | null; primary_color: string | null; secondary_color: string | null; football_data_id: number | null }
-        Insert: { id?: string; name: string; name_ar?: string | null; short_name: string; league?: string | null; country?: string | null; primary_color?: string | null; secondary_color?: string | null; football_data_id?: number | null }
-        Update: { id?: string; name?: string; name_ar?: string | null; short_name?: string; league?: string | null; country?: string | null; primary_color?: string | null; secondary_color?: string | null; football_data_id?: number | null }
-        Relationships: []
-      }
-      venues: {
-        Row: { id: string; name: string; name_ar: string | null; venue_type: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area: string | null; city: string | null; address: string | null; lat: number | null; lng: number | null; capacity: number | null; screens: number | null; has_sound: boolean | null; alcohol_free: boolean | null; family_friendly: boolean | null; instagram: string | null; phone: string | null; description: string | null; description_ar: string | null; owner_user_id: string | null; is_pro: boolean; is_demo: boolean; created_at: string }
-        Insert: { id?: string; name: string; name_ar?: string | null; venue_type?: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area?: string | null; city?: string | null; address?: string | null; lat?: number | null; lng?: number | null; capacity?: number | null; screens?: number | null; has_sound?: boolean | null; alcohol_free?: boolean | null; family_friendly?: boolean | null; instagram?: string | null; phone?: string | null; description?: string | null; description_ar?: string | null; owner_user_id?: string | null; is_pro?: boolean; is_demo?: boolean; created_at?: string }
-        Update: { id?: string; name?: string; name_ar?: string | null; venue_type?: "bar" | "cafe" | "hotel" | "restaurant" | "lounge" | "other"; area?: string | null; city?: string | null; address?: string | null; lat?: number | null; lng?: number | null; capacity?: number | null; screens?: number | null; has_sound?: boolean | null; alcohol_free?: boolean | null; family_friendly?: boolean | null; instagram?: string | null; phone?: string | null; description?: string | null; description_ar?: string | null; owner_user_id?: string | null; is_pro?: boolean; is_demo?: boolean; created_at?: string }
-        Relationships: []
-      }
-      venue_offers: {
-        Row: { id: string; venue_id: string; title: string; title_ar: string | null; details: string | null; details_ar: string | null; members_only: boolean; active: boolean }
-        Insert: { id?: string; venue_id: string; title: string; title_ar?: string | null; details?: string | null; details_ar?: string | null; members_only?: boolean; active?: boolean }
-        Update: { id?: string; venue_id?: string; title?: string; title_ar?: string | null; details?: string | null; details_ar?: string | null; members_only?: boolean; active?: boolean }
-        Relationships: []
-      }
-      groups: {
-        Row: { id: string; slug: string; name: string; name_ar: string | null; team_id: string | null; city: string | null; description: string | null; description_ar: string | null; home_venue_id: string | null; instagram: string | null; whatsapp_link: string | null; is_official: boolean; dues_amount_aed: number | null; visibility: "public" | "private"; created_by: string | null; is_demo: boolean; created_at: string }
-        Insert: { id?: string; slug: string; name: string; name_ar?: string | null; team_id?: string | null; city?: string | null; description?: string | null; description_ar?: string | null; home_venue_id?: string | null; instagram?: string | null; whatsapp_link?: string | null; is_official?: boolean; dues_amount_aed?: number | null; visibility?: "public" | "private"; created_by?: string | null; is_demo?: boolean; created_at?: string }
-        Update: { id?: string; slug?: string; name?: string; name_ar?: string | null; team_id?: string | null; city?: string | null; description?: string | null; description_ar?: string | null; home_venue_id?: string | null; instagram?: string | null; whatsapp_link?: string | null; is_official?: boolean; dues_amount_aed?: number | null; visibility?: "public" | "private"; created_by?: string | null; is_demo?: boolean; created_at?: string }
-        Relationships: []
-      }
-      group_members: {
-        Row: { id: string; group_id: string; user_id: string; role: "owner" | "admin" | "member"; member_number: number | null; dues_status: "unpaid" | "paid" | "exempt"; dues_paid_until: string | null; joined_at: string }
-        Insert: { id?: string; group_id: string; user_id: string; role?: "owner" | "admin" | "member"; member_number?: number | null; dues_status?: "unpaid" | "paid" | "exempt"; dues_paid_until?: string | null; joined_at?: string }
-        Update: { id?: string; group_id?: string; user_id?: string; role?: "owner" | "admin" | "member"; member_number?: number | null; dues_status?: "unpaid" | "paid" | "exempt"; dues_paid_until?: string | null; joined_at?: string }
-        Relationships: []
-      }
-      announcements: {
-        Row: { id: string; group_id: string; author_id: string | null; title: string; body: string | null; body_ar: string | null; watch_party_id: string | null; created_at: string }
-        Insert: { id?: string; group_id: string; author_id?: string | null; title: string; body?: string | null; body_ar?: string | null; watch_party_id?: string | null; created_at?: string }
-        Update: { id?: string; group_id?: string; author_id?: string | null; title?: string; body?: string | null; body_ar?: string | null; watch_party_id?: string | null; created_at?: string }
-        Relationships: []
-      }
-      fixtures: {
-        Row: { id: string; external_id: number | null; competition: string | null; competition_code: string | null; home_team_name: string; away_team_name: string; home_team_id: string | null; away_team_id: string | null; kickoff_at: string; status: string; home_score: number | null; away_score: number | null; halftime_home: number | null; halftime_away: number | null }
-        Insert: { id?: string; external_id?: number | null; competition?: string | null; competition_code?: string | null; home_team_name: string; away_team_name: string; home_team_id?: string | null; away_team_id?: string | null; kickoff_at: string; status?: string; home_score?: number | null; away_score?: number | null; halftime_home?: number | null; halftime_away?: number | null }
-        Update: { id?: string; external_id?: number | null; competition?: string | null; competition_code?: string | null; home_team_name?: string; away_team_name?: string; home_team_id?: string | null; away_team_id?: string | null; kickoff_at?: string; status?: string; home_score?: number | null; away_score?: number | null; halftime_home?: number | null; halftime_away?: number | null }
-        Relationships: []
-      }
-      watch_parties: {
-        Row: { id: string; group_id: string; venue_id: string | null; fixture_id: string | null; title: string | null; notes: string | null; notes_ar: string | null; capacity: number | null; starts_at: string | null; checkin_code: string | null; status: "scheduled" | "live" | "finished" | "cancelled"; created_by: string | null; is_demo: boolean; created_at: string }
-        Insert: { id?: string; group_id: string; venue_id?: string | null; fixture_id?: string | null; title?: string | null; notes?: string | null; notes_ar?: string | null; capacity?: number | null; starts_at?: string | null; checkin_code?: string | null; status?: "scheduled" | "live" | "finished" | "cancelled"; created_by?: string | null; is_demo?: boolean; created_at?: string }
-        Update: { id?: string; group_id?: string; venue_id?: string | null; fixture_id?: string | null; title?: string | null; notes?: string | null; notes_ar?: string | null; capacity?: number | null; starts_at?: string | null; checkin_code?: string | null; status?: "scheduled" | "live" | "finished" | "cancelled"; created_by?: string | null; is_demo?: boolean; created_at?: string }
-        Relationships: []
-      }
-      rsvps: {
-        Row: { id: string; watch_party_id: string; user_id: string; status: "going" | "waitlist" | "cancelled"; guests: number; created_at: string }
-        Insert: { id?: string; watch_party_id: string; user_id: string; status?: "going" | "waitlist" | "cancelled"; guests?: number; created_at?: string }
-        Update: { id?: string; watch_party_id?: string; user_id?: string; status?: "going" | "waitlist" | "cancelled"; guests?: number; created_at?: string }
-        Relationships: []
-      }
-      checkins: {
-        Row: { id: string; user_id: string; watch_party_id: string | null; venue_id: string | null; fixture_id: string | null; group_id: string | null; method: string | null; created_at: string }
-        Insert: { id?: string; user_id: string; watch_party_id?: string | null; venue_id?: string | null; fixture_id?: string | null; group_id?: string | null; method?: string | null; created_at?: string }
-        Update: { id?: string; user_id?: string; watch_party_id?: string | null; venue_id?: string | null; fixture_id?: string | null; group_id?: string | null; method?: string | null; created_at?: string }
-        Relationships: []
-      }
-      predictions: {
-        Row: { id: string; user_id: string; fixture_id: string; home_score: number; away_score: number; points: number | null; created_at: string }
-        Insert: { id?: string; user_id: string; fixture_id: string; home_score: number; away_score: number; points?: number | null; created_at?: string }
-        Update: { id?: string; user_id?: string; fixture_id?: string; home_score?: number; away_score?: number; points?: number | null; created_at?: string }
-        Relationships: []
-      }
-      motm_votes: {
-        Row: { id: string; watch_party_id: string; user_id: string; player_name: string }
-        Insert: { id?: string; watch_party_id: string; user_id: string; player_name: string }
-        Update: { id?: string; watch_party_id?: string; user_id?: string; player_name?: string }
-        Relationships: []
-      }
-      quizzes: {
-        Row: { id: string; fixture_id: string | null; language: string | null; questions: Json; sponsor_name: string | null; created_at: string }
-        Insert: { id?: string; fixture_id?: string | null; language?: string | null; questions: Json; sponsor_name?: string | null; created_at?: string }
-        Update: { id?: string; fixture_id?: string | null; language?: string | null; questions?: Json; sponsor_name?: string | null; created_at?: string }
-        Relationships: []
-      }
-      quiz_answers: {
-        Row: { id: string; quiz_id: string; user_id: string; answers: Json; score: number | null; created_at: string }
-        Insert: { id?: string; quiz_id: string; user_id: string; answers: Json; score?: number | null; created_at?: string }
-        Update: { id?: string; quiz_id?: string; user_id?: string; answers?: Json; score?: number | null; created_at?: string }
-        Relationships: []
-      }
-      ai_messages: {
-        Row: { id: string; user_id: string; fixture_id: string | null; watch_party_id: string | null; role: "user" | "assistant"; content: string; created_at: string }
-        Insert: { id?: string; user_id: string; fixture_id?: string | null; watch_party_id?: string | null; role: "user" | "assistant"; content: string; created_at?: string }
-        Update: { id?: string; user_id?: string; fixture_id?: string | null; watch_party_id?: string | null; role?: "user" | "assistant"; content?: string; created_at?: string }
-        Relationships: []
-      }
-      user_badges: {
-        Row: { id: string; user_id: string; badge_key: string; earned_at: string }
-        Insert: { id?: string; user_id: string; badge_key: string; earned_at?: string }
-        Update: { id?: string; user_id?: string; badge_key?: string; earned_at?: string }
-        Relationships: []
-      }
-    }
-    Views: { [_ in never]: never }
+      ai_messages: Table<{ content: string; created_at: string | null; fixture_id: string | null; id: string; role: string; user_id: string; watch_party_id: string | null },
+        "content" | "role" | "user_id",
+        [FK<"ai_messages_fixture_id_fkey", "fixture_id", "fixtures">, FK<"ai_messages_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
+      announcements: Table<{ author_id: string | null; body: string; body_ar: string | null; created_at: string | null; group_id: string; id: string; title: string | null; watch_party_id: string | null },
+        "body" | "group_id",
+        [FK<"announcements_group_id_fkey", "group_id", "groups">, FK<"announcements_party_fk", "watch_party_id", "watch_parties">]>;
+      checkins: Table<{ created_at: string | null; fixture_id: string | null; group_id: string | null; id: string; method: string; user_id: string; venue_id: string | null; watch_party_id: string | null },
+        "user_id",
+        [FK<"checkins_fixture_id_fkey", "fixture_id", "fixtures">, FK<"checkins_group_id_fkey", "group_id", "groups">, FK<"checkins_venue_id_fkey", "venue_id", "venues">, FK<"checkins_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
+      fixtures: Table<{ away_score: number | null; away_team_id: string | null; away_team_name: string; competition: string | null; competition_code: string | null; external_id: number | null; halftime_away: number | null; halftime_home: number | null; home_score: number | null; home_team_id: string | null; home_team_name: string; id: string; kickoff_at: string; status: string; updated_at: string | null },
+        "away_team_name" | "home_team_name" | "kickoff_at",
+        [FK<"fixtures_away_team_id_fkey", "away_team_id", "teams">, FK<"fixtures_home_team_id_fkey", "home_team_id", "teams">]>;
+      group_members: Table<{ dues_paid_until: string | null; dues_status: string; group_id: string; id: string; joined_at: string | null; member_number: number | null; role: string; user_id: string },
+        "group_id" | "user_id",
+        [FK<"group_members_group_id_fkey", "group_id", "groups">]>;
+      groups: Table<{ city: string; created_at: string | null; created_by: string | null; description: string | null; description_ar: string | null; dues_amount_aed: number | null; home_venue_id: string | null; id: string; instagram: string | null; is_demo: boolean; is_official: boolean; name: string; name_ar: string | null; slug: string; team_id: string | null; visibility: string; whatsapp_link: string | null },
+        "name" | "slug",
+        [FK<"groups_home_venue_id_fkey", "home_venue_id", "venues">, FK<"groups_team_id_fkey", "team_id", "teams">]>;
+      motm_votes: Table<{ created_at: string | null; id: string; player_name: string; user_id: string; watch_party_id: string },
+        "player_name" | "user_id" | "watch_party_id",
+        [FK<"motm_votes_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
+      predictions: Table<{ away_score: number; created_at: string | null; fixture_id: string; home_score: number; id: string; points: number | null; updated_at: string | null; user_id: string },
+        "away_score" | "fixture_id" | "home_score" | "user_id",
+        [FK<"predictions_fixture_id_fkey", "fixture_id", "fixtures">]>;
+      profile_private: Table<{ address: string | null; date_of_birth: string | null; email: string | null; phone: string | null; updated_at: string | null; user_id: string }, "user_id">;
+      profiles: Table<{ avatar_url: string | null; bio: string | null; city: string | null; country: string | null; created_at: string | null; favorite_team_id: string | null; full_name: string | null; id: string; notifications_enabled: boolean | null; onboarding_completed: boolean | null; onboarding_completed_at: string | null; onboarding_step: string | null; preferred_language: string | null; role: string; updated_at: string | null; user_id: string; username: string | null },
+        "user_id",
+        [FK<"profiles_favorite_team_id_fkey", "favorite_team_id", "teams">]>;
+      quiz_answers: Table<{ answers: Json; created_at: string | null; id: string; quiz_id: string; score: number; user_id: string },
+        "answers" | "quiz_id" | "user_id",
+        [FK<"quiz_answers_quiz_id_fkey", "quiz_id", "quizzes">]>;
+      quiz_keys: Table<{ answer_key: Json; quiz_id: string }, "answer_key" | "quiz_id", [FK<"quiz_keys_quiz_id_fkey", "quiz_id", "quizzes", true>]>;
+      quizzes: Table<{ created_at: string | null; fixture_id: string; id: string; language: string; questions: Json; sponsor_name: string | null },
+        "fixture_id" | "questions",
+        [FK<"quizzes_fixture_id_fkey", "fixture_id", "fixtures">]>;
+      rsvps: Table<{ created_at: string | null; guests: number; id: string; status: string; user_id: string; watch_party_id: string },
+        "user_id" | "watch_party_id",
+        [FK<"rsvps_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
+      sync_state: Table<{ key: string; updated_at: string | null; value: Json }, "key" | "value">;
+      teams: Table<{ country: string | null; created_at: string | null; football_data_id: number | null; id: string; league: string | null; name: string; name_ar: string | null; primary_color: string | null; secondary_color: string | null; short_name: string | null }, "name">;
+      user_badges: Table<{ badge_key: string; earned_at: string | null; id: string; user_id: string }, "badge_key" | "user_id">;
+      venue_offers: Table<{ active: boolean; created_at: string | null; details: string | null; details_ar: string | null; id: string; members_only: boolean; title: string; title_ar: string | null; venue_id: string },
+        "title" | "venue_id",
+        [FK<"venue_offers_venue_id_fkey", "venue_id", "venues">]>;
+      venues: Table<{ address: string | null; alcohol_free: boolean | null; area: string | null; capacity: number | null; city: string; created_at: string | null; description: string | null; description_ar: string | null; family_friendly: boolean | null; has_sound: boolean | null; id: string; instagram: string | null; is_demo: boolean; is_pro: boolean; lat: number | null; lng: number | null; name: string; name_ar: string | null; owner_user_id: string | null; phone: string | null; screens: number | null; venue_type: string }, "name">;
+      watch_parties: Table<{ capacity: number | null; checkin_code: string; created_at: string | null; created_by: string | null; fixture_id: string | null; group_id: string; id: string; is_demo: boolean; notes: string | null; notes_ar: string | null; starts_at: string | null; status: string; title: string | null; venue_id: string | null },
+        "group_id",
+        [FK<"watch_parties_fixture_id_fkey", "fixture_id", "fixtures">, FK<"watch_parties_group_id_fkey", "group_id", "groups">, FK<"watch_parties_venue_id_fkey", "venue_id", "venues">]>;
+    };
+    Views: { [_ in never]: never };
     Functions: {
-      join_group: { Args: { p_group: string }; Returns: Json }
-      leave_group: { Args: { p_group: string }; Returns: Json }
-      rsvp: { Args: { p_party: string; p_guests?: number }; Returns: Json }
-      cancel_rsvp: { Args: { p_party: string }; Returns: Json }
-      check_in: { Args: { p_code: string }; Returns: Json }
-      party_counts: { Args: { p_party: string }; Returns: Json }
-      group_leaderboard: { Args: { p_group: string }; Returns: { user_id: string; full_name: string | null; avatar_url: string | null; prediction_points: number; exact_scores: number; caps: number; quiz_points: number }[] }
-      city_leaderboard: { Args: { p_city?: string }; Returns: { group_id: string; name: string; name_ar: string | null; team_name: string | null; members: number; caps: number; avg_prediction_points: number }[] }
-      my_passport: { Args: Record<PropertyKey, never>; Returns: Json }
-      group_stats: { Args: { p_group: string }; Returns: Json }
-      venue_stats: { Args: { p_venue: string }; Returns: Json }
-      submit_quiz: { Args: { p_quiz: string; p_answers: Json }; Returns: Json }
-      is_group_admin: { Args: { p_group: string }; Returns: boolean }
-    }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
-  }
-}
+      can_see_group: { Args: { p_group: string }; Returns: boolean };
+      cancel_rsvp: { Args: { p_party: string }; Returns: undefined };
+      check_in: { Args: { p_code: string }; Returns: Json };
+      city_leaderboard: { Args: { p_city?: string }; Returns: { avg_prediction_points: number; caps: number; group_id: string; members: number; name: string; name_ar: string; team_name: string }[] };
+      get_current_profile_id: { Args: never; Returns: string };
+      group_leaderboard: { Args: { p_group: string }; Returns: { avatar_url: string; caps: number; exact_scores: number; full_name: string; prediction_points: number; quiz_points: number; user_id: string }[] };
+      group_stats: { Args: { p_group: string }; Returns: Json };
+      is_group_admin: { Args: { p_group: string }; Returns: boolean };
+      is_group_member: { Args: { p_group: string }; Returns: boolean };
+      is_system_admin: { Args: never; Returns: boolean };
+      is_venue_owner: { Args: { p_venue: string }; Returns: boolean };
+      join_group: { Args: { p_group: string }; Returns: Json };
+      leave_group: { Args: { p_group: string }; Returns: undefined };
+      my_passport: { Args: never; Returns: Json };
+      party_counts: { Args: { p_party: string }; Returns: Json };
+      rsvp: { Args: { p_guests?: number; p_party: string }; Returns: Json };
+      submit_quiz: { Args: { p_answers: Json; p_quiz: string }; Returns: Json };
+      venue_stats: { Args: { p_venue: string }; Returns: Json };
+    };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
+  };
+};
 
-type PublicSchema = Database["public"]
-export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"]
+type PublicSchema = Database["public"];
+export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"];
+export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"];
+export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"];
