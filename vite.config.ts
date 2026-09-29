@@ -11,17 +11,6 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
-    allowedHosts: [
-      "fanloyaltyhub.loca.lt",
-      ".trycloudflare.com",
-      ".loca.lt",
-    ],
-    proxy: {
-      "/api/ai": {
-        target: "http://localhost:3001",
-        changeOrigin: true,
-      },
-    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
