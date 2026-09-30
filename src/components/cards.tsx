@@ -38,7 +38,7 @@ export function PartyCard({ party, showGroup = true }: { party: PartyFull; showG
               <TeamBadge size="xs" shortName={f.away_team?.short_name || f.away_team_name.slice(0, 3)} primary={f.away_team?.primary_color} secondary={f.away_team?.secondary_color} />
             </span>
             <p className="min-w-0 flex-1 truncate font-bold">
-              {homeName} <span className="font-medium text-muted-foreground">{done ? <span className="scoreboard text-foreground" dir="ltr">{f.home_score}–{f.away_score}</span> : "v"}</span> {awayName}
+              {homeName} <span className="font-medium text-muted-foreground">{done ? <span className="scoreboard text-foreground" dir="ltr">{f.home_score}–{f.away_score}</span> : t("common.vs")}</span> {awayName}
             </p>
           </div>
         ) : <p className="flex items-center gap-1.5 truncate font-bold"><Tv className="h-4 w-4" />{party.title}</p>}

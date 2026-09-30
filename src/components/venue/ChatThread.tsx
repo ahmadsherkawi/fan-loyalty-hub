@@ -57,7 +57,7 @@ export function ChatThread({ venueId, threadId, asVenue, venueName }: { venueId:
           const mine = m.from_venue === asVenue;
           return (
             <div key={m.id} className={cn("max-w-[85%] rounded-2xl px-3 py-2 text-sm", mine ? "ms-auto rounded-ee-md bg-foreground text-background" : "rounded-es-md bg-surface")}>
-              <p className="whitespace-pre-line">{m.body}</p>
+              <p className="whitespace-pre-line" dir="auto">{m.body}</p>
               <p className={cn("mt-0.5 text-[10px]", mine ? "text-background/60" : "text-muted-foreground")}>{relativeTime(m.created_at, lang)}</p>
             </div>
           );

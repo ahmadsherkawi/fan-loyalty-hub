@@ -10,7 +10,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { toast } from "sonner";
 
 export default function AuthPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, profile, loading } = useAuth();
   const [params] = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">(params.get("mode") === "signup" ? "signup" : "signin");
@@ -24,8 +24,14 @@ export default function AuthPage() {
     if (params.get("error_description")?.toLowerCase().includes("provider")) toast.error(t("auth.googleUnavailable"));
   }, [params, t]);
 
-  const next = params.get("next");
-  if (!loading && user) return <Navigate to={profile && !profile.onboarding_completed ? "/onboarding" : next && next.startsWith("/") ? next : "/"} replace />;
+  const rawNext = params.get("next");
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  if (next) { try { localStorage.setItem("jamhoor.next", next); } catch { /* private mode */ } }
+  if (!loading && user) {
+    if (!profile) return <AppShell><div className="mx-auto mt-10 h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" /></AppShell>;
+    return <Navigate to={!profile.onboarding_completed ? `/onboarding${next ? `?next=${encodeURIComponent(next)}` : ""}` : next ?? "/"} replace />;
+  }
+  const nextQ = next ? `?next=${encodeURIComponent(next)}` : "";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +40,7 @@ export default function AuthPage() {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: `${window.location.origin}/onboarding`, data: { full_name: fullName, account_type: kind } },
+          options: { emailRedirectTo: `${window.location.origin}/onboarding${nextQ}`, data: { full_name: fullName, account_type: kind, preferred_language: lang } },
         });
         if (error) throw error;
         if (!data.session) toast.success(t("auth.checkEmail"));
@@ -50,7 +56,7 @@ export default function AuthPage() {
   };
 
   const google = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth` } });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth${nextQ}` } });
     if (error) toast.error(error.message.toLowerCase().includes("provider") ? t("auth.googleUnavailable") : t("auth.error"));
   };
 
@@ -59,8 +65,10 @@ export default function AuthPage() {
       <div className="mx-auto mt-2 max-w-sm">
         <h1 className="text-[28px] font-extrabold leading-tight">{mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</h1>
         <p className="mb-6 mt-1.5 text-sm text-muted-foreground">{t("auth.sub")}</p>
-        <Button type="button" variant="outline" className="w-full rounded-full" onClick={google}>{t("auth.google")}</Button>
-        <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.or")}<span className="h-px flex-1 bg-border" /></div>
+        {!(mode === "signup" && kind === "venue") && (<>
+          <Button type="button" variant="outline" className="w-full rounded-full" onClick={google}>{t("auth.google")}</Button>
+          <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.or")}<span className="h-px flex-1 bg-border" /></div>
+        </>)}
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("auth.iAm")}>

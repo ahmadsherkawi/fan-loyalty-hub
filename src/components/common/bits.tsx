@@ -53,13 +53,14 @@ export function SeeAll({ to, label }: { to: string; label: string }) {
   );
 }
 
-export function EmptyState({ icon, title, body, cta }: { icon?: ReactNode; title: string; body?: string; cta?: { to: string; label: string } }) {
+export function EmptyState({ icon, title, body, cta, action }: { icon?: ReactNode; title: string; body?: string; cta?: { to: string; label: string }; action?: ReactNode }) {
   return (
     <div className="rounded-2xl border border-dashed bg-surface px-6 py-9 text-center">
       {icon && <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground shadow-card">{icon}</div>}
       <p className="font-display text-base font-bold">{title}</p>
       {body && <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{body}</p>}
       {cta && <Button asChild className="mt-5"><Link to={cta.to}>{cta.label}</Link></Button>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

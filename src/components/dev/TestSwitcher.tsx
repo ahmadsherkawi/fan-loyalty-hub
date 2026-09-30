@@ -17,6 +17,17 @@ import { cn } from "@/lib/utils";
 
 export const TEST_MODE = true;
 const KEY = "jamhoor.testPasscode";
+const SHOW_KEY = "jamhoor.testBar";
+
+/** The bar is hidden for everyone unless this browser opted in by opening the site once with ?test=1 (?test=0 hides it again). */
+function barEnabled() {
+  try {
+    const q = new URLSearchParams(window.location.search).get("test");
+    if (q === "1") localStorage.setItem(SHOW_KEY, "1");
+    if (q === "0") localStorage.removeItem(SHOW_KEY);
+    return localStorage.getItem(SHOW_KEY) === "1";
+  } catch { return false; }
+}
 
 const PERSONAS = [
   { role: "fan", email: "fan@test.jamhoor.app", label: "Fan", name: "Omar", icon: User,
@@ -37,7 +48,8 @@ export function TestModeBar() {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(readCode());
   const [busy, setBusy] = useState<string | null>(null);
-  if (!TEST_MODE) return null;
+  const [show] = useState(barEnabled);
+  if (!TEST_MODE || !show) return null;
   const current = PERSONAS.find((p) => p.email === user?.email);
 
   async function become(role: string) {

@@ -268,7 +268,7 @@ export function useGuestList(partyId?: string, enabled = true) {
 
 export type RewardRow = {
   id: string; title: string; title_ar: string | null; details: string | null; details_ar: string | null; min_caps: number; members_only: boolean; repeatable: boolean;
-  venue_id: string; venue_name: string; venue_name_ar: string | null; venue_area: string | null; caps: number; unlocked: boolean;
+  venue_id: string; venue_name: string; venue_name_ar: string | null; venue_area: string | null; caps: number; unlocked: boolean; available?: boolean;
   last: { code: string; status: "issued" | "redeemed" | "expired"; expires_at: string; redeemed_at: string | null } | null;
 };
 export function useMyRewards(enabled = true) {

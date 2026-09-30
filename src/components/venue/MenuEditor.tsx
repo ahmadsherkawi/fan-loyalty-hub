@@ -26,7 +26,7 @@ export function MenuEditor({ venueId }: { venueId: string }) {
     queryKey: ["menu", venueId],
     queryFn: async () => ((await supabase.from("venue_menu_items").select("*").eq("venue_id", venueId).order("section").order("sort")).data ?? []) as Item[],
   });
-  const refresh = () => qc.invalidateQueries({ queryKey: ["menu", venueId] });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["menu", venueId] }); qc.invalidateQueries({ queryKey: ["menu-public", venueId] }); };
 
   async function add() {
     if (!f.name.trim()) return;
@@ -35,7 +35,8 @@ export function MenuEditor({ venueId }: { venueId: string }) {
     if (f.photo) {
       const path = `${venueId}/menu/${Date.now()}-${f.photo.name.replace(/[^a-z0-9.]/gi, "")}`;
       const { error } = await supabase.storage.from("venue-media").upload(path, f.photo, { contentType: f.photo.type });
-      if (!error) photo_url = supabase.storage.from("venue-media").getPublicUrl(path).data.publicUrl;
+      if (error) { setBusy(false); return toast.error(t("menu.photoError")); }
+      photo_url = supabase.storage.from("venue-media").getPublicUrl(path).data.publicUrl;
     }
     const { error } = await supabase.from("venue_menu_items").insert({
       venue_id: venueId, section: f.section, name: f.name.trim(), name_ar: f.name_ar.trim() || null, description: f.description.trim() || null,
@@ -43,6 +44,7 @@ export function MenuEditor({ venueId }: { venueId: string }) {
     });
     setBusy(false);
     if (error) return toast.error(t("common.error"));
+    toast.success(t("menu.added"));
     setF({ ...empty, section: f.section }); refresh();
   }
 
@@ -63,8 +65,8 @@ export function MenuEditor({ venueId }: { venueId: string }) {
                     <p className="truncate text-xs text-muted-foreground">{i.description}</p>
                   </div>
                   <span className="scoreboard shrink-0 text-lg font-bold">{i.price_aed != null ? Number(i.price_aed) : "—"}</span>
-                  <Switch checked={i.is_available} onCheckedChange={async (v) => { await supabase.from("venue_menu_items").update({ is_available: v }).eq("id", i.id); refresh(); }} aria-label={t("menu.available")} />
-                  <Button variant="ghost" size="iconSm" onClick={async () => { await supabase.from("venue_menu_items").delete().eq("id", i.id); refresh(); }} aria-label={t("common.delete")}><Trash2 /></Button>
+                  <Switch checked={i.is_available} onCheckedChange={async (v) => { const { error } = await supabase.from("venue_menu_items").update({ is_available: v }).eq("id", i.id); if (error) toast.error(t("common.error")); refresh(); }} aria-label={t("menu.available")} />
+                  <Button variant="ghost" size="iconSm" onClick={async () => { if (!window.confirm(t("menu.deleteQ", { name: i.name }))) return; const { error } = await supabase.from("venue_menu_items").delete().eq("id", i.id); if (error) toast.error(t("common.error")); refresh(); }} aria-label={t("common.delete")}><Trash2 /></Button>
                 </div>
               ))}
             </div>
@@ -78,7 +80,7 @@ export function MenuEditor({ venueId }: { venueId: string }) {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{MENU_SECTIONS.map((s) => <SelectItem key={s} value={s}>{t(`menu.${s}` as TKey)}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="number" inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder="AED" />
+          <Input type="number" inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder={t("menu.priceAed")} />
         </div>
         <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={t("menu.name")} />
         <Input dir="rtl" value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} placeholder={t("menu.nameAr")} />

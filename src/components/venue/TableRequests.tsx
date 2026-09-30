@@ -27,9 +27,13 @@ function TableRow({ r, venueId }: { r: TableReq; venueId: string }) {
   const { t, formatDateTime } = useI18n();
   const qc = useQueryClient();
   const [reply, setReply] = useState("");
+  const [busy, setBusy] = useState(false);
   async function answer(d: "confirmed" | "declined") {
+    if (busy) return;
+    setBusy(true);
     const { error } = await supabase.rpc("respond_table", { p_booking: r.id, p_decision: d, p_reply: reply });
-    if (error) return toast.error(t("common.error"));
+    setBusy(false);
+    if (error) { qc.invalidateQueries({ queryKey: ["venue-tables", venueId] }); return toast.error(t("common.error")); }
     toast.success(d === "confirmed" ? t("tables.confirmedToast") : t("tables.declinedToast"));
     qc.invalidateQueries({ queryKey: ["venue-tables", venueId] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -42,7 +46,7 @@ function TableRow({ r, venueId }: { r: TableReq; venueId: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-bold">{r.full_name ?? "—"} <span className="text-xs font-medium text-muted-foreground">· {t("vdash.capsN", { n: r.caps })}</span></p>
-          <p className="text-sm text-muted-foreground">{r.home_team_name ? `${r.home_team_name} v ${r.away_team_name}` : t("tables.anyNight")}{r.kickoff ? ` · ${formatDateTime(r.kickoff)}` : ""}</p>
+          <p className="text-sm text-muted-foreground">{r.home_team_name ? `${r.home_team_name} ${t("common.vs")} ${r.away_team_name}` : t("tables.anyNight")}{r.kickoff ? ` · ${formatDateTime(r.kickoff)}` : ""}</p>
           {r.note && <p className="mt-1 rounded-lg bg-surface px-2.5 py-1.5 text-sm">“{r.note}”</p>}
         </div>
         {r.status !== "pending" && <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", r.status === "confirmed" ? "bg-brand-soft text-brand" : "bg-muted text-muted-foreground")}>{t(`org.status_${r.status}` as never)}</span>}
@@ -50,8 +54,8 @@ function TableRow({ r, venueId }: { r: TableReq; venueId: string }) {
       {r.status === "pending" && (
         <div className="mt-3 flex gap-2">
           <Input value={reply} onChange={(e) => setReply(e.target.value)} placeholder={t("tables.replyPlaceholder")} className="h-10" />
-          <Button size="sm" className="h-10" onClick={() => answer("confirmed")}><Check /></Button>
-          <Button size="sm" variant="outline" className="h-10" onClick={() => answer("declined")}><X /></Button>
+          <Button size="sm" className="h-10" disabled={busy} onClick={() => answer("confirmed")} aria-label={t("vdash.confirm")}><Check /></Button>
+          <Button size="sm" variant="outline" className="h-10" disabled={busy} onClick={() => answer("declined")} aria-label={t("vdash.decline")}><X /></Button>
         </div>
       )}
     </div>

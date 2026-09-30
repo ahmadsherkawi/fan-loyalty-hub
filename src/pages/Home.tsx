@@ -143,7 +143,7 @@ function ForYou() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { data: rewards } = useMyRewards(!!user);
-  const ready = (rewards ?? []).filter((r) => r.unlocked && r.min_caps > 0 && !(r.last?.status === "redeemed" && !r.repeatable));
+  const ready = (rewards ?? []).filter((r) => (r.available ?? r.unlocked) && r.min_caps > 0);
   if (!ready.length) return null;
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">

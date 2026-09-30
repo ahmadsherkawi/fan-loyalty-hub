@@ -73,9 +73,6 @@ export default function ProfilePage() {
           </div>
         </div>
         <div className="flex items-center justify-between"><Label>{t("profile.language")}</Label><LanguageToggle /></div>
-        <div className="flex items-center justify-between"><Label>{t("profile.notifications")}</Label>
-          <Switch checked={profile?.notifications_enabled ?? true} onCheckedChange={(v) => supabase.from("profiles").update({ notifications_enabled: v }).eq("user_id", user.id).then(() => refreshProfile())} />
-        </div>
       </div>
 
       <Section title={t("profile.myGroups")}>
@@ -86,7 +83,7 @@ export default function ProfilePage() {
       <div className="mt-9 flex items-center gap-3 rounded-2xl bg-surface p-4">
         <Store className="h-5 w-5 shrink-0 text-muted-foreground" />
         <p className="flex-1 text-sm">{t("profile.runVenue")}</p>
-        <Button asChild size="sm" variant="outline"><Link to="/auth?mode=signup&type=venue" onClick={() => signOut()}>{t("profile.venueAccount")}</Link></Button>
+        <Button size="sm" variant="outline" onClick={async () => { await signOut(); navigate("/auth?mode=signup&type=venue"); }}>{t("profile.venueAccount")}</Button>
       </div>
 
       <Button variant="ghost" className="mt-10 w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={async () => { await signOut(); navigate("/"); }}>

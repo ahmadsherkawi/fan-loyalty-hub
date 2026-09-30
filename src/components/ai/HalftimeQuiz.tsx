@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Check, Lock, X } from "lucide-react";
 import { matchNightOver, quizOpen, type Phase } from "@/lib/matchPhase";
 import { FeatureHeader } from "@/components/common/bits";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -43,8 +44,14 @@ export function HalftimeQuiz({ fixtureId, partyId, phase, kickoff }: { fixtureId
     setAnswers(next);
     if (quiz && next.length === quiz.questions.length) {
       setSubmitting(true);
-      const { data } = await supabase.rpc("submit_quiz", { p_quiz: quiz.id, p_answers: next });
+      const { data, error } = await supabase.rpc("submit_quiz", { p_quiz: quiz.id, p_answers: next });
       setSubmitting(false);
+      if (error) {
+        toast.error(error.message.includes("closed") ? t("quiz.closed") : error.message.includes("already") ? t("quiz.alreadyShort") : t("common.error"));
+        setAnswers([]); setIdx(0);
+        qc.invalidateQueries({ queryKey: ["quiz-answer", quiz.id] });
+        return;
+      }
       setResult(data as unknown as { score: number; total: number; answer_key: number[] });
       qc.invalidateQueries({ queryKey: ["quiz-answer", quiz.id] });
     } else setIdx(idx + 1);

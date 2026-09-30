@@ -11,6 +11,7 @@ import { CardSkeletons, DemoChip, EmptyState, FeatureHeader } from "@/components
 import { MatchWall } from "@/components/party/MatchWall";
 import { checkinWindow, phaseOf, type Phase } from "@/lib/matchPhase";
 import { GuestList } from "@/components/GuestList";
+import { EditPartyButtons } from "@/components/party/EditParty";
 import { cn } from "@/lib/utils";
 import { PunditChat } from "@/components/ai/PunditChat";
 import { HalftimeQuiz } from "@/components/ai/HalftimeQuiz";
@@ -61,7 +62,10 @@ export default function PartyPage() {
   const live = isLive(f?.status) || party.status === "live";
   const done = isFinished(f?.status) || party.status === "finished";
   const when = partyTime(party);
-  const title = f ? `${f.home_team_name} v ${f.away_team_name}` : party.title ?? t("page.party");
+  const homeN = (lang === "ar" && f?.home_team?.name_ar) || f?.home_team_name;
+  const awayN = (lang === "ar" && f?.away_team?.name_ar) || f?.away_team_name;
+  const title = f ? `${homeN} ${t("common.vs")} ${awayN}` : party.title ?? t("page.party");
+  const cancelled = party.status === "cancelled";
   const venueName = loc(party.venue, "name", lang);
   const url = `${window.location.origin}/party/${party.id}`;
   const shareText = t("party.shareText", { match: title, venue: venueName || "", time: formatDateTime(when) });
@@ -76,12 +80,15 @@ export default function PartyPage() {
     setBusy(true);
     const { data, error } = await supabase.rpc("rsvp", { p_party: party!.id, p_guests: guests });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("closed") ? t("party.rsvpClosed") : error.message.includes("declined") ? t("party.venue_declinedSub") : t("common.error"));
+    if (error) return toast.error(error.message.includes("reservations closed") ? t("party.rsvpClosed") : error.message.includes("party closed") ? t("party.cancelledBanner") : error.message.includes("declined") ? t("party.fanDeclined") : t("common.error"));
     toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : party!.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
   async function cancel() {
-    await supabase.rpc("cancel_rsvp", { p_party: party!.id });
+    if (!window.confirm(mine?.status === "waitlist" ? t("party.leaveWaitlistQ") : t("party.cancelRsvpQ"))) return;
+    const { error } = await supabase.rpc("cancel_rsvp", { p_party: party!.id });
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("party.rsvpCancelled"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
 
@@ -95,7 +102,7 @@ export default function PartyPage() {
         {party.group && <Link to={`/g/${party.group.slug}`} className="text-sm font-bold text-brand hover:underline">{loc(party.group, "name", lang)}</Link>}
         <DemoChip show={party.is_demo} />
       </div>
-      {party.title && f && party.title !== title && <h1 className="mb-4 text-[26px] font-extrabold leading-tight">{party.title}</h1>}
+      {party.title && f && party.title !== title && <h1 className="mb-4 text-[26px] font-extrabold leading-tight" dir="auto">{party.title}</h1>}
       {f ? (
         <FixtureScoreboard fixture={f} footer={
           <div className="flex items-center gap-2 text-sm">
@@ -113,7 +120,14 @@ export default function PartyPage() {
         <Button variant="outline" size="sm" onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
       </div>
 
-      {party.venue && party.venue_status !== "none" && !done && (
+      {cancelled && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl bg-destructive/10 px-4 py-3">
+          <CalendarX2 className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="text-sm"><p className="font-bold text-destructive">{t("party.cancelledBanner")}</p><p className="text-muted-foreground">{t("party.cancelledSub")}</p></div>
+        </div>
+      )}
+
+      {party.venue && party.venue_status !== "none" && !done && !cancelled && (
         <div className={cn("mt-4 flex items-start gap-3 rounded-2xl px-4 py-3",
           party.venue_status === "confirmed" ? "bg-brand-soft" : party.venue_status === "declined" ? "bg-destructive/10" : "bg-surface")}>
           {party.venue_status === "confirmed" ? <TicketCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
@@ -123,7 +137,7 @@ export default function PartyPage() {
             <p className={cn("font-bold", party.venue_status === "confirmed" ? "text-brand" : party.venue_status === "declined" ? "text-destructive" : "")}>
               {t(`party.venue_${party.venue_status}` as never, { venue: venueName })}
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground" dir="auto">
               {party.venue_status === "confirmed" ? [party.reserved_area, party.venue_note].filter(Boolean).join(" · ") || t("party.venue_confirmedSub")
                 : party.venue_status === "declined" ? party.venue_note || t("party.venue_declinedSub")
                 : t("party.venue_pendingSub")}
@@ -133,7 +147,7 @@ export default function PartyPage() {
       )}
 
       {/* RSVP — the one thing every visitor needs */}
-      {!done && (
+      {!done && !cancelled && (
         <div className="card mt-4 p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-1.5">
@@ -149,7 +163,7 @@ export default function PartyPage() {
           {mine ? (
             <div className="mt-4 flex items-center justify-between rounded-xl bg-brand-soft px-4 py-3">
               <div>
-                <p className="flex items-center gap-2 text-sm font-bold text-brand"><CheckCircle2 className="h-5 w-5" />{mine.status === "waitlist" ? t("party.onWaitlist") : party.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
+                <p className="flex items-center gap-2 text-sm font-bold text-brand"><CheckCircle2 className="h-5 w-5" />{party.venue_status === "declined" ? t("party.fanDeclined") : mine.status === "waitlist" ? t("party.onWaitlist") : party.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
                 {mine.status === "going" && party.venue_status === "pending" && <p className="ms-7 text-xs text-muted-foreground">{t("party.seatHeldSub")}</p>}
               </div>
               <button className="text-sm font-semibold text-muted-foreground hover:text-foreground" onClick={cancel}>{t("party.cancel")}</button>
@@ -160,7 +174,7 @@ export default function PartyPage() {
             <div className="mt-4 flex items-center gap-2">
               <div className="flex h-11 items-center rounded-full border bg-card">
                 <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.max(0, guests - 1))} aria-label="-"><Minus className="h-4 w-4" /></button>
-                <span className="w-14 text-center text-xs font-semibold">{guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
+                <span className="w-14 text-center text-xs font-semibold">{guests === 1 ? t("party.plusOneGuest") : guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
                 <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.min(5, guests + 1))} aria-label="+"><Plus className="h-4 w-4" /></button>
               </div>
               <Button className="flex-1" onClick={doRsvp} disabled={busy || party.venue_status === "declined"}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
@@ -188,7 +202,7 @@ export default function PartyPage() {
           ) : (
             <>
               {f && !done && <PredictionInput fixture={f} />}
-              {f && <PunditChat fixtureId={f.id} partyId={party.id} homeName={f.home_team_name} awayName={f.away_team_name} />}
+              {f && <PunditChat fixtureId={f.id} partyId={party.id} homeName={homeN ?? f.home_team_name} awayName={awayN ?? f.away_team_name} />}
               {f && <HalftimeQuiz fixtureId={f.id} partyId={party.id} phase={phase} kickoff={f.kickoff_at} />}
               {f && <MotmVote partyId={party.id} fixture={f} phase={phase} checkedIn={!!myCheckin} />}
               {done && <RecapCard party={party} />}
@@ -212,7 +226,7 @@ export default function PartyPage() {
             </div>
           ) : <EmptyState title={t("party.venueTbc")} />}
           {loc(party, "notes", lang) && (
-            <div className="card p-4"><p className="eyebrow mb-1">{t("party.notes")}</p><p className="whitespace-pre-line text-sm">{loc(party, "notes", lang)}</p></div>
+            <div className="card p-4"><p className="eyebrow mb-1">{t("party.notes")}</p><p className="whitespace-pre-line text-sm" dir="auto">{loc(party, "notes", lang)}</p></div>
           )}
           {(offers ?? []).length > 0 && (
             <div className="rounded-2xl border border-gold/50 bg-gold-soft p-4">
@@ -230,9 +244,10 @@ export default function PartyPage() {
 
         {(isAdmin || isVenueOwner) && (
           <TabsContent value="host" className="space-y-3">
-            {isAdmin && party.venue_status === "declined" && (
+            {isAdmin && (party.venue_status === "declined" || party.venue_status === "none") && !cancelled && (
               <Button asChild variant="ink" className="w-full"><Link to={`/organiser/${party.group?.slug}?party=${party.id}`}>{t("party.pickAnotherVenue")}</Link></Button>
             )}
+            {isAdmin && !cancelled && <div className="card p-4"><EditPartyButtons party={party} /></div>}
             <div className="card p-4">
               <FeatureHeader icon={<Users />} title={t("party.turnout")} sub={isVenueOwner ? t("party.guestListSub") : t("party.privacyNote")} />
               <div className="mt-4 grid grid-cols-3 divide-x rounded-xl bg-surface py-3 text-center rtl:divide-x-reverse">

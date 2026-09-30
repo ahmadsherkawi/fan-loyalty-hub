@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Volume2, VolumeX } from "lucide-react";
+import { toast } from "sonner";
 import { Chip } from "@/components/common/bits";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/i18n/I18nContext";
@@ -30,14 +31,24 @@ export function ScreeningsEditor({ venueId }: { venueId: string }) {
   const days = list.reduce<Record<string, FixtureWithTeams[]>>((a, f) => { (a[f.kickoff_at.slice(0, 10)] ??= []).push(f); return a; }, {});
   const comps = COMPS.filter((c) => (fixtures ?? []).some((f) => f.competition_code === c));
 
-  async function toggle(f: FixtureWithTeams, on: boolean) {
-    if (on) await supabase.from("venue_screenings").insert({ venue_id: venueId, fixture_id: f.id });
-    else await supabase.from("venue_screenings").delete().eq("venue_id", venueId).eq("fixture_id", f.id);
+  const refresh = () => {
     qc.invalidateQueries({ queryKey: ["screenings", venueId] });
+    qc.invalidateQueries({ queryKey: ["venue-screenings", venueId] });
+    qc.invalidateQueries({ queryKey: ["fixture-venues"] });
+    qc.invalidateQueries({ queryKey: ["venues-next-games"] });
+    qc.invalidateQueries({ queryKey: ["screen-counts"] });
+  };
+  async function toggle(f: FixtureWithTeams, on: boolean) {
+    const { error } = on
+      ? await supabase.from("venue_screenings").insert({ venue_id: venueId, fixture_id: f.id })
+      : await supabase.from("venue_screenings").delete().eq("venue_id", venueId).eq("fixture_id", f.id);
+    if (error && !error.message.includes("duplicate")) toast.error(t("common.error"));
+    refresh();
   }
   async function sound(id: string, v: boolean) {
-    await supabase.from("venue_screenings").update({ sound: v }).eq("id", id);
-    qc.invalidateQueries({ queryKey: ["screenings", venueId] });
+    const { error } = await supabase.from("venue_screenings").update({ sound: v }).eq("id", id);
+    if (error) toast.error(t("common.error"));
+    refresh();
   }
 
   return (
@@ -58,7 +69,7 @@ export function ScreeningsEditor({ venueId }: { venueId: string }) {
                 <div key={f.id} className={cn("flex items-center gap-3 px-4 py-2.5", s && "bg-brand-soft/40")}>
                   <span className="scoreboard w-11 shrink-0 text-sm font-semibold">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{f.home_team_name} v {f.away_team_name}</p>
+                    <p className="truncate text-sm font-semibold">{f.home_team_name} {t("common.vs")} {f.away_team_name}</p>
                     <p className="truncate text-[11px] text-muted-foreground">{f.competition}</p>
                   </div>
                   {s && (

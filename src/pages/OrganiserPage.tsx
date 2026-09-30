@@ -5,6 +5,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 import { CalendarX2, Clock, MessageCircle, Sparkles, TicketCheck, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
+import { EditPartyButtons } from "@/components/party/EditParty";
 import { CardSkeletons, EmptyState, FeatureHeader, Initials } from "@/components/common/bits";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -65,11 +66,16 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, venue_id: homeVenueId ?? "" });
   const [created, setCreated] = useState<{ id: string; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
-  const { data: venues } = useVenues(city);
+  const { data: allVenues } = useVenues(city);
+  // Only venues that have joined Jamhoor can receive a booking request
+  const venues = (allVenues ?? []).filter((v) => !!v.owner_user_id);
+  useEffect(() => {
+    if (allVenues && draft.venue_id && !venues.some((v) => v.id === draft.venue_id)) setDraft((d) => ({ ...d, venue_id: "" }));
+  }, [allVenues, draft.venue_id, venues]);
   const { data: fixtures } = useQuery({
     queryKey: ["org-fixtures", teamId],
     queryFn: async () => {
-      let q = supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date(Date.now() - 3 * 3600e3).toISOString())
+      let q = supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date(Date.now() + 30 * 60e3).toISOString())
         .lt("kickoff_at", new Date(Date.now() + 45 * 864e5).toISOString()).order("kickoff_at").limit(60);
       if (teamId) q = q.or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`);
       return ((await q).data ?? []) as unknown as FixtureWithTeams[];
@@ -86,7 +92,8 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
     if (error || d.error || !d.draft) return toast.error(t("common.error"));
     const x = d.draft;
     setDraft({
-      fixture_id: (x.fixture_id as string) ?? "", venue_id: (x.venue_id as string) ?? homeVenueId ?? "",
+      fixture_id: (fixtures ?? []).some((f) => f.id === x.fixture_id) ? (x.fixture_id as string) : "",
+      venue_id: venues.some((v) => v.id === x.venue_id) ? (x.venue_id as string) : venues.some((v) => v.id === homeVenueId) ? homeVenueId ?? "" : "",
       capacity: x.capacity ? String(x.capacity) : "", title: (x.title as string) ?? "", notes: (x.notes as string) ?? "",
       announcement_en: (x.announcement_en as string) ?? "", announcement_ar: (x.announcement_ar as string) ?? "",
     });
@@ -97,14 +104,15 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
     setSaving(true);
     const { data: party, error } = await supabase.from("watch_parties").insert({
       group_id: groupId, fixture_id: draft.fixture_id, venue_id: draft.venue_id || null, title: draft.title || null,
-      notes: draft.notes || null, capacity: draft.capacity ? Number(draft.capacity) : null, created_by: user.id,
+      notes: draft.notes || null, capacity: Number(draft.capacity) >= 1 ? Math.round(Number(draft.capacity)) : null, created_by: user.id,
     }).select("id").single();
     if (error || !party) { setSaving(false); return toast.error(error?.message.includes("limit") ? t("org.pendingLimit") : t("common.error")); }
     if (draft.announcement_en || draft.announcement_ar) {
-      await supabase.from("announcements").insert({
+      const { error: aErr } = await supabase.from("announcements").insert({
         group_id: groupId, author_id: user.id, title: draft.title || null, body: draft.announcement_en || draft.announcement_ar,
         body_ar: draft.announcement_ar || null, watch_party_id: party.id,
       });
+      if (aErr) toast.error(t("org.announceFailed"));
     }
     setSaving(false);
     const url = `${window.location.origin}/party/${party.id}`;
@@ -142,17 +150,18 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
         <div className="grid gap-1.5"><Label>{t("org.fixture")}</Label>
           <Select value={draft.fixture_id} onValueChange={set("fixture_id")}>
             <SelectTrigger><SelectValue placeholder={t("org.pickFixture")} /></SelectTrigger>
-            <SelectContent>{(fixtures ?? []).map((f) => <SelectItem key={f.id} value={f.id}>{f.home_team_name} v {f.away_team_name} · {formatDateTime(f.kickoff_at)}</SelectItem>)}</SelectContent>
+            <SelectContent>{(fixtures ?? []).map((f) => <SelectItem key={f.id} value={f.id}>{f.home_team_name} {t("common.vs")} {f.away_team_name} · {formatDateTime(f.kickoff_at)}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="grid grid-cols-[1fr_7rem] gap-3">
           <div className="grid gap-1.5"><Label>{t("org.venue")}</Label>
             <Select value={draft.venue_id} onValueChange={set("venue_id")}>
               <SelectTrigger><SelectValue placeholder={t("groups.pickVenue")} /></SelectTrigger>
-              <SelectContent>{(venues ?? []).map((v) => <SelectItem key={v.id} value={v.id}>{loc(v, "name", lang)}</SelectItem>)}</SelectContent>
+              <SelectContent>{venues.map((v) => <SelectItem key={v.id} value={v.id}>{loc(v, "name", lang)}{v.area ? ` · ${v.area}` : ""}</SelectItem>)}</SelectContent>
             </Select>
+            {allVenues && !venues.length && <p className="text-xs text-muted-foreground">{t("org.noBookableVenues")}</p>}
           </div>
-          <div className="grid gap-1.5"><Label>{t("org.capacity")}</Label><Input type="number" value={draft.capacity} onChange={(e) => set("capacity")(e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label>{t("org.capacity")}</Label><Input type="number" min={1} value={draft.capacity} onChange={(e) => set("capacity")(e.target.value)} /></div>
         </div>
         <div className="grid gap-1.5"><Label>{t("org.title")}</Label><Input value={draft.title} onChange={(e) => set("title")(e.target.value)} /></div>
         <div className="grid gap-1.5"><Label>{t("org.notes")}</Label><Textarea rows={2} value={draft.notes} onChange={(e) => set("notes")(e.target.value)} /></div>
@@ -168,10 +177,15 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
 
 function StatsPanel({ groupId }: { groupId: string }) {
   const { t, formatDateTime } = useI18n();
-  const { data: s } = useQuery({
+  const { data: s, isError, refetch } = useQuery({
     queryKey: ["group-stats", groupId],
-    queryFn: async () => (await supabase.rpc("group_stats", { p_group: groupId })).data as unknown as Stats,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("group_stats", { p_group: groupId });
+      if (error) throw error;
+      return data as unknown as Stats;
+    },
   });
+  if (isError) return <EmptyState title={t("common.error")} action={<Button variant="outline" onClick={() => refetch()}>{t("common.retry")}</Button>} />;
   if (!s) return <CardSkeletons />;
   const chart = [...s.per_party].reverse().slice(-10).map((p) => ({
     name: p.home_team_name ? `${p.home_team_name.slice(0, 3)}–${(p.away_team_name ?? "").slice(0, 3)}` : (p.title ?? "").slice(0, 8),
@@ -221,6 +235,7 @@ function MembersPanel({ groupId, dues }: { groupId: string; dues: number | null 
     queryFn: async () => (await supabase.from("group_members").select("*").eq("group_id", groupId).order("member_number")).data ?? [],
   });
   const { data: profiles } = useProfilesByIds((members ?? []).map((m) => m.user_id));
+  const iAmOwner = (members ?? []).some((m) => m.user_id === user?.id && m.role === "owner");
   async function update(id: string, patch: { role?: string; dues_status?: string; dues_paid_until?: string | null }) {
     const { error } = await supabase.from("group_members").update(patch).eq("id", id);
     if (error) toast.error(t("common.error"));
@@ -242,7 +257,7 @@ function MembersPanel({ groupId, dues }: { groupId: string; dues: number | null 
                 <SelectTrigger className="h-8 w-28 rounded-full text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>{["unpaid", "paid", "exempt"].map((s) => <SelectItem key={s} value={s}>{t(`dues.${s}` as never)}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={m.role} disabled={m.role === "owner" || m.user_id === user?.id} onValueChange={(v) => update(m.id, { role: v })}>
+              <Select value={m.role} disabled={!iAmOwner || m.role === "owner" || m.user_id === user?.id} onValueChange={(v) => update(m.id, { role: v })}>
                 <SelectTrigger className="h-8 w-28 rounded-full text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>{["member", "admin", "owner"].map((r) => <SelectItem key={r} value={r} disabled={r === "owner"}>{t(`role.${r}` as never)}</SelectItem>)}</SelectContent>
               </Select>
@@ -262,13 +277,16 @@ function NewsPanel({ groupId, slug }: { groupId: string; slug: string }) {
   const [en, setEn] = useState("");
   const [ar, setAr] = useState("");
   const [posted, setPosted] = useState<string | null>(null);
-  useEffect(() => { setPosted(null); }, [title, en, ar]);
+  const [busy, setBusy] = useState(false);
   async function post() {
-    if (!user || !(en || ar)) return;
-    const { error } = await supabase.from("announcements").insert({ group_id: groupId, author_id: user.id, title: title || null, body: en || ar, body_ar: ar || null });
+    if (!user || !(en.trim() || ar.trim()) || busy) return;
+    setBusy(true);
+    const { error } = await supabase.from("announcements").insert({ group_id: groupId, author_id: user.id, title: title.trim() || null, body: en.trim() || ar.trim(), body_ar: ar.trim() || null });
+    setBusy(false);
     if (error) return toast.error(t("common.error"));
     qc.invalidateQueries({ queryKey: ["announcements", groupId] });
     setPosted(`${title ? `${title}\n` : ""}${lang === "ar" ? ar || en : en || ar}\n\n${window.location.origin}/g/${slug}`);
+    setTitle(""); setEn(""); setAr("");
     toast.success(t("org.posted"));
   }
   return (
@@ -278,7 +296,7 @@ function NewsPanel({ groupId, slug }: { groupId: string; slug: string }) {
         <div className="grid gap-1.5"><Label>{t("org.announceEn")}</Label><Textarea rows={4} dir="ltr" value={en} onChange={(e) => setEn(e.target.value)} /></div>
         <div className="grid gap-1.5"><Label>{t("org.announceAr")}</Label><Textarea rows={4} dir="rtl" value={ar} onChange={(e) => setAr(e.target.value)} /></div>
       </div>
-      <Button className="rounded-full" onClick={post} disabled={!(en || ar)}>{t("org.post")}</Button>
+      <Button className="rounded-full" onClick={post} disabled={busy || !(en.trim() || ar.trim())}>{busy ? t("common.loading") : t("org.post")}</Button>
       {posted && <Button asChild variant="outline" className="rounded-full"><a href={whatsappShare(posted)} target="_blank" rel="noreferrer"><MessageCircle className="me-1.5 h-4 w-4" />{t("org.postWhatsapp")}</a></Button>}
     </div>
   );
@@ -290,7 +308,8 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const { data: parties } = useGroupParties(groupId);
-  const { data: venues } = useVenues(city);
+  const { data: allVenues } = useVenues(city);
+  const venues = (allVenues ?? []).filter((v) => !!v.owner_user_id);
   const [moving, setMoving] = useState<string | null>(params.get("party"));
   const upcoming = (parties ?? []).filter((p) => !isFinished(p.fixture?.status) && p.status !== "finished" && p.status !== "cancelled")
     .sort((a, b) => new Date(partyTime(a)).getTime() - new Date(partyTime(b)).getTime());
@@ -299,8 +318,8 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
     const { error } = await supabase.from("watch_parties").update({ venue_id: venueId }).eq("id", partyId);
     if (error) return toast.error(error.message.includes("limit") ? t("org.pendingLimit") : t("common.error"));
     setMoving(null);
-    toast.success(t("org.requestSent", { venue: loc(venues?.find((v) => v.id === venueId), "name", lang) }));
-    qc.invalidateQueries({ queryKey: ["parties-group", groupId] });
+    toast.success(t("org.requestSent", { venue: loc(venues.find((v) => v.id === venueId), "name", lang) }));
+    qc.invalidateQueries();
   }
   return (
     <section>
@@ -312,7 +331,7 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
             <div key={p.id} className="px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <Link to={`/party/${p.id}`} className="block truncate font-semibold hover:underline">{p.fixture ? `${p.fixture.home_team_name} v ${p.fixture.away_team_name}` : p.title}</Link>
+                  <Link to={`/party/${p.id}`} className="block truncate font-semibold hover:underline">{p.fixture ? `${p.fixture.home_team_name} ${t("common.vs")} ${p.fixture.away_team_name}` : p.title}</Link>
                   <p className="truncate text-xs text-muted-foreground">{formatDateTime(partyTime(p))} · {loc(p.venue, "name", lang) || t("party.venueTbc")}</p>
                 </div>
                 <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
@@ -323,14 +342,17 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
               </div>
               {st === "confirmed" && p.reserved_area && <p className="mt-1 text-xs text-brand">{p.reserved_area}</p>}
               {st === "declined" && p.venue_note && <p className="mt-1 text-xs text-destructive">{p.venue_note}</p>}
-              {(st === "declined" || moving === p.id) && (
+              {(st === "declined" || st === "none" || moving === p.id) ? (
                 <div className="mt-2">
                   <Select onValueChange={(v) => move(p.id, v)}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder={t("org.moveTo")} /></SelectTrigger>
-                    <SelectContent>{(venues ?? []).filter((v) => v.id !== p.venue_id).map((v) => <SelectItem key={v.id} value={v.id}>{loc(v, "name", lang)}{v.area ? ` · ${v.area}` : ""}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-10"><SelectValue placeholder={st === "none" ? t("org.pickVenueNow") : t("org.moveTo")} /></SelectTrigger>
+                    <SelectContent>{venues.filter((v) => v.id !== p.venue_id).map((v) => <SelectItem key={v.id} value={v.id}>{loc(v, "name", lang)}{v.area ? ` · ${v.area}` : ""}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-              )}
+              ) : st === "pending" ? (
+                <button className="mt-1 text-xs font-semibold text-brand hover:underline" onClick={() => setMoving(p.id)}>{t("org.changeVenue")}</button>
+              ) : null}
+              <div className="mt-2"><EditPartyButtons party={p} compact /></div>
             </div>
           );
         })}

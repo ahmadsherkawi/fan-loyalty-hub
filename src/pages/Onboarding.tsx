@@ -13,6 +13,13 @@ import type { TKey } from "@/i18n/en";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+/** Where to go after onboarding: the page the person was trying to reach before signing up. */
+function takeNext() {
+  let n = new URLSearchParams(window.location.search).get("next");
+  try { n = n || localStorage.getItem("jamhoor.next"); localStorage.removeItem("jamhoor.next"); } catch { /* private mode */ }
+  return n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
+}
+
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Al Ain", "Beirut", "Other"] as const;
 
 export default function Onboarding() {
@@ -54,7 +61,7 @@ export default function Onboarding() {
     setSaving(false);
     if (error) { toast.error(t("onb.saveError")); return; }
     await refreshProfile();
-    navigate("/", { replace: true });
+    navigate(takeNext(), { replace: true });
   };
 
   const next = () => (step < 3 ? setStep(step + 1) : finish());

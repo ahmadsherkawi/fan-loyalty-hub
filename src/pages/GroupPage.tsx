@@ -57,7 +57,10 @@ export default function GroupPage() {
     qc.invalidateQueries();
   }
   async function leave() {
-    await supabase.rpc("leave_group", { p_group: group!.id });
+    if (!window.confirm(t("group.leaveQ", { name: loc(group, "name", lang) }))) return;
+    const { error } = await supabase.rpc("leave_group", { p_group: group!.id });
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("group.left"));
     qc.invalidateQueries();
   }
   const shareText = t("group.shareText", { name: loc(group, "name", lang) });
@@ -137,8 +140,8 @@ export default function GroupPage() {
         <TabsContent value="news" className="space-y-3">
           {(announcements ?? []).length ? announcements!.map((a) => (
             <article key={a.id} className="card p-4">
-              {a.title && <h3 className="font-semibold">{a.title}</h3>}
-              <p className="mt-1 whitespace-pre-line text-sm">{(lang === "ar" && a.body_ar) || a.body}</p>
+              {a.title && <h3 className="font-semibold" dir="auto">{a.title}</h3>}
+              <p className="mt-1 whitespace-pre-line text-sm" dir="auto">{(lang === "ar" && a.body_ar) || a.body}</p>
               <p className="mt-2 text-xs text-muted-foreground">{formatDateTime(a.created_at ?? new Date().toISOString())}</p>
               {a.watch_party_id && <Link to={`/party/${a.watch_party_id}`} className="mt-2 inline-block text-sm font-bold text-brand">{t("group.openParty")}</Link>}
             </article>
@@ -146,16 +149,17 @@ export default function GroupPage() {
         </TabsContent>
 
         <TabsContent value="about" className="space-y-4">
-          {loc(group, "description", lang) && <p className="whitespace-pre-line">{loc(group, "description", lang)}</p>}
+          {loc(group, "description", lang) && <p className="whitespace-pre-line" dir="auto">{loc(group, "description", lang)}</p>}
           {group.home_venue && (<div><h3 className="mb-2 eyebrow">{t("group.homeVenue")}</h3><VenueCard venue={group.home_venue} /></div>)}
           <div className="flex flex-wrap gap-2">
             {group.instagram && <Button asChild variant="outline" className="rounded-full"><a href={`https://instagram.com/${group.instagram.replace("@", "")}`} target="_blank" rel="noreferrer"><Instagram className="me-1.5 h-4 w-4" />{group.instagram}</a></Button>}
             {group.whatsapp_link && <Button asChild variant="outline" className="rounded-full"><a href={group.whatsapp_link} target="_blank" rel="noreferrer"><MessageCircle className="me-1.5 h-4 w-4" />{t("group.whatsappGroup")}</a></Button>}
           </div>
-          {group.dues_amount_aed ? <p className="text-sm"><span className="text-muted-foreground">{t("group.dues")}: </span><span className="font-semibold">AED {group.dues_amount_aed}</span> <span className="text-muted-foreground">/ {t("group.year")}</span></p> : null}
+          {group.dues_amount_aed ? <p className="text-sm"><span className="text-muted-foreground">{t("group.dues")}: </span><span className="font-semibold">{t("common.aed", { n: group.dues_amount_aed })}</span> <span className="text-muted-foreground">/ {t("group.year")}</span></p> : null}
           <p className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5" />{t("group.since", { date: formatDateTime(group.created_at ?? new Date().toISOString(), { month: "long", year: "numeric" }) })}</p>
           <div><h3 className="mb-2 eyebrow">{t("group.tabMembers")}</h3>
-          {!user ? <EmptyState title={t("group.signInMembers")} cta={{ to: `/auth?next=/g/${slug}`, label: t("nav.signIn") }} /> : (
+          {!user ? <EmptyState title={t("group.signInMembers")} cta={{ to: `/auth?next=/g/${slug}`, label: t("nav.signIn") }} />
+            : !me ? <div className="rounded-2xl bg-surface px-4 py-5 text-center text-sm"><p className="text-muted-foreground">{t("group.joinToSeeMembers")}</p><Button className="mt-3" size="sm" onClick={join}>{t("group.join")}</Button></div> : (
             <div className="card overflow-hidden">
               {(members ?? []).map((m) => {
                 const p = profiles?.find((x) => x.user_id === m.user_id);

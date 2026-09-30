@@ -63,7 +63,7 @@ export default function VenuesPage() {
                   <DemoChip show={v.is_demo} />
                 </div>
                 <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}{v.screens ? ` · ${t("venue.screens", { n: v.screens })}` : ""}</p>
-                {n?.first && <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-brand"><Tv className="h-3 w-3" />{t("venues.next")}: {n.first.home_team_name} v {n.first.away_team_name} · {formatDateTime(n.first.kickoff_at, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</p>}
+                {n?.first && <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-brand"><Tv className="h-3 w-3" />{t("venues.next")}: {n.first.home_team_name} {t("common.vs")} {n.first.away_team_name} · {formatDateTime(n.first.kickoff_at, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</p>}
               </div>
               <div className="text-center"><p className="scoreboard text-xl font-bold leading-none">{n?.count ?? 0}</p><p className="text-[10px] text-muted-foreground">{t("venues.games")}</p></div>
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground rtl:rotate-180" />
@@ -71,7 +71,7 @@ export default function VenuesPage() {
           );
         }) : <EmptyState icon={<Store className="h-5 w-5" />} title={t("venues.empty")} />}
       </div>
-      <Link to="/auth?mode=signup&next=/profile" className="mt-6 block rounded-2xl bg-surface p-4 text-center text-sm">
+      <Link to="/auth?mode=signup&type=venue" className="mt-6 block rounded-2xl bg-surface p-4 text-center text-sm">
         <span className="font-semibold">{t("venues.ownVenue")}</span> <span className="text-brand">{t("landing.venueCta")} →</span>
       </Link>
     </AppShell>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Minus, Plus, Target } from "lucide-react";
 import { FeatureHeader } from "@/components/common/bits";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ export function PredictionInput({ fixture, compact = false, bare = false }: { fi
   const { t } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const locked = new Date(fixture.kickoff_at).getTime() <= Date.now();
   const { data: existing } = useQuery({
     queryKey: ["prediction", fixture.id, user?.id],
@@ -52,7 +54,7 @@ export function PredictionInput({ fixture, compact = false, bare = false }: { fi
   useEffect(() => { if (existing) { setH(existing.home_score); setA(existing.away_score); } }, [existing]);
 
   async function save() {
-    if (!user) return;
+    if (!user) { navigate(`/auth?next=${encodeURIComponent(window.location.pathname)}`); return; }
     setSaving(true);
     const { error } = existing
       ? await supabase.from("predictions").update({ home_score: h, away_score: a }).eq("id", existing.id)
@@ -87,7 +89,7 @@ export function PredictionInput({ fixture, compact = false, bare = false }: { fi
           {existing ? (done && existing.points !== null ? t("predict.points", { n: existing.points }) : t("predict.lockedIn")) : t("predict.closed")}
         </p>
       ) : (
-        <Button className={cn("w-full", compact ? "mt-3 h-10" : "mt-4")} variant={existing ? "outline" : "default"} onClick={save} disabled={saving}>{existing ? t("predict.update") : t("predict.save")}</Button>
+        <Button className={cn("w-full", compact ? "mt-3 h-10" : "mt-4")} variant={existing ? "outline" : "default"} onClick={save} disabled={saving}>{!user ? t("predict.signInToSave") : existing ? t("predict.update") : t("predict.save")}</Button>
       )}
     </div>
   );

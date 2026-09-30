@@ -27,6 +27,7 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
   const used = r.last?.status === "redeemed" && !r.repeatable;
   const live = r.last?.status === "issued" && new Date(r.last.expires_at) > new Date();
   const missing = Math.max(0, r.min_caps - r.caps);
+  const coolingDown = r.repeatable && r.unlocked && r.available === false && !live;
   // While the code is on screen, watch for the venue redeeming it so the fan sees it happen live
   const { data: status } = useQuery({
     queryKey: ["redemption", code?.code],
@@ -46,7 +47,7 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
     setBusy(true);
     const { data, error } = await supabase.rpc("claim_reward", { p_offer: r.id });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("members") ? t("rewards.joinFirst") : error.message.includes("tomorrow") ? t("rewards.tomorrow") : error.message.includes("already used") ? t("rewards.used") : error.message.includes("not enough") ? t("rewards.needMore") : t("common.error"));
+    if (error) return toast.error(error.message.includes("members") ? t("rewards.joinFirst") : error.message.includes("tomorrow") ? t("rewards.tomorrow") : error.message.includes("already used") ? t("rewards.alreadyUsed") : error.message.includes("not enough") ? t("rewards.needMore") : t("common.error"));
     setCode(data as unknown as Code);
     qc.invalidateQueries({ queryKey: ["my-rewards"] });
   }
@@ -68,7 +69,8 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
           </div>
         )}
       </div>
-      {used ? <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-brand"><CheckCircle2 className="h-4 w-4" />{t("rewards.used")}</span>
+      {coolingDown ? <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-muted-foreground"><CheckCircle2 className="h-4 w-4" />{t("rewards.comeBack")}</span>
+        : used ? <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-brand"><CheckCircle2 className="h-4 w-4" />{t("rewards.used")}</span>
         : r.unlocked ? <Button size="sm" variant={live ? "outline" : "default"} onClick={claim} disabled={busy} className="shrink-0">{live ? t("rewards.showCode") : t("rewards.getCode")}</Button>
         : <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />}
 
@@ -98,7 +100,7 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
 
 export function RewardsSummary({ rewards, caps }: { rewards: RewardRow[]; caps: number }) {
   const { t } = useI18n();
-  const ready = rewards.filter((r) => r.unlocked && !(r.last?.status === "redeemed" && !r.repeatable) && r.min_caps > 0).length;
+  const ready = rewards.filter((r) => (r.available ?? r.unlocked) && r.min_caps > 0).length;
   const next = rewards.filter((r) => !r.unlocked && r.min_caps > caps).sort((a, b) => a.min_caps - b.min_caps)[0];
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-gold-soft px-4 py-3">

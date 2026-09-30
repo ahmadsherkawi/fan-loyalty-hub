@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useAccount } from "@/lib/access";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Clock, Instagram, MapPin, MessageCircle, Navigation, Phone, Volume2, VolumeX } from "lucide-react";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -29,6 +30,7 @@ export default function VenuePage() {
   const { t, lang, formatDateTime } = useI18n();
   const { user } = useAuth();
   const acct = useAccount();
+  const qc = useQueryClient();
   const [chat, setChat] = useState(params.get("chat") === "1");
   const { data: venue, isLoading } = useQuery({
     queryKey: ["venue", id],
@@ -68,6 +70,14 @@ export default function VenuePage() {
       .eq("venue_id", id!).eq("user_id", user!.id).neq("status", "cancelled").order("created_at", { ascending: false }).limit(3)).data ?? [],
   });
 
+  async function cancelTable(bid: string) {
+    if (!window.confirm(t("tables.cancelQ"))) return;
+    const { error } = await supabase.rpc("cancel_table", { p_booking: bid });
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("tables.cancelled"));
+    qc.invalidateQueries({ queryKey: ["my-tables", id] });
+  }
+
   if (isLoading || !acct.ready) return <AppShell><CardSkeletons /></AppShell>;
   if (!venue) return <AppShell><BackButton /><EmptyState title={t("venue.notFound")} /></AppShell>;
   const isOwner = !!user && venue.owner_user_id === user.id;
@@ -76,6 +86,7 @@ export default function VenuePage() {
   const preview = acct.isVenue;
   const name = loc(venue, "name", lang);
   const wa = venue.whatsapp?.replace(/[^0-9]/g, "");
+  const joined = !!venue.owner_user_id;
   const partyFixtures = new Set((parties ?? []).map((p) => p.fixture_id));
 
   return (
@@ -99,13 +110,14 @@ export default function VenuePage() {
           {loc(venue, "description", lang) && <p className="mt-3 text-sm">{loc(venue, "description", lang)}</p>}
           <div className="mt-4"><VenueFacts venue={venue} /></div>
           <div className={cn("no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5", preview && "pointer-events-none opacity-60")} aria-disabled={preview}>
-            <Button size="sm" onClick={() => setChat(true)}><MessageCircle />{t("chat.message")}</Button>
-            <RequestTable venueId={venue.id} venueName={name} fixtureId={null} trigger={<Button size="sm" variant="ink">{t("tables.request")}</Button>} />
+            {joined && <Button size="sm" onClick={() => setChat(true)}><MessageCircle />{t("chat.message")}</Button>}
+            {joined && <RequestTable venueId={venue.id} venueName={name} fixtureId={null} trigger={<Button size="sm" variant="ink">{t("tables.request")}</Button>} />}
             {venue.phone && <Button asChild variant="outline" size="sm"><a href={`tel:${venue.phone.replace(/\s/g, "")}`}><Phone />{t("venue.call")}</a></Button>}
             {wa && <Button asChild variant="outline" size="sm"><a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></Button>}
             {venue.lat && venue.lng && <Button asChild variant="outline" size="sm"><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation />{t("party.directions")}</a></Button>}
             {venue.instagram && <Button asChild variant="outline" size="sm"><a href={`https://instagram.com/${venue.instagram.replace("@", "")}`} target="_blank" rel="noreferrer"><Instagram />{venue.instagram}</a></Button>}
           </div>
+          {!joined && <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs text-muted-foreground">{t("venue.notJoined")}</p>}
         </div>
       </div>
 
@@ -118,8 +130,11 @@ export default function VenuePage() {
                 <span className="scoreboard text-xl font-bold">{b.party_size}</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{t(`tables.status_${b.status}` as TKey)}</p>
-                  <p className="truncate text-xs text-muted-foreground">{fx ? `${fx.home_team_name} v ${fx.away_team_name} · ${formatDateTime(fx.kickoff_at)}` : t("tables.anyNight")}{b.venue_reply ? ` · “${b.venue_reply}”` : ""}</p>
+                  <p className="truncate text-xs text-muted-foreground">{fx ? `${fx.home_team_name} ${t("common.vs")} ${fx.away_team_name} · ${formatDateTime(fx.kickoff_at)}` : t("tables.anyNight")}{b.venue_reply ? ` · “${b.venue_reply}”` : ""}</p>
                 </div>
+                {b.status !== "declined" && (!fx || new Date(fx.kickoff_at).getTime() > Date.now()) && (
+                  <button className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground" onClick={() => cancelTable(b.id)}>{t("common.cancel")}</button>
+                )}
               </div>
             );
           })}
@@ -157,10 +172,10 @@ export default function VenuePage() {
                         <TeamBadge size="xs" shortName={f.away_team?.short_name || f.away_team_name.slice(0, 3)} primary={f.away_team?.primary_color} secondary={f.away_team?.secondary_color} />
                       </div>
                       <Link to={`/match/${f.id}`} className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{f.home_team_name} v {f.away_team_name}</p>
+                        <p className="truncate text-sm font-semibold">{f.home_team_name} {t("common.vs")} {f.away_team_name}</p>
                         <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">{s.sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{s.sound ? t("venue.withSound") : t("venue.noSound")} · {f.competition}</p>
                       </Link>
-                      {!preview && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} v ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
+                      {!preview && joined && new Date(f.kickoff_at).getTime() > Date.now() && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} ${t("common.vs")} ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
                         trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
                     </div>
                   );
@@ -192,7 +207,7 @@ export default function VenuePage() {
                         {loc(i, "description", lang) && <p className="text-xs text-muted-foreground">{loc(i, "description", lang)}</p>}
                         {i.tags.length > 0 && <p className="mt-1 flex flex-wrap gap-1">{i.tags.map((tag) => <span key={tag} className="rounded bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t(`tag.${tag}` as TKey)}</span>)}</p>}
                       </div>
-                      {i.price_aed != null && <p className="shrink-0 text-end"><span className="scoreboard text-xl font-bold">{Number(i.price_aed)}</span><span className="block text-[10px] text-muted-foreground">AED</span></p>}
+                      {i.price_aed != null && <p className="shrink-0 text-end"><span className="scoreboard text-xl font-bold">{Number(i.price_aed)}</span><span className="block text-[10px] text-muted-foreground">{t("common.aedShort")}</span></p>}
                     </div>
                   ))}
                 </div>

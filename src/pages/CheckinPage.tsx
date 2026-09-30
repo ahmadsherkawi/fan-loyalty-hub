@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useMyRewards, useParty } from "@/lib/data";
+import { loc, useMyRewards, useParty } from "@/lib/data";
 
 type Result = { checkin_id: string; watch_party_id: string; group_id: string; caps: number };
 
@@ -47,7 +47,8 @@ export default function CheckinPage() {
     if (error) {
       const m = error.message;
       setErr(m.includes("location required") ? t("checkin.needLocation") : m.includes("too far") ? t("checkin.tooFar")
-        : m.includes("use live code") ? t("checkin.useLive") : m.includes("invalid") ? t("checkin.invalid") : t("common.error"));
+        : m.includes("use live code") ? t("checkin.useLive") : m.includes("venue location") ? t("checkin.venueNoLocation")
+        : m.includes("invalid") ? `${t("checkin.invalid")} ${t("checkin.window")}` : t("common.error"));
       return;
     }
     setResult(data as unknown as Result);
@@ -94,7 +95,7 @@ export default function CheckinPage() {
             </div>
           </div>
           <h1 className="mt-7 text-3xl font-extrabold">{t("checkin.success")}</h1>
-          <p className="mt-2 text-muted-foreground">{party?.fixture ? `${party.fixture.home_team_name} v ${party.fixture.away_team_name}` : ""}{party?.venue ? ` · ${party.venue.name}` : ""}</p>
+          <p className="mt-2 text-muted-foreground">{party?.fixture ? `${(lang === "ar" && party.fixture.home_team?.name_ar) || party.fixture.home_team_name} ${t("common.vs")} ${(lang === "ar" && party.fixture.away_team?.name_ar) || party.fixture.away_team_name}` : ""}{party?.venue ? ` · ${loc(party.venue, "name", lang)}` : ""}</p>
           <p className="mt-3 inline-flex rounded-full bg-brand-soft px-3 py-1 text-sm font-bold text-brand">+1 {t("league.caps")}</p>
           {(() => {
             const rw = rewards ?? [];

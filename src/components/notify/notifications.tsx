@@ -28,8 +28,12 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   table_request: { icon: <Utensils />, tone: "neutral" },
   table_confirmed: { icon: <Utensils />, tone: "brand" },
   table_declined: { icon: <Utensils />, tone: "neutral" },
+  table_cancelled: { icon: <Utensils />, tone: "neutral" },
   venue_message: { icon: <MessageCircle />, tone: "neutral" },
   venue_reply: { icon: <MessageCircle />, tone: "brand" },
+  party_rsvps: { icon: <Ticket />, tone: "brand" },
+  party_cancelled: { icon: <CalendarX2 />, tone: "neutral" },
+  venue_declined_fan: { icon: <CalendarX2 />, tone: "neutral" },
 };
 
 export function useUnreadCount() {
@@ -57,18 +61,21 @@ export function useNotificationText() {
     const pick = (k: string) => String((lang === "ar" && d[`${k}_ar`]) || d[k] || "");
     const when = d.kickoff ? formatDateTime(String(d.kickoff), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
     const vars = {
-      group: pick("group"), venue: pick("venue"), match: String(d.match ?? ""), when, title: pick("title"), body: pick("body"),
+      group: pick("group"), venue: pick("venue"),
+      match: lang === "ar" ? String(d.match_ar || String(d.match ?? "").replace(" v ", " ضد ")) : String(d.match ?? ""), when, title: pick("title"), body: pick("body"),
       latest: String(d.latest ?? ""), seats: String(d.seats ?? 0), n: String(d.new_count ?? 1), reservations: String(d.reservations ?? 0),
       caps: String(d.caps ?? d.min_caps ?? ""), area: String(d.area ?? ""), note: String(d.note ?? ""),
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
       size: String(d.size ?? ""), fan: String(d.fan ?? ""), reply: d.reply ? `· “${d.reply}”` : "",
     };
-    const k = n.kind;
+    const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle" : n.kind;
     const title = t(`notif.${k}.t` as TKey, vars);
     let body = t(`notif.${k}.b` as TKey, vars);
     if (k === "booking_confirmed" && vars.area) body += ` · ${vars.area}`;
     if (k === "booking_declined" && vars.note) body = vars.note;
-    return { title, body };
+    // Tidy separators left behind by empty values (e.g. a table request without a specific match)
+    body = body.replace(/(\s*·\s*)+$/, "").replace(/^\s*·\s*/, "").replace(/·\s*·/g, "·").trim();
+    return { title: title.replace(/(\s*·\s*)+$/, ""), body };
   };
 }
 

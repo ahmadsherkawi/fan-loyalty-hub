@@ -110,7 +110,7 @@ export default function PassportPage() {
                 <div key={i} className="card flex items-center gap-3 p-4">
                   <span className="scoreboard flex h-10 w-10 shrink-0 rotate-[-6deg] items-center justify-center rounded-full border-2 border-dashed border-gold bg-gold-soft text-xs font-bold text-gold-ink">#{pp.history.length - i}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{h.home_team_name} v {h.away_team_name}{h.home_score !== null ? <span className="scoreboard text-muted-foreground" dir="ltr"> {h.home_score}–{h.away_score}</span> : null}</p>
+                    <p className="truncate font-medium">{h.home_team_name} {t("common.vs")} {h.away_team_name}{h.home_score !== null ? <span className="scoreboard text-muted-foreground" dir="ltr"> {h.home_score}–{h.away_score}</span> : null}</p>
                     <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{h.venue_name} · {h.group_name}</p>
                   </div>
                   <span className="text-xs text-muted-foreground">{formatDateTime(h.created_at, { day: "numeric", month: "short" })}</span>

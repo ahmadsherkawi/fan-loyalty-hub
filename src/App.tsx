@@ -27,7 +27,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const VenuesPage = lazy(() => import("./pages/VenuesPage"));
 const MatchPage = lazy(() => import("./pages/MatchPage"));
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } } });
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

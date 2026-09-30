@@ -111,14 +111,14 @@ export default function Landing() {
               <li key={text} className="flex gap-3"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{text}</li>
             ))}
           </ul>
-          <Button asChild className="mt-6"><Link to="/auth?mode=signup">{t("landing.orgCta")}</Link></Button>
+          <Button asChild className="mt-6"><Link to="/auth?mode=signup&next=/groups">{t("landing.orgCta")}</Link></Button>
         </div>
         <div className="card flex flex-col p-6 md:p-8">
           <p className="eyebrow">{t("landing.forVenues")}</p>
           <h3 className="mt-2 text-2xl font-extrabold">{t("landing.venuesSub")}</h3>
           <div className="mt-auto flex items-center gap-3 pt-6">
             <IconDot><Store /></IconDot>
-            <Button asChild variant="outline"><Link to="/auth?mode=signup&next=/profile">{t("landing.venueCta")}</Link></Button>
+            <Button asChild variant="outline"><Link to="/auth?mode=signup&type=venue">{t("landing.venueCta")}</Link></Button>
           </div>
         </div>
       </section>

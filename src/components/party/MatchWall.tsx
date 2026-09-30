@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, EyeOff, Lock, Send } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,10 +38,13 @@ export function MatchWall({ partyId, checkedIn, isHost }: { partyId: string; che
   const fileRef = useRef<HTMLInputElement>(null);
   const { data: open } = useQuery({
     queryKey: ["wall-open", partyId],
+    enabled: !!user,
+    refetchInterval: 60_000,
     queryFn: async () => ((await supabase.rpc("party_wall_open", { p_party: partyId })).data ?? false) as boolean,
   });
   const { data: posts } = useQuery({
     queryKey: ["wall", partyId],
+    enabled: !!user,
     refetchInterval: open ? 8_000 : false,
     queryFn: async () => ((await supabase.rpc("party_wall", { p_party: partyId })).data ?? []) as unknown as Post[],
   });
@@ -71,11 +75,20 @@ export function MatchWall({ partyId, checkedIn, isHost }: { partyId: string; che
   }
   async function react(p: Post, emoji: string) {
     if (!user) return;
-    if (p.my_reactions.includes(emoji)) await supabase.from("party_post_reactions").delete().eq("post_id", p.id).eq("user_id", user.id).eq("emoji", emoji);
-    else await supabase.from("party_post_reactions").insert({ post_id: p.id, user_id: user.id, emoji });
+    if (!checkedIn) { toast.error(t("wall.checkInFirst")); return; }
+    const { error } = p.my_reactions.includes(emoji)
+      ? await supabase.from("party_post_reactions").delete().eq("post_id", p.id).eq("user_id", user.id).eq("emoji", emoji)
+      : await supabase.from("party_post_reactions").insert({ post_id: p.id, user_id: user.id, emoji });
+    if (error) toast.error(t("common.error"));
     refresh();
   }
-  async function hide(p: Post) { await supabase.rpc("hide_post", { p_post: p.id }); refresh(); }
+  async function hide(p: Post) {
+    const { error } = await supabase.rpc("hide_post", { p_post: p.id });
+    if (error) toast.error(t("common.error"));
+    refresh();
+  }
+
+  if (!user) return <EmptyState title={t("party.signInFeatures")} body={t("wall.signInBody")} cta={{ to: `/auth?next=/party/${partyId}`, label: t("nav.signIn") }} />;
 
   return (
     <div className="space-y-3">
@@ -97,7 +110,7 @@ export function MatchWall({ partyId, checkedIn, isHost }: { partyId: string; che
               {p.photo_path && <img src={photoUrl(p.photo_path)} alt="" loading="lazy" className="max-h-[420px] w-full bg-muted object-cover" />}
               <div className="p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-sm"><span className="font-bold">{p.first_name}</span>{p.body ? <span className="ms-1.5">{p.body}</span> : null}</p>
+                  <p className="text-sm"><span className="font-bold">{p.first_name}</span>{p.body ? <span className="ms-1.5" dir="auto">{p.body}</span> : null}</p>
                   <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(p.created_at, lang)}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-1">

@@ -68,24 +68,30 @@ function CreateGroupDialog() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: "", name_ar: "", team_id: profile?.favorite_team_id ?? "", city: profile?.city && profile.city !== "Other" ? profile.city : "Dubai",
-    description: "", home_venue_id: "", dues: "", visibility: "public",
+    description: "", home_venue_id: "", dues: "",
   });
   const { data: venues } = useVenues(form.city);
-  const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v, ...(k === "city" ? { home_venue_id: "" } : {}) }));
 
   async function submit() {
     if (!user || !form.name.trim()) return;
     setBusy(true);
-    let slug = slugify(form.name);
-    const { data: clash } = await supabase.from("groups").select("slug").like("slug", `${slug}%`);
-    if (clash?.some((c) => c.slug === slug)) slug = `${slug}-${(clash.length + 1)}`;
-    const { error } = await supabase.from("groups").insert({
-      slug, name: form.name.trim(), name_ar: form.name_ar.trim() || null, team_id: form.team_id || null, city: form.city,
+    const base = slugify(form.name);
+    const { data: clash } = await supabase.from("groups").select("slug").like("slug", `${base}%`);
+    let slug = clash?.some((c) => c.slug === base) ? `${base}-${(clash.length + 1)}` : base;
+    const row = {
+      name: form.name.trim(), name_ar: form.name_ar.trim() || null, team_id: form.team_id || null, city: form.city,
       description: form.description.trim() || null, home_venue_id: form.home_venue_id || null,
-      dues_amount_aed: form.dues ? Number(form.dues) : null, visibility: form.visibility, created_by: user.id,
-    });
+      dues_amount_aed: Number(form.dues) > 0 ? Math.round(Number(form.dues)) : null, visibility: "public", created_by: user.id,
+    };
+    let { error } = await supabase.from("groups").insert({ slug, ...row });
+    if (error?.code === "23505") {
+      // Someone else (or a private group) already uses that link: add a short suffix and try once more
+      slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+      ({ error } = await supabase.from("groups").insert({ slug, ...row }));
+    }
     setBusy(false);
-    if (error) { toast.error(t("common.error")); return; }
+    if (error) { toast.error(error.message.includes("limit") ? t("groups.limit") : t("common.error")); return; }
     qc.invalidateQueries({ queryKey: ["groups"] });
     qc.invalidateQueries({ queryKey: ["my-memberships"] });
     toast.success(t("groups.created"));
@@ -99,7 +105,7 @@ function CreateGroupDialog() {
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl">
         <DialogHeader><DialogTitle>{t("groups.create")}</DialogTitle></DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-1.5"><Label>{t("groups.name")}</Label><Input value={form.name} onChange={(e) => set("name")(e.target.value)} placeholder="Dubai Madridistas" /></div>
+          <div className="grid gap-1.5"><Label>{t("groups.name")}</Label><Input value={form.name} onChange={(e) => set("name")(e.target.value)} placeholder={t("groups.namePh")} /></div>
           <div className="grid gap-1.5"><Label>{t("groups.nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => set("name_ar")(e.target.value)} placeholder="مدريديستا دبي" /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label>{t("groups.team")}</Label>
@@ -122,18 +128,7 @@ function CreateGroupDialog() {
             </Select>
           </div>
           <div className="grid gap-1.5"><Label>{t("groups.description")}</Label><Textarea value={form.description} onChange={(e) => set("description")(e.target.value)} rows={3} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5"><Label>{t("groups.dues")}</Label><Input type="number" inputMode="numeric" value={form.dues} onChange={(e) => set("dues")(e.target.value)} placeholder="100" /></div>
-            <div className="grid gap-1.5"><Label>{t("groups.visibility")}</Label>
-              <Select value={form.visibility} onValueChange={set("visibility")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">{t("groups.public")}</SelectItem>
-                  <SelectItem value="private">{t("groups.private")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <div className="grid gap-1.5"><Label>{t("groups.dues")}</Label><Input type="number" min={0} inputMode="numeric" value={form.dues} onChange={(e) => set("dues")(e.target.value)} placeholder="100" /></div>
           <Button onClick={submit} disabled={busy || !form.name.trim()} className="rounded-full">{busy ? t("common.loading") : t("groups.createCta")}</Button>
         </div>
       </DialogContent>

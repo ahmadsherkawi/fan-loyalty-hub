@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Check, CheckCircle2, ChevronDown, Clock, Gift, Monitor, Plus, ScanLine, Trash2, Users, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, Clock, Gift, MapPin, Monitor, Plus, ScanLine, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, FeatureHeader } from "@/components/common/bits";
@@ -15,6 +15,7 @@ import { ProDialog, VenueSettings } from "@/components/venue/VenueSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,7 +58,7 @@ export default function VenueDashboard() {
   const { data: proReq, refetch: refetchPro } = useQuery({
     queryKey: ["pro-req", id],
     enabled: allowed,
-    queryFn: async () => (await supabase.from("venue_pro_requests").select("id").eq("venue_id", id!).limit(1)).data ?? [],
+    queryFn: async () => (await supabase.from("venue_pro_requests").select("id").eq("venue_id", id!).eq("status", "new").limit(1)).data ?? [],
   });
   const unreadMsgs = (inbox ?? []).reduce((s, r) => s + (r.venue_unread ?? 0), 0);
 
@@ -67,7 +68,6 @@ export default function VenueDashboard() {
   const pending = (bookings ?? []).filter((b) => b.venue_status === "pending");
   const upcoming = (bookings ?? []).filter((b) => b.venue_status === "confirmed" && !isFinished(b.fixture_status) && b.status !== "finished");
   const past = (bookings ?? []).filter((b) => b.venue_status === "confirmed" && (isFinished(b.fixture_status) || b.status === "finished"));
-  const declined = (bookings ?? []).filter((b) => b.venue_status === "declined");
   const focus = params.get("party");
 
   return (
@@ -78,6 +78,15 @@ export default function VenueDashboard() {
         <Button asChild variant="outline" size="sm"><Link to={`/venues/${venue!.id}?preview=1`}>{t("vdash.viewPublic")}</Link></Button>
         <ProDialog venue={venue!} requested={(proReq ?? []).length > 0} onRequested={() => refetchPro()} />
       </div>
+      {(venue!.lat == null || venue!.lng == null) && (
+        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-gold/60 bg-gold-soft px-4 py-3">
+          <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-ink" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-bold">{t("vdash.setLocationTitle")}</p>
+            <p className="text-muted-foreground">{t("vdash.setLocationBody")}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
@@ -126,12 +135,6 @@ export default function VenueDashboard() {
                   <div className="space-y-3">{past.map((b) => <NightCard key={b.id} b={b} past />)}</div>
                 </section>
               )}
-              {declined.length > 0 && (
-                <section>
-                  <h2 className="mb-3 eyebrow">{t("vdash.declined")}</h2>
-                  <div className="card divide-y">{declined.map((b) => <div key={b.id} className="flex justify-between px-4 py-3 text-sm"><span>{matchName(b)} · {b.group_name}</span><span className="text-muted-foreground">{t("vdash.declinedShort")}</span></div>)}</div>
-                </section>
-              )}
             </>
           )}
         </TabsContent>
@@ -146,10 +149,15 @@ export default function VenueDashboard() {
   );
 }
 
-const matchName = (b: Booking) => (b.home_team_name ? `${b.home_team_name} v ${b.away_team_name}` : b.title ?? "");
+function useMatchName() {
+  const { t } = useI18n();
+  return (b: { home_team_name: string | null; away_team_name: string | null; title?: string | null }) =>
+    b.home_team_name ? `${b.home_team_name} ${t("common.vs")} ${b.away_team_name}` : b.title ?? "";
+}
 
 function BookingHead({ b }: { b: Booking }) {
   const { lang, formatDateTime } = useI18n();
+  const matchName = useMatchName();
   return (
     <div className="flex items-start gap-3">
       {b.kickoff && (
@@ -162,7 +170,7 @@ function BookingHead({ b }: { b: Booking }) {
       <div className="min-w-0 flex-1">
         <p className="font-bold leading-tight">{matchName(b)}</p>
         <p className="mt-0.5 text-sm text-muted-foreground">{b.competition}{b.kickoff ? ` · ${formatDateTime(b.kickoff, { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</p>
-        <Link to={`/g/${b.group_slug}`} className="mt-1 inline-block text-sm font-semibold text-brand">{(lang === "ar" && b.group_name_ar) || b.group_name}</Link>
+        <p className="mt-1 text-sm font-semibold text-brand">{(lang === "ar" && b.group_name_ar) || b.group_name}</p>
       </div>
     </div>
   );
@@ -176,10 +184,15 @@ function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
   const [seats, setSeats] = useState(String(b.capacity ?? ""));
   const [busy, setBusy] = useState<string | null>(null);
   async function answer(decision: "confirmed" | "declined") {
+    if (decision === "confirmed" && seats && Number(seats) < 1) return toast.error(t("vdash.seatsMin"));
     setBusy(decision);
     const { error } = await supabase.rpc("respond_booking", { p_party: b.id, p_decision: decision, p_note: note, p_area: area, p_capacity: seats ? Number(seats) : null });
     setBusy(null);
-    if (error) return toast.error(t("common.error"));
+    if (error) {
+      const m = error.message;
+      qc.invalidateQueries({ queryKey: ["venue-bookings", venueId] });
+      return toast.error(m.includes("location") ? t("vdash.setLocationTitle") : m.includes("started") ? t("vdash.tooLate") : m.includes("cancelled") ? t("vdash.partyCancelled") : m.includes("capacity") ? t("vdash.seatsMin") : t("common.error"));
+    }
     toast.success(decision === "confirmed" ? t("vdash.confirmedToast", { group: b.group_name }) : t("vdash.declinedToast"));
     qc.invalidateQueries({ queryKey: ["venue-bookings", venueId] });
     qc.invalidateQueries({ queryKey: ["venue-stats", venueId] });
@@ -248,6 +261,8 @@ function RewardsPanel({ venueId }: { venueId: string }) {
   const [result, setResult] = useState<{ fan: string | null; title: string; title_ar: string | null; caps: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", details: "", min_caps: "3", repeatable: false });
+  const [adding, setAdding] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const { data: offers } = useQuery({
     queryKey: ["offers-all", venueId],
     queryFn: async () => (await supabase.from("venue_offers").select("*").eq("venue_id", venueId).order("min_caps")).data ?? [],
@@ -271,13 +286,28 @@ function RewardsPanel({ venueId }: { venueId: string }) {
   }
   async function addOffer() {
     if (!form.title.trim()) return;
-    const { error } = await supabase.from("venue_offers").insert({ venue_id: venueId, title: form.title.trim(), details: form.details.trim() || null, min_caps: Number(form.min_caps) || 0, repeatable: form.repeatable });
+    const caps = Math.min(500, Math.max(0, Math.round(Number(form.min_caps) || 0)));
+    setAdding(true);
+    const { error } = await supabase.from("venue_offers").insert({ venue_id: venueId, title: form.title.trim(), details: form.details.trim() || null, min_caps: caps, repeatable: form.repeatable });
+    setAdding(false);
     if (error) return toast.error(t("common.error"));
     setForm({ title: "", details: "", min_caps: "3", repeatable: false });
-    qc.invalidateQueries({ queryKey: ["offers-all", venueId] });
+    toast.success(t("vdash.rewardAdded"));
+    refreshOffers();
   }
-  async function toggle(oid: string, active: boolean) { await supabase.from("venue_offers").update({ active }).eq("id", oid); qc.invalidateQueries({ queryKey: ["offers-all", venueId] }); }
-  async function remove(oid: string) { await supabase.from("venue_offers").delete().eq("id", oid); qc.invalidateQueries({ queryKey: ["offers-all", venueId] }); }
+  const refreshOffers = () => { qc.invalidateQueries({ queryKey: ["offers-all", venueId] }); qc.invalidateQueries({ queryKey: ["offers", venueId] }); qc.invalidateQueries({ queryKey: ["my-rewards"] }); };
+  async function toggle(oid: string, active: boolean) {
+    const { error } = await supabase.from("venue_offers").update({ active }).eq("id", oid);
+    if (error) toast.error(t("common.error"));
+    refreshOffers();
+  }
+  async function remove(oid: string) {
+    const { error } = await supabase.from("venue_offers").delete().eq("id", oid);
+    if (error && error.message.includes("history")) { await supabase.from("venue_offers").update({ active: false }).eq("id", oid); toast.success(t("vdash.rewardSwitchedOff")); }
+    else if (error) toast.error(t("common.error"));
+    setConfirmDel(null);
+    refreshOffers();
+  }
 
   return (
     <div className="space-y-6">
@@ -301,7 +331,8 @@ function RewardsPanel({ venueId }: { venueId: string }) {
 
       <div>
         <h2 className="mb-3 text-lg font-bold">{t("vdash.yourRewards")}</h2>
-        <div className="card divide-y">
+        {(offers ?? []).length === 0 && <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("vdash.noRewards")}</p>}
+        <div className={cn("card divide-y", (offers ?? []).length === 0 && "hidden")}>
           {(offers ?? []).map((o) => (
             <div key={o.id} className="flex items-center gap-3 px-4 py-3">
               <span className={cn("scoreboard flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl text-lg font-bold leading-none", o.min_caps ? "bg-gold text-accent-foreground" : "bg-muted text-muted-foreground")}>
@@ -312,7 +343,7 @@ function RewardsPanel({ venueId }: { venueId: string }) {
                 <p className="truncate text-xs text-muted-foreground">{o.min_caps ? t("rewards.unlockAt", { n: o.min_caps }) : t("rewards.memberPerk")}{o.details ? ` · ${loc(o, "details", lang)}` : ""}</p>
               </div>
               <Switch checked={o.active} onCheckedChange={(v) => toggle(o.id, v)} aria-label={t("vdash.active")} />
-              <Button variant="ghost" size="iconSm" onClick={() => remove(o.id)} aria-label={t("common.delete")}><Trash2 /></Button>
+              <Button variant="ghost" size="iconSm" onClick={() => setConfirmDel(o.id)} aria-label={t("common.delete")}><Trash2 /></Button>
             </div>
           ))}
         </div>
@@ -325,9 +356,21 @@ function RewardsPanel({ venueId }: { venueId: string }) {
             <label className="flex h-11 items-center justify-between rounded-xl border px-3 text-sm">{t("vdash.repeatable")}<Switch checked={form.repeatable} onCheckedChange={(v) => setForm({ ...form, repeatable: v })} /></label>
           </div>
           <p className="text-xs text-muted-foreground">{t("vdash.capsHint")}</p>
-          <Button onClick={addOffer} disabled={!form.title.trim()}><Plus />{t("vdash.add")}</Button>
+          <Button onClick={addOffer} disabled={!form.title.trim() || adding}><Plus />{t("vdash.add")}</Button>
         </div>
       </div>
+      <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("vdash.deleteRewardQ")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("vdash.deleteRewardBody")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmDel && remove(confirmDel)}>{t("common.delete")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {(recent ?? []).length > 0 && (
         <div>
@@ -346,6 +389,7 @@ function RewardsPanel({ venueId }: { venueId: string }) {
 
 function Insights({ stats }: { stats?: VStats }) {
   const { t, formatDateTime } = useI18n();
+  const matchName = useMatchName();
   const chart = [...(stats?.per_match ?? [])].reverse().slice(-10).map((m) => ({
     name: `${m.home_team_name.slice(0, 3)}–${m.away_team_name.slice(0, 3)}`,
     [t("vdash.returning")]: m.checkins - m.new_faces, [t("vdash.newFaces")]: m.new_faces,
@@ -373,7 +417,7 @@ function Insights({ stats }: { stats?: VStats }) {
         ) : <p className="mt-3 text-sm text-muted-foreground">{t("vdash.noData")}</p>}
         <div className="mt-3 space-y-1">
           {(stats?.per_match ?? []).slice(0, 6).map((m) => (
-            <div key={m.id} className="flex justify-between text-sm"><span>{m.home_team_name} v {m.away_team_name} · <span className="text-muted-foreground">{formatDateTime(m.kickoff, { day: "numeric", month: "short" })}</span></span><span className="scoreboard font-bold">{m.checkins}</span></div>
+            <div key={m.id} className="flex justify-between text-sm"><span>{matchName(m)} · <span className="text-muted-foreground">{formatDateTime(m.kickoff, { day: "numeric", month: "short" })}</span></span><span className="scoreboard font-bold">{m.checkins}</span></div>
           ))}
         </div>
       </div>
@@ -397,6 +441,8 @@ function Insights({ stats }: { stats?: VStats }) {
 function ScanButton({ onCode }: { onCode: (code: string) => void }) {
   const { t } = useI18n();
   const [on, setOn] = useState(false);
+  const cb = useRef(onCode);
+  cb.current = onCode;
   useEffect(() => {
     if (!on) return;
     let scanner: { stop: () => Promise<void>; clear: () => void } | null = null;
@@ -407,11 +453,11 @@ function ScanButton({ onCode }: { onCode: (code: string) => void }) {
       scanner = s as unknown as typeof scanner;
       s.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (text) => {
         const m = text.match(/([A-Z0-9]{6})$/i);
-        if (m) { setOn(false); onCode(m[1].toUpperCase()); }
+        if (m) { setOn(false); cb.current(m[1].toUpperCase()); }
       }, () => undefined).catch(() => { setOn(false); toast.error(t("checkin.noCamera")); });
     });
     return () => { stopped = true; scanner?.stop().then(() => scanner?.clear()).catch(() => undefined); };
-  }, [on, onCode, t]);
+  }, [on, t]);
   return on ? (
     <div className="mt-3"><div id="reward-reader" className="overflow-hidden rounded-2xl" /><Button variant="ghost" className="mt-2 w-full text-white hover:bg-white/10 hover:text-white" onClick={() => setOn(false)}>{t("checkin.stopScan")}</Button></div>
   ) : <Button variant="ghost" className="mt-2 w-full text-white/80 hover:bg-white/10 hover:text-white" onClick={() => setOn(true)}><ScanLine />{t("vdash.scanFanCode")}</Button>;
@@ -422,17 +468,24 @@ function SeatsEditor({ b }: { b: Booking }) {
   const qc = useQueryClient();
   const [edit, setEdit] = useState(false);
   const [v, setV] = useState(String(b.capacity ?? ""));
+  const [saving, setSaving] = useState(false);
   async function save() {
-    const { error } = await supabase.rpc("set_party_capacity", { p_party: b.id, p_capacity: Number(v) });
+    if (!(Number(v) >= 1)) return toast.error(t("vdash.seatsMin"));
+    setSaving(true);
+    const { error } = await supabase.rpc("set_party_capacity", { p_party: b.id, p_capacity: Math.round(Number(v)) });
+    setSaving(false);
     if (error) return toast.error(t("common.error"));
     toast.success(t("vdash.seatsSaved")); setEdit(false);
     qc.invalidateQueries({ queryKey: ["venue-bookings"] });
+    qc.invalidateQueries({ queryKey: ["venue-stats"] });
+    qc.invalidateQueries({ queryKey: ["guest-list", b.id] });
+    qc.invalidateQueries({ queryKey: ["party-counts", b.id] });
   }
   if (!edit) return <button onClick={() => setEdit(true)} className="mt-2 text-xs font-semibold text-brand hover:underline">{t("vdash.changeSeats")}</button>;
   return (
     <div className="mt-2 flex items-center gap-2">
       <Input type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} className="h-9 w-24" />
-      <Button size="sm" onClick={save} disabled={!v}>{t("profile.save")}</Button>
+      <Button size="sm" onClick={save} disabled={!v || saving}>{t("profile.save")}</Button>
       <Button size="sm" variant="ghost" onClick={() => setEdit(false)}>{t("common.cancel")}</Button>
     </div>
   );

@@ -32,7 +32,7 @@ export default function MatchPage() {
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
   if (!fixture) return <AppShell><BackButton /><EmptyState title={t("party.notFound")} /></AppShell>;
   const venues = (showing ?? []).filter((s) => s.venue?.is_listed).sort((a, b) => Number(b.venue.is_pro) - Number(a.venue.is_pro) || a.venue.name.localeCompare(b.venue.name));
-  const label = `${fixture.home_team_name} v ${fixture.away_team_name} · ${formatDateTime(fixture.kickoff_at)}`;
+  const label = `${fixture.home_team_name} ${t("common.vs")} ${fixture.away_team_name} · ${formatDateTime(fixture.kickoff_at)}`;
   return (
     <AppShell>
       <BackButton />
@@ -53,7 +53,7 @@ export default function MatchPage() {
                   <p className="flex items-center gap-1.5 truncate font-semibold">{loc(v, "name", lang)}{v.is_pro && <span className="rounded bg-foreground px-1 text-[9px] font-bold text-background">PRO</span>}</p>
                   <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{v.area ?? t(`city.${v.city}` as never)} · {sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{sound ? t("venue.withSound") : t("venue.noSound")}</p>
                 </Link>
-                <RequestTable venueId={v.id} venueName={loc(v, "name", lang)} fixtureId={fixture.id} matchLabel={label} trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />
+                {v.owner_user_id && new Date(fixture.kickoff_at).getTime() > Date.now() && <RequestTable venueId={v.id} venueName={loc(v, "name", lang)} fixtureId={fixture.id} matchLabel={label} trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
               </div>
             ))}
           </div>
