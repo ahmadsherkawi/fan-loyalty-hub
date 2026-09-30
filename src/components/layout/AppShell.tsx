@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, Home, QrCode, Tv, Users } from "lucide-react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Initials } from "@/components/common/bits";
 import { NotificationBell } from "@/components/notify/notifications";
+import { TestModeBar } from "@/components/dev/TestSwitcher";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +42,7 @@ export function Header() {
   const { user, profile } = useAuth();
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
+      <TestModeBar />
       <div className="container flex h-14 items-center gap-3 md:h-16">
         <Link to="/" aria-label="Jamhoor" className="min-w-0 shrink"><Wordmark /></Link>
         {user && (
