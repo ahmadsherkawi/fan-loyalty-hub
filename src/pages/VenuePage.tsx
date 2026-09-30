@@ -13,6 +13,7 @@ import { RewardItem } from "@/components/rewards/Rewards";
 import { ChatThread } from "@/components/venue/ChatThread";
 import { RequestTable } from "@/components/venue/RequestTable";
 import { MENU_SECTIONS } from "@/components/venue/MenuEditor";
+import { compLabel } from "@/lib/competitions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -174,7 +175,7 @@ export default function VenuePage() {
                       </div>
                       <Link to={`/match/${f.id}`} className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{f.home_team_name} {t("common.vs")} {f.away_team_name}</p>
-                        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">{s.sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{s.sound ? t("venue.withSound") : t("venue.noSound")} · {f.competition}</p>
+                        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">{s.sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{s.sound ? t("venue.withSound") : t("venue.noSound")} · {compLabel(t, f.competition_code, f.competition)}</p>
                       </Link>
                       {!preview && joined && new Date(f.kickoff_at).getTime() > Date.now() && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} ${t("common.vs")} ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
                         trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}

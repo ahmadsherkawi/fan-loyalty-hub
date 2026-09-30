@@ -23,6 +23,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { isFinished, loc, useVenueBookings, type Booking, type Venue } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { compLabel } from "@/lib/competitions";
 
 type VStats = {
   total_checkins: number; unique_fans: number; groups_hosted: number; pending_requests: number; upcoming_seats: number; rewards_redeemed: number;
@@ -157,7 +158,7 @@ function useMatchName() {
 }
 
 function BookingHead({ b }: { b: Booking }) {
-  const { lang, formatDateTime } = useI18n();
+  const { t, lang, formatDateTime } = useI18n();
   const matchName = useMatchName();
   return (
     <div className="flex items-start gap-3">
@@ -170,7 +171,7 @@ function BookingHead({ b }: { b: Booking }) {
       )}
       <div className="min-w-0 flex-1">
         <p className="font-bold leading-tight">{matchName(b)}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{b.competition}{b.kickoff ? ` · ${formatDateTime(b.kickoff, { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{compLabel(t, b.competition_code, b.competition)}{b.kickoff ? ` · ${formatDateTime(b.kickoff, { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</p>
         <p className="mt-1 text-sm font-semibold text-brand">{(lang === "ar" && b.group_name_ar) || b.group_name}</p>
       </div>
     </div>

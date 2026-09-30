@@ -12,7 +12,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { FIXTURE_SELECT, useMyMemberships, type FixtureWithTeams } from "@/lib/data";
 
-const COMP_ORDER = ["CL", "PL", "PD", "SA", "BL1", "FL1", "PPL", "DED"];
+import { COMPETITIONS as COMP_ORDER, isKnownComp } from "@/lib/competitions";
 
 export default function PredictPage() {
   const { t, formatDateTime } = useI18n();
@@ -84,7 +84,7 @@ export default function PredictPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 {fs.map((f) => (
                   <div key={f.id} className="card p-3">
-                    <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{f.competition_code && COMP_ORDER.includes(f.competition_code) ? t(`comp.${f.competition_code}` as never) : f.competition}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
+                    <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{isKnownComp(f.competition_code) ? t(`comp.${f.competition_code}` as never) : f.competition}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
                     <PredictionInput fixture={f} compact bare />
                     <Link to={`/match/${f.id}`} className="mt-2 flex items-center justify-between rounded-lg bg-surface px-3 py-2 text-xs font-semibold">
                       <span className="flex items-center gap-1.5"><Tv className="h-3.5 w-3.5" />{screenCounts?.get(f.id) ? t("matches.venuesShowing", { n: screenCounts.get(f.id)! }) : t("matches.whereToWatch")}</span>

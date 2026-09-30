@@ -243,7 +243,7 @@ export { shareOrCopy, downloadIcs } from "@/lib/share";
 export type Booking = {
   id: string; title: string | null; capacity: number | null; status: string; venue_status: "pending" | "confirmed" | "declined" | "none";
   venue_note: string | null; reserved_area: string | null; checkin_code: string; created_at: string; kickoff: string | null; pending: boolean;
-  home_team_name: string | null; away_team_name: string | null; competition: string | null; fixture_status: string | null; home_score: number | null; away_score: number | null;
+  home_team_name: string | null; away_team_name: string | null; competition: string | null; competition_code?: string | null; fixture_status: string | null; home_score: number | null; away_score: number | null;
   group_id: string; group_name: string; group_name_ar: string | null; group_slug: string; group_members: number; organiser: string | null;
   reservations: number; seats: number; waitlist: number; checked_in: number;
 };

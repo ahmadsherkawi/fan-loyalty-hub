@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { isKnownComp } from "@/lib/competitions";
 import { TeamBadge } from "@/components/brand/TeamBadge";
 import { LivePill } from "@/components/common/bits";
 import { useI18n } from "@/i18n/I18nContext";
@@ -17,7 +18,6 @@ function Side({ name, team }: { name: string; team: FixtureWithTeams["home_team"
 }
 
 /** The dark "stadium" match card — the one dark surface on a white app, so it always leads the eye. */
-const KNOWN_COMPS = ["CL", "PL", "PD", "SA", "BL1", "FL1", "PPL", "DED"];
 
 export function FixtureScoreboard({ fixture, footer, className }: { fixture: FixtureWithTeams; footer?: ReactNode; className?: string }) {
   const { t, formatDateTime } = useI18n();
@@ -27,7 +27,7 @@ export function FixtureScoreboard({ fixture, footer, className }: { fixture: Fix
     <div className={cn("overflow-hidden rounded-3xl bg-stadium text-white shadow-lift", className)}>
       <div className="p-5 pb-6">
         <div className="mb-4 flex items-center justify-between gap-2 text-xs font-medium text-white/70">
-          <span className="truncate">{fixture.competition_code && KNOWN_COMPS.includes(fixture.competition_code) ? t(`comp.${fixture.competition_code}` as never) : fixture.competition}</span>
+          <span className="truncate">{isKnownComp(fixture.competition_code) ? t(`comp.${fixture.competition_code}` as never) : fixture.competition}</span>
           {live ? <LivePill /> : done ? <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold text-white">{t("match.fullTime")}</span>
             : <span>{formatDateTime(fixture.kickoff_at, { weekday: "short", day: "numeric", month: "short" })}</span>}
         </div>

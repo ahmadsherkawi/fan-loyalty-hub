@@ -10,7 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
-const COMPS = ["PL", "CL", "PD", "SA", "BL1", "FL1", "PPL", "DED"];
+import { COMPETITIONS as COMPS } from "@/lib/competitions";
+import { compLabel } from "@/lib/competitions";
 
 /** The venue ticks the games it will show; fans find them in "Where to watch". */
 export function ScreeningsEditor({ venueId }: { venueId: string }) {
@@ -70,7 +71,7 @@ export function ScreeningsEditor({ venueId }: { venueId: string }) {
                   <span className="scoreboard w-11 shrink-0 text-sm font-semibold">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{f.home_team_name} {t("common.vs")} {f.away_team_name}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">{f.competition}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{compLabel(t, f.competition_code, f.competition)}</p>
                   </div>
                   {s && (
                     <button onClick={() => sound(s.id, !s.sound)} className="text-muted-foreground" aria-label={t("venue.sound")}>

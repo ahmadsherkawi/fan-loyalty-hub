@@ -811,6 +811,15 @@ export const en = {
   "party.venueCantHost": "The venue can't host this one, so reservations are paused.",
   "notif.booking_withdrawn.t": "Request withdrawn by {group}",
   "notif.booking_withdrawn.b": "{match} · {when} · they chose another venue",
+  "comp.UPL": "UAE Pro League",
+  "comp.ULC": "ADIB Cup",
+  "comp.SPL": "Saudi Pro League",
+  "comp.SKC": "King's Cup",
+  "comp.ACL": "AFC Champions League Elite",
+  "comp.QSL": "Qatar Stars League",
+  "comp.KPL": "Kuwait Premier League",
+  "comp.BPL": "Bahrain Premier League",
+  "comp.OPL": "Oman Professional League",
 } as const;
 
 export type TKey = keyof typeof en;
