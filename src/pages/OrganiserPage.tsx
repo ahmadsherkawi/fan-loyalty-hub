@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3, Megaphone, MessageCircle, Sparkles, Tv, UserCog, Wand2 } from "lucide-react";
+import { MessageCircle, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, BackButton } from "@/components/layout/AppShell";
-import { CardSkeletons, EmptyState, Initials } from "@/components/common/bits";
+import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
+import { CardSkeletons, EmptyState, FeatureHeader, Initials } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,14 +37,13 @@ export default function OrganiserPage() {
   return (
     <AppShell>
       <BackButton />
-      <p className="text-sm font-semibold text-primary"><Link to={`/g/${group.slug}`}>{loc(group, "name", lang)}</Link></p>
-      <h1 className="text-3xl font-bold">{t("page.organiser")}</h1>
-      <Tabs defaultValue="party" className="mt-5">
-        <TabsList className="w-full justify-start overflow-x-auto rounded-full">
-          <TabsTrigger value="party" className="rounded-full"><Tv className="me-1.5 h-4 w-4" />{t("org.tabParty")}</TabsTrigger>
-          <TabsTrigger value="stats" className="rounded-full"><BarChart3 className="me-1.5 h-4 w-4" />{t("org.tabStats")}</TabsTrigger>
-          <TabsTrigger value="members" className="rounded-full"><UserCog className="me-1.5 h-4 w-4" />{t("org.tabMembers")}</TabsTrigger>
-          <TabsTrigger value="news" className="rounded-full"><Megaphone className="me-1.5 h-4 w-4" />{t("org.tabNews")}</TabsTrigger>
+      <PageTitle eyebrow={<Link to={`/g/${group.slug}`} className="text-brand">{loc(group, "name", lang)}</Link>} title={t("page.organiser")} />
+      <Tabs defaultValue="party">
+        <TabsList className="w-full">
+          <TabsTrigger value="party">{t("org.tabParty")}</TabsTrigger>
+          <TabsTrigger value="stats">{t("org.tabStats")}</TabsTrigger>
+          <TabsTrigger value="members">{t("org.tabMembers")}</TabsTrigger>
+          <TabsTrigger value="news">{t("org.tabNews")}</TabsTrigger>
         </TabsList>
         <TabsContent value="party"><PartyCreator groupId={group.id} teamId={group.team_id} city={group.city} homeVenueId={group.home_venue_id} slug={group.slug} /></TabsContent>
         <TabsContent value="stats"><StatsPanel groupId={group.id} /></TabsContent>
@@ -116,10 +115,10 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
 
   if (created) {
     return (
-      <div className="rounded-3xl border bg-card p-5 text-center">
+      <div className="card p-5 text-center">
         <p className="text-lg font-semibold">{t("org.partyCreated")}</p>
         <p className="mt-1 text-sm text-muted-foreground">{t("org.nowShare")}</p>
-        <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-secondary p-4 text-start text-sm" dir="auto">{created.text}</pre>
+        <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-surface p-4 font-sans text-start text-sm" dir="auto">{created.text}</pre>
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           <Button asChild className="rounded-full"><a href={whatsappShare(created.text)} target="_blank" rel="noreferrer"><MessageCircle className="me-1.5 h-4 w-4" />{t("org.postWhatsapp")}</a></Button>
           <Button asChild variant="outline" className="rounded-full"><Link to={`/party/${created.id}`}>{t("org.openParty")}</Link></Button>
@@ -131,13 +130,13 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-accent/30 bg-accent/5 p-4">
-        <p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-accent" />{t("org.copilot")}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{t("org.copilotHint")}</p>
-        <Textarea className="mt-3" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("org.copilotPlaceholder")} />
-        <Button className="mt-2 rounded-full" onClick={askCopilot} disabled={thinking || !prompt.trim()}><Wand2 className="me-1.5 h-4 w-4" />{thinking ? t("org.thinking") : t("org.draftIt")}</Button>
+      <div className="rounded-2xl border border-ai/20 bg-ai-soft p-4">
+        <FeatureHeader icon={<Sparkles />} tone="ai" ai title={t("org.copilot")} sub={t("org.copilotHint")} />
+        <Textarea className="mt-3 bg-card" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("org.copilotPlaceholder")} />
+        <Button variant="ai" className="mt-3 w-full" onClick={askCopilot} disabled={thinking || !prompt.trim()}><Wand2 className="me-1.5 h-4 w-4" />{thinking ? t("org.thinking") : t("org.draftIt")}</Button>
       </div>
-      <div className="grid gap-4 rounded-3xl border bg-card p-4">
+      <div className="grid gap-4 card p-4">
+        <p className="eyebrow">{t("org.orManual")}</p>
         <div className="grid gap-1.5"><Label>{t("org.fixture")}</Label>
           <Select value={draft.fixture_id} onValueChange={set("fixture_id")}>
             <SelectTrigger><SelectValue placeholder={t("org.pickFixture")} /></SelectTrigger>
@@ -161,7 +160,6 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
         </div>
         <Button className="rounded-full" onClick={create} disabled={saving || !draft.fixture_id}>{saving ? t("common.loading") : t("org.createParty")}</Button>
       </div>
-      <p className="text-xs text-muted-foreground">{t("org.slugHint", { slug })}</p>
     </div>
   );
 }
@@ -184,26 +182,26 @@ function StatsPanel({ groupId }: { groupId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {tiles.map((x) => <div key={x.l} className="rounded-2xl border bg-card p-4"><p className="scoreboard text-2xl font-bold">{x.v}</p><p className="text-xs text-muted-foreground">{x.l}</p></div>)}
+        {tiles.map((x, i) => <div key={x.l} className={i === 0 ? "col-span-2 rounded-2xl bg-foreground p-4 text-background md:col-span-1" : "card p-4"}><p className="scoreboard text-3xl font-bold leading-none">{x.v}</p><p className={i === 0 ? "mt-1 text-xs text-background/60" : "mt-1 text-xs text-muted-foreground"}>{x.l}</p></div>)}
       </div>
       {chart.length > 0 && (
-        <div className="rounded-3xl border bg-card p-4">
-          <p className="mb-3 font-semibold">{t("org.turnout")}</p>
+        <div className="card p-4">
+          <div className="mb-3 flex items-center justify-between"><p className="font-bold">{t("org.turnout")}</p><div className="flex gap-3 text-xs text-muted-foreground"><span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#CBD2DC]" />{t("party.going")}</span><span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-foreground" />{t("party.checkedIn")}</span></div></div>
           <div className="h-56" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chart}>
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12 }} />
-                <Bar dataKey={t("party.going")} fill="hsl(var(--muted-foreground))" radius={[6, 6, 0, 0]} />
-                <Bar dataKey={t("party.checkedIn")} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                <Bar dataKey={t("party.going")} fill="#CBD2DC" radius={[6, 6, 0, 0]} />
+                <Bar dataKey={t("party.checkedIn")} fill="#0B1220" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
       {s.top_fans.length > 0 && (
-        <div className="rounded-3xl border bg-card p-4">
+        <div className="card p-4">
           <p className="mb-2 font-semibold">{t("org.topFans")}</p>
           {s.top_fans.map((f, i) => <div key={i} className="flex justify-between py-1.5 text-sm"><span>{i + 1}. {f.full_name}</span><span className="scoreboard font-bold">{f.caps}</span></div>)}
         </div>
@@ -231,7 +229,7 @@ function MembersPanel({ groupId, dues }: { groupId: string; dues: number | null 
   return (
     <div className="space-y-3">
       {dues ? <p className="text-sm text-muted-foreground">{t("org.duesInfo", { amount: dues })}</p> : null}
-      <div className="overflow-hidden rounded-2xl border bg-card">
+      <div className="overflow-hidden card">
         {(members ?? []).map((m) => {
           const p = profiles?.find((x) => x.user_id === m.user_id);
           return (
@@ -272,7 +270,7 @@ function NewsPanel({ groupId, slug }: { groupId: string; slug: string }) {
     toast.success(t("org.posted"));
   }
   return (
-    <div className="grid gap-3 rounded-3xl border bg-card p-4">
+    <div className="grid gap-3 card p-4">
       <div className="grid gap-1.5"><Label>{t("org.title")}</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-1.5"><Label>{t("org.announceEn")}</Label><Textarea rows={4} dir="ltr" value={en} onChange={(e) => setEn(e.target.value)} /></div>

@@ -59,15 +59,15 @@ export default function VenueDashboard() {
   return (
     <AppShell>
       <BackButton />
-      <p className="text-sm font-semibold text-primary"><Link to={`/venues/${venue!.id}`}>{loc(venue, "name", lang)}</Link></p>
-      <h1 className="text-3xl font-bold">{t("page.venueDashboard")}</h1>
+      <p className="text-sm font-semibold text-brand"><Link to={`/venues/${venue!.id}`}>{loc(venue, "name", lang)}</Link></p>
+      <h1 className="text-[28px] font-extrabold leading-tight">{t("page.venueDashboard")}</h1>
       <div className="mt-5 grid grid-cols-3 gap-3">
         {[{ v: stats?.total_checkins ?? 0, l: t("vdash.checkins") }, { v: stats?.unique_fans ?? 0, l: t("vdash.fans") }, { v: stats?.groups_hosted ?? 0, l: t("vdash.groups") }].map((x) => (
-          <div key={x.l} className="rounded-2xl border bg-card p-4"><p className="scoreboard text-3xl font-bold">{x.v}</p><p className="text-xs text-muted-foreground">{x.l}</p></div>
+          <div key={x.l} className="card p-4"><p className="scoreboard text-[28px] font-extrabold leading-tight">{x.v}</p><p className="text-xs text-muted-foreground">{x.l}</p></div>
         ))}
       </div>
-      <div className="mt-4 rounded-3xl border bg-card p-4">
-        <p className="mb-3 flex items-center gap-2 font-semibold"><TrendingUp className="h-4 w-4 text-primary" />{t("vdash.perMatch")}</p>
+      <div className="mt-4 card p-4">
+        <p className="mb-3 flex items-center gap-2 font-semibold"><TrendingUp className="h-4 w-4 text-brand" />{t("vdash.perMatch")}</p>
         {chart.length ? (
           <div className="h-56" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
@@ -87,8 +87,8 @@ export default function VenueDashboard() {
           ))}
         </div>
       </div>
-      <div className="mt-4 rounded-3xl border bg-card p-4">
-        <p className="flex items-center gap-2 font-semibold"><Gift className="h-4 w-4 text-accent" />{t("vdash.offers")}</p>
+      <div className="mt-4 card p-4">
+        <p className="flex items-center gap-2 font-semibold"><Gift className="h-4 w-4 text-gold-ink" />{t("vdash.offers")}</p>
         <div className="mt-3 space-y-2">
           {(offers ?? []).map((o) => (
             <div key={o.id} className="flex items-center gap-3 rounded-xl bg-secondary/50 p-3">
@@ -105,7 +105,7 @@ export default function VenueDashboard() {
         </div>
       </div>
       {!venue!.is_pro && (
-        <div className="mt-4 rounded-3xl border border-accent/40 bg-accent/10 p-5">
+        <div className="mt-4 rounded-3xl border border-gold/50 bg-gold-soft p-5">
           <p className="font-display text-lg font-bold">{t("vdash.proTitle")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("vdash.proBody")}</p>
           <Button className="mt-3 rounded-full" variant="secondary" onClick={() => toast.success(t("vdash.proThanks"))}>{t("vdash.proCta")}</Button>

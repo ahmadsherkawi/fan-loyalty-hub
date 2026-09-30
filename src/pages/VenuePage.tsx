@@ -37,7 +37,7 @@ export default function VenuePage() {
   return (
     <AppShell>
       <BackButton />
-      <div className="rounded-3xl border bg-card bg-pitch-lines p-5">
+      <div className="card p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold">{loc(venue, "name", lang)}</h1>
           <DemoChip show={venue.is_demo} />
@@ -54,9 +54,9 @@ export default function VenuePage() {
         </div>
       </div>
       {(offers ?? []).length > 0 && (
-        <Section title={t("party.perks")} icon={<Gift className="h-5 w-5 text-accent" />}>
+        <Section title={t("party.perks")} icon={<Gift className="h-5 w-5 text-gold-ink" />}>
           <div className="grid gap-3 md:grid-cols-2">{offers!.map((o) => (
-            <div key={o.id} className="rounded-2xl border border-accent/30 bg-accent/5 p-4"><p className="font-medium">{loc(o, "title", lang)}</p><p className="text-sm text-muted-foreground">{loc(o, "details", lang)}</p></div>
+            <div key={o.id} className="rounded-2xl border border-gold/50 bg-gold-soft p-4"><p className="font-medium">{loc(o, "title", lang)}</p><p className="text-sm text-muted-foreground">{loc(o, "details", lang)}</p></div>
           ))}</div>
         </Section>
       )}

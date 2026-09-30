@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppShell, BackButton } from "@/components/layout/AppShell";
+import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { GroupCard } from "@/components/cards";
 import { CardSkeletons, Chip, EmptyState } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
@@ -39,26 +39,19 @@ export default function GroupsPage() {
 
   return (
     <AppShell>
-      <BackButton />
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">{t("page.groups")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("groups.sub")}</p>
-        </div>
-        {user && <CreateGroupDialog />}
+      <PageTitle title={t("page.groups")} sub={t("groups.sub")} action={user ? <CreateGroupDialog /> : undefined} />
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("groups.search")} className="h-12 rounded-full bg-surface ps-11" />
       </div>
-      <div className="relative mt-5">
-        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("groups.search")} className="h-11 rounded-full ps-9" />
-      </div>
-      <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
         {myTeam && <Chip active={mine} onClick={() => setMine(!mine)}>{loc(myTeam, "name", lang)}</Chip>}
         <Chip active={city === "all"} onClick={() => setCity("all")}>{t("common.all")}</Chip>
         {cities.map((c) => <Chip key={c} active={city === c} onClick={() => setCity(c)}>{t(`city.${c}` as never)}</Chip>)}
       </div>
       <div className="mt-4">
         {isLoading ? <CardSkeletons n={4} /> : list.length ? (
-          <div className="grid gap-3 md:grid-cols-2">{list.map((g) => <GroupCard key={g.id} group={g} memberCount={g.member_count} />)}</div>
+          <div className="grid gap-3">{list.map((g) => <GroupCard key={g.id} group={g} memberCount={g.member_count} />)}</div>
         ) : <EmptyState icon={<Users className="h-5 w-5" />} title={t("groups.empty")} body={t("groups.emptyBody")} />}
       </div>
     </AppShell>
@@ -102,8 +95,8 @@ function CreateGroupDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button className="shrink-0 rounded-full"><Plus className="me-1 h-4 w-4" />{t("groups.create")}</Button></DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogTrigger asChild><Button variant="ink" size="sm" className="shrink-0"><Plus />{t("groups.create")}</Button></DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl">
         <DialogHeader><DialogTitle>{t("groups.create")}</DialogTitle></DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-1.5"><Label>{t("groups.name")}</Label><Input value={form.name} onChange={(e) => set("name")(e.target.value)} placeholder="Dubai Madridistas" /></div>

@@ -69,10 +69,10 @@ export default function Onboarding() {
 
         {step === 1 && (
           <section>
-            <h1 className="mb-6 text-3xl font-bold">{t("onb.langTitle")}</h1>
+            <h1 className="mb-6 text-[28px] font-extrabold leading-tight">{t("onb.langTitle")}</h1>
             <div className="grid grid-cols-2 gap-3">
               {([["en", "English"], ["ar", "العربية"]] as [Lang, string][]).map(([l, label]) => (
-                <button key={l} onClick={() => setLang(l)} className={cn("rounded-2xl border bg-card p-6 text-xl font-semibold transition-colors", lang === l && "border-primary bg-primary/10", l === "ar" && "font-arabic")}>{label}</button>
+                <button key={l} onClick={() => setLang(l)} className={cn("card p-6 text-xl font-semibold transition-colors", lang === l && "border-brand bg-brand-soft ring-2 ring-brand/15", l === "ar" && "font-arabic")}>{label}</button>
               ))}
             </div>
           </section>
@@ -80,7 +80,7 @@ export default function Onboarding() {
 
         {step === 2 && (
           <section>
-            <h1 className="mb-4 text-3xl font-bold">{t("onb.teamTitle")}</h1>
+            <h1 className="mb-4 text-[28px] font-extrabold leading-tight">{t("onb.teamTitle")}</h1>
             <div className="relative mb-4">
               <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("onb.teamSearch")} className="ps-9" />
@@ -89,11 +89,11 @@ export default function Onboarding() {
             <div className="space-y-5">
               {grouped.map(([league, list]) => (
                 <div key={league}>
-                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{league}</h2>
+                  <h2 className="mb-2 eyebrow">{league}</h2>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {list.map((tm) => (
-                      <button key={tm.id} onClick={() => setTeamId(tm.id)} className={cn("relative flex flex-col items-center gap-2 rounded-2xl border bg-card p-3 text-center text-xs font-medium", teamId === tm.id && "border-primary bg-primary/10")}>
-                        {teamId === tm.id && <Check className="absolute end-2 top-2 h-4 w-4 text-primary" />}
+                      <button key={tm.id} onClick={() => setTeamId(tm.id)} className={cn("relative flex flex-col items-center gap-2 card p-3 text-center text-xs font-medium", teamId === tm.id && "border-brand bg-brand-soft ring-2 ring-brand/15")}>
+                        {teamId === tm.id && <Check className="absolute end-2 top-2 h-4 w-4 text-brand" />}
                         <TeamBadge shortName={tm.short_name} primary={tm.primary_color} secondary={tm.secondary_color} />
                         <span className="line-clamp-2">{lang === "ar" && tm.name_ar ? tm.name_ar : tm.name}</span>
                       </button>
@@ -107,10 +107,10 @@ export default function Onboarding() {
 
         {step === 3 && (
           <section>
-            <h1 className="mb-6 text-3xl font-bold">{t("onb.cityTitle")}</h1>
+            <h1 className="mb-6 text-[28px] font-extrabold leading-tight">{t("onb.cityTitle")}</h1>
             <div className="grid grid-cols-2 gap-2">
               {CITIES.map((c) => (
-                <button key={c} onClick={() => setCity(c)} className={cn("rounded-2xl border bg-card p-4 text-start font-medium", city === c && "border-primary bg-primary/10")}>{t(`city.${c}` as TKey)}</button>
+                <button key={c} onClick={() => setCity(c)} className={cn("card p-4 text-start font-medium", city === c && "border-brand bg-brand-soft ring-2 ring-brand/15")}>{t(`city.${c}` as TKey)}</button>
               ))}
             </div>
           </section>

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Download, Sparkles, Share2 } from "lucide-react";
+import { Download, Image as ImageIcon, Share2 } from "lucide-react";
+import { FeatureHeader } from "@/components/common/bits";
 import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -51,18 +52,15 @@ export function RecapCard({ party }: { party: PartyFull }) {
   const body = recap ? (lang === "ar" ? recap.body_ar : recap.body_en) : "";
 
   return (
-    <div className="rounded-3xl border bg-card p-4">
-      <div className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent"><Sparkles className="h-5 w-5" /></span>
-        <div><h3 className="font-semibold">{t("recap.title")}</h3><p className="text-xs text-muted-foreground">{t("recap.sub")}</p></div>
-      </div>
-      {!recap && <Button className="mt-4 w-full rounded-full" onClick={generate} disabled={busy}>{busy ? t("recap.generating") : t("recap.generate")}</Button>}
+    <div className="card p-4">
+      <FeatureHeader icon={<ImageIcon />} tone="ai" ai title={t("recap.title")} sub={t("recap.sub")} />
+      {!recap && <Button variant="ai" className="mt-4 w-full" onClick={generate} disabled={busy}>{busy ? t("recap.generating") : t("recap.generate")}</Button>}
       {err && <p className="mt-3 text-sm text-destructive">{t("common.error")}</p>}
       {recap && f && (
         <>
           <div ref={cardRef} dir={lang === "ar" ? "rtl" : "ltr"} className="mt-4 overflow-hidden rounded-2xl p-6 text-white"
-            style={{ background: `radial-gradient(80% 60% at 50% 0%, ${team?.primary_color ?? "#1DB954"}AA, #0A0F0D 75%)` }}>
-            <div className="flex items-center justify-between"><Wordmark /><span className="text-xs opacity-70">{party.group?.name}</span></div>
+            style={{ background: `radial-gradient(80% 60% at 50% 0%, ${team?.primary_color ?? "#00C566"}AA, #0B1220 75%)` }}>
+            <div className="flex items-center justify-between"><Wordmark invert /><span className="text-xs opacity-70">{party.group?.name}</span></div>
             <div className="mt-6 flex items-center justify-center gap-4">
               <TeamBadge shortName={f.home_team?.short_name || f.home_team_name.slice(0, 3)} primary={f.home_team?.primary_color} secondary={f.home_team?.secondary_color} size="lg" />
               <span className="scoreboard text-5xl font-bold" dir="ltr">{f.home_score ?? "-"}–{f.away_score ?? "-"}</span>

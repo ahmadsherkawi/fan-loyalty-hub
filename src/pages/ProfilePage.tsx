@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, Store } from "lucide-react";
 import { toast } from "sonner";
+import { Initials } from "@/components/common/bits";
 import { AppShell, BackButton, LanguageToggle } from "@/components/layout/AppShell";
 import { GroupCard } from "@/components/cards";
 import { Section } from "@/components/common/bits";
@@ -44,8 +45,14 @@ export default function ProfilePage() {
   return (
     <AppShell>
       <BackButton />
-      <h1 className="text-3xl font-bold">{t("page.profile")}</h1>
-      <div className="mt-5 grid gap-4 rounded-3xl border bg-card p-5">
+      <div className="mb-5 flex items-center gap-4">
+        <Initials name={profile?.full_name || user.email} className="h-16 w-16 bg-foreground text-xl text-background ring-0" />
+        <div className="min-w-0">
+          <h1 className="truncate text-[26px] font-extrabold leading-tight">{profile?.full_name || t("page.profile")}</h1>
+          <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+        </div>
+      </div>
+      <div className="grid gap-4 card p-5">
         <div className="grid gap-1.5"><Label>{t("auth.fullName")}</Label>
           <div className="flex gap-2"><Input value={name} onChange={(e) => setName(e.target.value)} /><Button variant="outline" className="rounded-full" disabled={!name.trim() || name === profile?.full_name} onClick={() => save({ full_name: name.trim() })}>{t("profile.save")}</Button></div>
         </div>
@@ -67,7 +74,6 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between"><Label>{t("profile.notifications")}</Label>
           <Switch checked={profile?.notifications_enabled ?? true} onCheckedChange={(v) => supabase.from("profiles").update({ notifications_enabled: v }).eq("user_id", user.id).then(() => refreshProfile())} />
         </div>
-        <p className="text-xs text-muted-foreground">{user.email}</p>
       </div>
 
       <Section title={t("profile.myGroups")}>
@@ -75,15 +81,15 @@ export default function ProfilePage() {
           : <Button asChild variant="outline" className="rounded-full"><Link to="/groups">{t("home.findGroup")}</Link></Button>}
       </Section>
 
-      <Section title={t("profile.venues")} icon={<Store className="h-5 w-5 text-primary" />} action={<RegisterVenue />}>
+      <Section title={t("profile.venues")} icon={<Store className="h-5 w-5 text-brand" />} action={<RegisterVenue />}>
         {(myVenues ?? []).length ? (
           <div className="grid gap-3 md:grid-cols-2">{myVenues!.map((v) => (
-            <Link key={v.id} to={`/venue-dashboard/${v.id}`} className="rounded-2xl border bg-card p-4 hover:border-primary/50"><p className="font-semibold">{loc(v, "name", lang)}</p><p className="text-xs text-muted-foreground">{t("page.venueDashboard")}</p></Link>
+            <Link key={v.id} to={`/venue-dashboard/${v.id}`} className="card p-4 card-hover"><p className="font-semibold">{loc(v, "name", lang)}</p><p className="text-xs text-muted-foreground">{t("page.venueDashboard")}</p></Link>
           ))}</div>
         ) : <p className="text-sm text-muted-foreground">{t("profile.venuesEmpty")}</p>}
       </Section>
 
-      <Button variant="outline" className="mt-10 rounded-full" onClick={async () => { await signOut(); navigate("/"); }}>
+      <Button variant="ghost" className="mt-10 w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={async () => { await signOut(); navigate("/"); }}>
         <LogOut className="me-1.5 h-4 w-4 rtl:rotate-180" />{t("nav.signOut")}
       </Button>
     </AppShell>

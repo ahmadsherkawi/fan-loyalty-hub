@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Target } from "lucide-react";
-import { AppShell, BackButton } from "@/components/layout/AppShell";
+import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { PredictionInput } from "@/components/match/PredictionInput";
 import { CardSkeletons, Chip, EmptyState } from "@/components/common/bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,19 +50,17 @@ export default function PredictPage() {
 
   return (
     <AppShell>
-      <BackButton />
-      <h1 className="text-3xl font-bold">{t("page.predict")}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{t("predict.sub")}</p>
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <PageTitle title={t("page.predict")} sub={t("predict.hint")} />
+      <div className="grid grid-cols-3 divide-x rounded-2xl bg-foreground py-4 text-center text-background rtl:divide-x-reverse divide-white/10">
         {[{ v: total, l: t("league.pts") }, { v: exact, l: t("league.exact") }, { v: (mine ?? []).length, l: t("predict.made") }].map((s) => (
-          <div key={s.l} className="rounded-2xl border bg-card p-3 text-center"><p className="scoreboard text-2xl font-bold">{s.v}</p><p className="text-xs text-muted-foreground">{s.l}</p></div>
+          <div key={s.l}><p className="scoreboard text-3xl font-bold leading-none">{s.v}</p><p className="mt-1 text-xs text-background/60">{s.l}</p></div>
         ))}
       </div>
 
       <Tabs defaultValue="upcoming" className="mt-6">
-        <TabsList className="rounded-full"><TabsTrigger value="upcoming" className="rounded-full">{t("predict.upcoming")}</TabsTrigger><TabsTrigger value="results" className="rounded-full">{t("predict.results")}</TabsTrigger></TabsList>
+        <TabsList className="w-full"><TabsTrigger value="upcoming">{t("predict.upcoming")}</TabsTrigger><TabsTrigger value="results">{t("predict.results")}</TabsTrigger></TabsList>
         <TabsContent value="upcoming">
-          <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
             <Chip active={comp === "mine"} onClick={() => setComp("mine")}>{t("predict.myTeams")}</Chip>
             {comps.map((c) => <Chip key={c} active={comp === c} onClick={() => setComp(c)}>{t(`comp.${c}` as never)}</Chip>)}
           </div>
@@ -70,12 +68,12 @@ export default function PredictPage() {
             <EmptyState icon={<Target className="h-5 w-5" />} title={t("predict.none")} body={t("predict.noneBody")} />
           ) : Object.entries(byDay).map(([day, fs]) => (
             <div key={day} className="mb-6">
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{formatDateTime(`${day}T12:00:00Z`, { weekday: "long", day: "numeric", month: "long" })}</h3>
+              <h3 className="mb-2 eyebrow">{formatDateTime(`${day}T12:00:00Z`, { weekday: "long", day: "numeric", month: "long" })}</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 {fs.map((f) => (
-                  <div key={f.id}>
-                    <p className="mb-1 text-xs text-muted-foreground">{f.home_team_name} v {f.away_team_name} · {formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit" })}</p>
-                    <PredictionInput fixture={f} compact />
+                  <div key={f.id} className="card p-3">
+                    <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{f.competition}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
+                    <PredictionInput fixture={f} compact bare />
                   </div>
                 ))}
               </div>
@@ -84,14 +82,14 @@ export default function PredictPage() {
         </TabsContent>
         <TabsContent value="results">
           {settled.length === 0 ? <EmptyState title={t("predict.noResults")} /> : (
-            <div className="overflow-hidden rounded-2xl border bg-card">
+            <div className="card overflow-hidden">
               {settled.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 border-b px-4 py-3 text-sm last:border-0">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{p.fixture.home_team_name} v {p.fixture.away_team_name}</p>
                     <p className="text-xs text-muted-foreground" dir="ltr">{t("predict.youSaid")} {p.home_score}–{p.away_score} · FT {p.fixture.home_score}–{p.fixture.away_score}</p>
                   </div>
-                  <span className={`scoreboard rounded-full px-2.5 py-1 text-xs font-bold ${p.points === 3 ? "bg-accent text-accent-foreground" : p.points === 1 ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>+{p.points}</span>
+                  <span className={`scoreboard rounded-full px-2.5 py-1 text-xs font-bold ${p.points === 3 ? "bg-gold text-accent-foreground" : p.points === 1 ? "bg-brand-soft text-brand" : "bg-muted text-muted-foreground"}`}>+{p.points}</span>
                 </div>
               ))}
             </div>

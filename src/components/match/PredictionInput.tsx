@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Minus, Plus, Target } from "lucide-react";
+import { FeatureHeader } from "@/components/common/bits";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -12,15 +13,30 @@ import { cn } from "@/lib/utils";
 
 function Stepper({ value, onChange, disabled }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full" disabled={disabled} onClick={() => onChange(Math.min(20, value + 1))} aria-label="+"><Plus className="h-4 w-4" /></Button>
-      <span className="scoreboard w-10 rounded-xl bg-background py-1 text-center text-2xl font-bold">{value}</span>
-      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full" disabled={disabled} onClick={() => onChange(Math.max(0, value - 1))} aria-label="-"><Minus className="h-4 w-4" /></Button>
+    <div className="flex flex-col items-center gap-1.5">
+      <Button type="button" variant="outline" size="iconSm" disabled={disabled} onClick={() => onChange(Math.min(20, value + 1))} aria-label="+"><Plus className="h-4 w-4" /></Button>
+      <span className="scoreboard flex h-14 w-12 items-center justify-center rounded-xl bg-foreground text-4xl font-bold text-background">{value}</span>
+      <Button type="button" variant="outline" size="iconSm" disabled={disabled} onClick={() => onChange(Math.max(0, value - 1))} aria-label="-"><Minus className="h-4 w-4" /></Button>
     </div>
   );
 }
 
-export function PredictionInput({ fixture, compact = false }: { fixture: FixtureWithTeams; compact?: boolean }) {
+function Row({ team, name, value, onChange, disabled }: { team: FixtureWithTeams["home_team"]; name: string; value: number; onChange: (n: number) => void; disabled?: boolean }) {
+  const { lang } = useI18n();
+  return (
+    <div className="flex items-center gap-3">
+      <TeamBadge size="sm" shortName={team?.short_name || name.slice(0, 3)} primary={team?.primary_color} secondary={team?.secondary_color} />
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{(lang === "ar" && team?.name_ar) || team?.name || name}</span>
+      <div className="flex items-center gap-1" dir="ltr">
+        <Button type="button" variant="outline" size="iconSm" disabled={disabled || value === 0} onClick={() => onChange(Math.max(0, value - 1))} aria-label="-"><Minus /></Button>
+        <span className="scoreboard w-9 text-center text-2xl font-bold">{value}</span>
+        <Button type="button" variant="outline" size="iconSm" disabled={disabled} onClick={() => onChange(Math.min(20, value + 1))} aria-label="+"><Plus /></Button>
+      </div>
+    </div>
+  );
+}
+
+export function PredictionInput({ fixture, compact = false, bare = false }: { fixture: FixtureWithTeams; compact?: boolean; bare?: boolean }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -50,21 +66,28 @@ export function PredictionInput({ fixture, compact = false }: { fixture: Fixture
 
   const done = isFinished(fixture.status);
   return (
-    <div className={cn("rounded-3xl border bg-card", compact ? "p-3" : "p-4")}>
-      {!compact && <p className="mb-3 flex items-center gap-2 font-semibold"><Target className="h-4 w-4 text-primary" />{t("predict.yourPrediction")}</p>}
-      <div className="flex items-center justify-center gap-3" dir="ltr">
-        <TeamBadge size="sm" shortName={fixture.home_team?.short_name || fixture.home_team_name.slice(0, 3)} primary={fixture.home_team?.primary_color} secondary={fixture.home_team?.secondary_color} />
-        <Stepper value={h} onChange={setH} disabled={locked} />
-        <span className="text-muted-foreground">–</span>
-        <Stepper value={a} onChange={setA} disabled={locked} />
-        <TeamBadge size="sm" shortName={fixture.away_team?.short_name || fixture.away_team_name.slice(0, 3)} primary={fixture.away_team?.primary_color} secondary={fixture.away_team?.secondary_color} />
-      </div>
+    <div className={cn(!bare && "card", !bare && (compact ? "p-3" : "p-4"))}>
+      {!compact && <div className="mb-4"><FeatureHeader icon={<Target />} tone="brand" title={t("predict.yourPrediction")} sub={t("predict.hint")} /></div>}
+      {compact ? (
+        <div className="space-y-2">
+          <Row team={fixture.home_team} name={fixture.home_team_name} value={h} onChange={setH} disabled={locked} />
+          <Row team={fixture.away_team} name={fixture.away_team_name} value={a} onChange={setA} disabled={locked} />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-3" dir="ltr">
+          <TeamBadge size="md" shortName={fixture.home_team?.short_name || fixture.home_team_name.slice(0, 3)} primary={fixture.home_team?.primary_color} secondary={fixture.home_team?.secondary_color} />
+          <Stepper value={h} onChange={setH} disabled={locked} />
+          <span className="scoreboard text-2xl text-muted-foreground">–</span>
+          <Stepper value={a} onChange={setA} disabled={locked} />
+          <TeamBadge size="md" shortName={fixture.away_team?.short_name || fixture.away_team_name.slice(0, 3)} primary={fixture.away_team?.primary_color} secondary={fixture.away_team?.secondary_color} />
+        </div>
+      )}
       {locked ? (
-        <p className="mt-3 text-center text-xs text-muted-foreground">
+        <p className="mt-3 rounded-lg bg-surface py-2 text-center text-xs font-semibold text-muted-foreground">
           {existing ? (done && existing.points !== null ? t("predict.points", { n: existing.points }) : t("predict.lockedIn")) : t("predict.closed")}
         </p>
       ) : (
-        <Button className="mt-3 w-full rounded-full" onClick={save} disabled={saving}>{existing ? t("predict.update") : t("predict.save")}</Button>
+        <Button className={cn("w-full", compact ? "mt-3 h-10" : "mt-4")} variant={existing ? "outline" : "default"} onClick={save} disabled={saving}>{existing ? t("predict.update") : t("predict.save")}</Button>
       )}
     </div>
   );

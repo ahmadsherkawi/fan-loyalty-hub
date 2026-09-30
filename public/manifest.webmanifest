@@ -4,8 +4,8 @@
   "description": "Your football crowd, wherever you live.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0F0D",
-  "theme_color": "#0A0F0D",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

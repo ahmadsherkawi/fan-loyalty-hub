@@ -1,10 +1,22 @@
 import { Link } from "react-router-dom";
-import { MapPin, Users, Tv, Volume2, Wine, Coffee, Baby, Crown } from "lucide-react";
+import { ChevronRight, MapPin, Users, Tv, Volume2, Wine, Coffee, Baby, BadgeCheck } from "lucide-react";
 import { TeamBadge } from "@/components/brand/TeamBadge";
-import { DemoChip, Initials } from "@/components/common/bits";
+import { DemoChip, Initials, LivePill } from "@/components/common/bits";
 import { useI18n } from "@/i18n/I18nContext";
 import { isFinished, isLive, loc, partyTime, usePartyCounts, type GroupFull, type LeaderRow, type PartyFull, type Venue } from "@/lib/data";
 import { cn } from "@/lib/utils";
+
+/** Date "ticket stub": weekday, day, month stacked. */
+function DateStub({ iso, muted }: { iso: string; muted?: boolean }) {
+  const { formatDateTime } = useI18n();
+  return (
+    <div className={cn("flex w-14 shrink-0 flex-col items-center justify-center rounded-xl py-2 text-center", muted ? "bg-muted text-muted-foreground" : "bg-foreground text-background")}>
+      <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{formatDateTime(iso, { weekday: "short" })}</span>
+      <span className="scoreboard text-2xl font-bold leading-none">{formatDateTime(iso, { day: "numeric" })}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{formatDateTime(iso, { month: "short" })}</span>
+    </div>
+  );
+}
 
 export function PartyCard({ party, showGroup = true }: { party: PartyFull; showGroup?: boolean }) {
   const { t, lang, formatDateTime } = useI18n();
@@ -12,40 +24,41 @@ export function PartyCard({ party, showGroup = true }: { party: PartyFull; showG
   const f = party.fixture;
   const live = isLive(f?.status) || party.status === "live";
   const done = isFinished(f?.status) || party.status === "finished";
-  const cap = party.capacity ?? 0;
-  const pct = cap ? Math.min(100, Math.round(((counts?.going ?? 0) / cap) * 100)) : 0;
+  const when = partyTime(party);
+  const homeName = (lang === "ar" && f?.home_team?.name_ar) || f?.home_team?.name || f?.home_team_name;
+  const awayName = (lang === "ar" && f?.away_team?.name_ar) || f?.away_team?.name || f?.away_team_name;
   return (
-    <Link to={`/party/${party.id}`} className="block rounded-2xl border bg-card p-4 transition-colors hover:border-primary/50">
-      <div className="flex items-start gap-3">
+    <Link to={`/party/${party.id}`} className="card card-hover flex min-w-0 items-center gap-3 p-3 pe-4">
+      <DateStub iso={when} muted={done} />
+      <div className="min-w-0 flex-1">
         {f ? (
-          <div className="flex -space-x-2 rtl:space-x-reverse">
-            <TeamBadge size="sm" shortName={f.home_team?.short_name || f.home_team_name.slice(0, 3)} primary={f.home_team?.primary_color} secondary={f.home_team?.secondary_color} />
-            <TeamBadge size="sm" shortName={f.away_team?.short_name || f.away_team_name.slice(0, 3)} primary={f.away_team?.primary_color} secondary={f.away_team?.secondary_color} />
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex shrink-0 -space-x-1.5 rtl:space-x-reverse">
+              <TeamBadge size="xs" shortName={f.home_team?.short_name || f.home_team_name.slice(0, 3)} primary={f.home_team?.primary_color} secondary={f.home_team?.secondary_color} />
+              <TeamBadge size="xs" shortName={f.away_team?.short_name || f.away_team_name.slice(0, 3)} primary={f.away_team?.primary_color} secondary={f.away_team?.secondary_color} />
+            </span>
+            <p className="min-w-0 flex-1 truncate font-bold">
+              {homeName} <span className="font-medium text-muted-foreground">{done ? <span className="scoreboard text-foreground" dir="ltr">{f.home_score}–{f.away_score}</span> : "v"}</span> {awayName}
+            </p>
           </div>
-        ) : <Tv className="h-8 w-8 text-accent" />}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-semibold">{f ? `${f.home_team_name} v ${f.away_team_name}` : party.title}</p>
-            {live && <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{t("match.live")}</span>}
+        ) : <p className="flex items-center gap-1.5 truncate font-bold"><Tv className="h-4 w-4" />{party.title}</p>}
+        <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(when, { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+          <span aria-hidden>·</span>
+          <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{loc(party.venue, "name", lang) || t("party.venueTbc")}</span>
+        </p>
+        {(showGroup && party.group) || live || party.is_demo ? (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {live && <LivePill />}
+            {showGroup && party.group && <span className="truncate text-xs font-semibold text-brand">{loc(party.group, "name", lang)}</span>}
             <DemoChip show={party.is_demo} />
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {done && f ? <span className="scoreboard font-semibold text-foreground" dir="ltr">{f.home_score}–{f.away_score} · </span> : null}
-            {formatDateTime(partyTime(party))}
-          </p>
-          <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3 shrink-0" />{loc(party.venue, "name", lang) || t("party.venueTbc")}{party.venue?.area ? ` · ${party.venue.area}` : ""}
-          </p>
-          {showGroup && party.group && <p className="mt-1 truncate text-xs font-medium text-primary">{loc(party.group, "name", lang)}</p>}
-        </div>
-        <div className="shrink-0 text-end">
-          <p className="scoreboard text-lg font-bold leading-none">{done ? counts?.checked_in ?? 0 : counts?.going ?? 0}</p>
-          <p className="text-[10px] text-muted-foreground">{done ? t("party.checkedIn") : t("party.going")}</p>
-        </div>
+        ) : null}
       </div>
-      {!done && cap > 0 && (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>
-      )}
+      <div className="shrink-0 text-center">
+        <p className="scoreboard text-2xl font-bold leading-none">{done ? counts?.checked_in ?? 0 : counts?.going ?? 0}</p>
+        <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">{done ? t("party.checkedIn") : t("party.going")}</p>
+      </div>
     </Link>
   );
 }
@@ -54,21 +67,26 @@ export function GroupCard({ group, memberCount }: { group: GroupFull; memberCoun
   const { t, lang } = useI18n();
   const team = group.team;
   return (
-    <Link to={`/g/${group.slug}`} className="flex items-center gap-3 rounded-2xl border bg-card p-4 transition-colors hover:border-primary/50">
-      <TeamBadge shortName={team?.short_name || "FC"} primary={team?.primary_color} secondary={team?.secondary_color} />
+    <Link to={`/g/${group.slug}`} className="card card-hover flex items-center gap-3 p-3 pe-4">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: `${team?.primary_color ?? "#00C566"}14` }}>
+        <TeamBadge shortName={team?.short_name || "FC"} primary={team?.primary_color} secondary={team?.secondary_color} />
+      </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-semibold">{loc(group, "name", lang)}</p>
-          {group.is_official && <Crown className="h-3.5 w-3.5 text-accent" aria-label={t("group.official")} />}
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-bold">{loc(group, "name", lang)}</p>
+          {group.is_official && <BadgeCheck className="h-4 w-4 shrink-0 text-brand" aria-label={t("group.official")} />}
+        </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {loc(team, "name", lang)} · {t(`city.${group.city}` as never) || group.city}
+        </p>
+        <div className="mt-1.5 flex items-center gap-2">
+          {memberCount !== undefined && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-foreground"><Users className="h-3.5 w-3.5 text-muted-foreground" />{t("home.members", { n: memberCount })}</span>
+          )}
           <DemoChip show={group.is_demo} />
         </div>
-        <p className="truncate text-xs text-muted-foreground">
-          {t(`city.${group.city}` as never) || group.city}{group.home_venue ? ` · ${loc(group.home_venue, "name", lang)}` : ""}
-        </p>
       </div>
-      {memberCount !== undefined && (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5" />{memberCount}</span>
-      )}
+      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground rtl:rotate-180" />
     </Link>
   );
 }
@@ -83,9 +101,9 @@ export function VenueFacts({ venue }: { venue: Venue }) {
     venue.capacity ? { icon: Users, label: t("venue.capacity", { n: venue.capacity }) } : null,
   ].filter(Boolean) as { icon: typeof Tv; label: string }[];
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {chips.map(({ icon: Icon, label }) => (
-        <span key={label} className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs"><Icon className="h-3.5 w-3.5" />{label}</span>
+        <span key={label} className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-medium"><Icon className="h-3.5 w-3.5 text-muted-foreground" />{label}</span>
       ))}
     </div>
   );
@@ -94,9 +112,9 @@ export function VenueFacts({ venue }: { venue: Venue }) {
 export function VenueCard({ venue }: { venue: Venue }) {
   const { lang, t } = useI18n();
   return (
-    <Link to={`/venues/${venue.id}`} className="block rounded-2xl border bg-card p-4 transition-colors hover:border-primary/50">
+    <Link to={`/venues/${venue.id}`} className="card card-hover block p-4">
       <div className="flex items-center gap-2">
-        <p className="font-semibold">{loc(venue, "name", lang)}</p>
+        <p className="font-bold">{loc(venue, "name", lang)}</p>
         <DemoChip show={venue.is_demo} />
       </div>
       <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[venue.area, t(`city.${venue.city}` as never)].filter(Boolean).join(" · ")}</p>
@@ -105,22 +123,22 @@ export function VenueCard({ venue }: { venue: Venue }) {
   );
 }
 
-const medal = ["bg-accent text-accent-foreground", "bg-zinc-300 text-zinc-900", "bg-amber-700 text-white"];
+const podium = ["bg-gold text-accent-foreground", "bg-[#D9DEE5] text-foreground", "bg-[#E8C9A8] text-foreground"];
 
 export function LeaderboardTable({ rows, currentUserId }: { rows: LeaderRow[]; currentUserId?: string }) {
   const { t } = useI18n();
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card">
-      <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-2 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="card overflow-hidden">
+      <div className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem] gap-2 border-b bg-surface px-4 py-2.5 eyebrow">
         <span>#</span><span>{t("league.fan")}</span><span className="text-end">{t("league.pts")}</span><span className="text-end">{t("league.exact")}</span><span className="text-end">{t("league.caps")}</span>
       </div>
       {rows.map((r, i) => (
-        <div key={r.user_id} className={cn("grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] items-center gap-2 px-4 py-2.5 text-sm", r.user_id === currentUserId && "bg-primary/10")}>
-          <span className={cn("scoreboard flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold", medal[i] ?? "text-muted-foreground")}>{i + 1}</span>
-          <span className="flex min-w-0 items-center gap-2"><Initials name={r.full_name} className="h-7 w-7" /><span className="truncate">{r.full_name ?? "—"}</span></span>
-          <span className="scoreboard text-end font-bold">{r.prediction_points}</span>
-          <span className="scoreboard text-end">{r.exact_scores}</span>
-          <span className="scoreboard text-end">{r.caps}</span>
+        <div key={r.user_id} className={cn("grid grid-cols-[2rem_1fr_3rem_3rem_3rem] items-center gap-2 border-b px-4 py-3 text-sm last:border-0", r.user_id === currentUserId && "bg-brand-soft")}>
+          <span className={cn("scoreboard flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold", podium[i] ?? "text-muted-foreground")}>{i + 1}</span>
+          <span className="flex min-w-0 items-center gap-2"><Initials name={r.full_name} className="h-7 w-7" /><span className="truncate font-medium">{r.full_name ?? "—"}</span></span>
+          <span className="scoreboard text-end text-lg font-bold">{r.prediction_points}</span>
+          <span className="scoreboard text-end text-lg text-muted-foreground">{r.exact_scores}</span>
+          <span className="scoreboard text-end text-lg text-muted-foreground">{r.caps}</span>
         </div>
       ))}
     </div>

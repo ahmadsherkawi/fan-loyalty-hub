@@ -11,15 +11,15 @@ export default function VenueScreen() {
   const { t, lang } = useI18n();
   const { data: party } = useParty(id);
   const { data: counts } = usePartyCounts(id);
-  if (!party) return <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">{t("common.loading")}</div>;
+  if (!party) return <div className="flex min-h-screen items-center justify-center bg-foreground text-white/60">{t("common.loading")}</div>;
   const f = party.fixture;
   const team = party.group?.team;
   const url = `${window.location.origin}/checkin/${party.checkin_code}`;
   return (
-    <div className="flex min-h-screen flex-col bg-background bg-floodlight p-8 text-foreground"
-      style={{ backgroundImage: `radial-gradient(70% 50% at 50% 0%, ${team?.primary_color ?? "#1DB954"}55, transparent 70%)` }}>
+    <div className="flex min-h-screen flex-col bg-foreground p-8 text-white"
+      style={{ backgroundImage: `radial-gradient(70% 50% at 50% 0%, ${team?.primary_color ?? "#00C566"}55, transparent 70%)` }}>
       <div className="flex items-center justify-between">
-        <Wordmark />
+        <Wordmark invert />
         <p className="text-xl font-semibold">{loc(party.group, "name", lang)}</p>
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-10 lg:flex-row lg:gap-20">
@@ -31,16 +31,16 @@ export default function VenueScreen() {
               <TeamBadge size="lg" shortName={f.away_team?.short_name || f.away_team_name.slice(0, 3)} primary={f.away_team?.primary_color} secondary={f.away_team?.secondary_color} className="scale-150" />
             </div>
           )}
-          <p className="mt-10 text-lg text-muted-foreground">{t("screen.checkedIn")}</p>
-          <p className="scoreboard text-[8rem] font-bold leading-none text-accent">{counts?.checked_in ?? 0}</p>
+          <p className="mt-10 text-lg text-white/60">{t("screen.checkedIn")}</p>
+          <p className="scoreboard text-[9rem] font-bold leading-none text-primary">{counts?.checked_in ?? 0}</p>
         </div>
         <div className="text-center">
-          <div className="rounded-3xl bg-white p-6"><QRCodeSVG value={url} size={260} /></div>
+          <div className="rounded-3xl bg-white p-6"><QRCodeSVG value={url} size={260} fgColor="#0B1220" /></div>
           <p className="mt-4 text-2xl font-semibold">{t("screen.scan")}</p>
-          <p className="mt-1 text-muted-foreground">{t("screen.orCode")} <span className="scoreboard font-bold tracking-[0.2em] text-foreground" dir="ltr">{party.checkin_code}</span></p>
+          <p className="mt-1 text-white/60">{t("screen.orCode")} <span className="scoreboard font-bold tracking-[0.2em] text-white" dir="ltr">{party.checkin_code}</span></p>
         </div>
       </div>
-      <p className="text-center text-sm text-muted-foreground">{t("brand.tagline")}</p>
+      <p className="text-center text-sm text-white/60">{t("brand.tagline")}</p>
     </div>
   );
 }

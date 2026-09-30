@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Check, X } from "lucide-react";
+import { FeatureHeader } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -50,21 +51,15 @@ export function HalftimeQuiz({ fixtureId }: { fixtureId: string }) {
 
   if (!user) return null;
   return (
-    <div className="rounded-3xl border bg-card p-4">
-      <div className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary"><Brain className="h-5 w-5" /></span>
-        <div className="flex-1">
-          <h3 className="font-semibold">{t("quiz.title")}</h3>
-          <p className="text-xs text-muted-foreground">{quiz?.sponsor_name ? t("quiz.presentedBy", { sponsor: quiz.sponsor_name }) : t("quiz.sub")}</p>
-        </div>
-      </div>
+    <div className="card p-4">
+      <FeatureHeader icon={<Brain />} tone="ai" ai title={t("quiz.title")} sub={quiz?.sponsor_name ? t("quiz.presentedBy", { sponsor: quiz.sponsor_name }) : t("quiz.sub")} />
 
-      {!started && <Button className="mt-4 w-full rounded-full" onClick={() => setStarted(true)}>{t("quiz.start")}</Button>}
+      {!started && <Button variant="ai" className="mt-4 w-full" onClick={() => setStarted(true)}>{t("quiz.start")}</Button>}
       {started && isFetching && <p className="mt-4 animate-pulse text-sm text-muted-foreground">{t("quiz.generating")}</p>}
       {started && error && <p className="mt-4 text-sm text-destructive">{t("quiz.error")}</p>}
 
       {quiz && previous && !result && (
-        <p className="mt-4 rounded-2xl bg-secondary p-4 text-center text-sm">{t("quiz.already", { score: previous.score, total: quiz.questions.length })}</p>
+        <p className="mt-4 rounded-2xl bg-surface p-4 text-center text-sm">{t("quiz.already", { score: previous.score, total: quiz.questions.length })}</p>
       )}
 
       {quiz && !previous && !result && quiz.questions[idx] && (
@@ -73,7 +68,7 @@ export function HalftimeQuiz({ fixtureId }: { fixtureId: string }) {
           <p className="mt-1 font-medium">{quiz.questions[idx].q}</p>
           <div className="mt-3 grid gap-2">
             {quiz.questions[idx].options.map((o, i) => (
-              <button key={i} disabled={submitting} onClick={() => pick(i)} className="rounded-xl border bg-background px-3 py-2.5 text-start text-sm transition-colors hover:border-primary">{o}</button>
+              <button key={i} disabled={submitting} onClick={() => pick(i)} className="rounded-xl border bg-card px-4 py-3 text-start text-sm font-medium transition-colors hover:border-ai hover:bg-ai-soft">{o}</button>
             ))}
           </div>
         </div>
@@ -87,9 +82,9 @@ export function HalftimeQuiz({ fixtureId }: { fixtureId: string }) {
             {quiz.questions.map((q, i) => {
               const ok = answers[i] === result.answer_key[i];
               return (
-                <div key={i} className="rounded-xl bg-secondary/60 p-3 text-sm">
+                <div key={i} className="rounded-xl bg-surface p-3 text-sm">
                   <p className="font-medium">{q.q}</p>
-                  <p className={cn("mt-1 flex items-center gap-1", ok ? "text-primary" : "text-destructive")}>
+                  <p className={cn("mt-1 flex items-center gap-1", ok ? "text-brand" : "text-destructive")}>
                     {ok ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}{q.options[result.answer_key[i]]}
                   </p>
                 </div>

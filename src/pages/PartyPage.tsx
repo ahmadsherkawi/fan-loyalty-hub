@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, Gift, MapPin, MessageCircle, Minus, Navigation, Plus, QrCode, Share2 } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Gift, MapPin, MessageCircle, Minus, Navigation, Plus, QrCode, Share2, Stamp, Tv } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
@@ -79,108 +80,132 @@ export default function PartyPage() {
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
 
+  const pct = cap ? Math.min(100, ((counts?.going ?? 0) / cap) * 100) : 0;
+  const share = async () => { const r = await shareOrCopy(shareText, url); if (r === "copied") toast.success(t("common.copied")); };
+
   return (
     <AppShell>
       <BackButton />
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {party.group && <Link to={`/g/${party.group.slug}`} className="text-sm font-semibold text-primary">{loc(party.group, "name", lang)}</Link>}
+        {party.group && <Link to={`/g/${party.group.slug}`} className="text-sm font-bold text-brand hover:underline">{loc(party.group, "name", lang)}</Link>}
         <DemoChip show={party.is_demo} />
       </div>
-      {party.title && f && party.title !== title && <h1 className="mb-3 text-2xl font-bold">{party.title}</h1>}
-      {f ? <FixtureScoreboard fixture={f} /> : <h1 className="text-2xl font-bold">{title}</h1>}
+      {party.title && f && party.title !== title && <h1 className="mb-4 text-[26px] font-extrabold leading-tight">{party.title}</h1>}
+      {f ? (
+        <FixtureScoreboard fixture={f} footer={
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1 truncate font-semibold">{venueName || t("party.venueTbc")}</span>
+            <span className="shrink-0 text-white/60">{formatDateTime(when, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        } />
+      ) : <h1 className="text-2xl font-extrabold">{title}</h1>}
 
-      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_20rem]">
-        <div className="space-y-4">
-          {/* RSVP */}
-          {!done && (
-            <div className="rounded-3xl border bg-card p-4">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="scoreboard text-3xl font-bold">{counts?.going ?? 0}{cap ? <span className="text-lg text-muted-foreground">/{cap}</span> : null}</p>
-                  <p className="text-xs text-muted-foreground">{t("party.goingCount")}{counts?.waitlist ? ` · ${t("party.waitlistCount", { n: counts.waitlist })}` : ""}</p>
-                </div>
-                {live && <p className="text-sm font-semibold text-primary">{t("party.checkedInLive", { n: counts?.checked_in ?? 0 })}</p>}
+      {/* Quick actions — always labelled */}
+      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+        <Button asChild variant="outline" size="sm"><a href={whatsappShare(`${shareText} ${url}`)} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></Button>
+        <Button variant="outline" size="sm" onClick={share}><Share2 />{t("common.share")}</Button>
+        <Button variant="outline" size="sm" onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
+      </div>
+
+      {/* RSVP — the one thing every visitor needs */}
+      {!done && (
+        <div className="card mt-4 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-baseline gap-1.5">
+              <span dir="ltr" className="flex items-baseline gap-1.5"><span className="scoreboard text-4xl font-bold leading-none">{counts?.going ?? 0}</span>
+              {cap ? <span className="scoreboard text-xl text-muted-foreground">/ {cap}</span> : null}</span>
+              <span className="ms-1 text-sm font-medium text-muted-foreground">{t("party.goingCount")}</span>
+            </div>
+            {goingProfiles && goingProfiles.length > 0 && (
+              <div className="flex -space-x-2 rtl:space-x-reverse">{goingProfiles.slice(0, 4).map((p) => <Initials key={p.user_id} name={p.full_name} />)}</div>
+            )}
+          </div>
+          {cap > 0 && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>}
+          {counts?.waitlist ? <p className="mt-2 text-xs text-muted-foreground">{t("party.waitlistCount", { n: counts.waitlist })}</p> : null}
+          {live && <p className="mt-2 text-sm font-semibold text-brand">{t("party.checkedInLive", { n: counts?.checked_in ?? 0 })}</p>}
+
+          {mine ? (
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-brand-soft px-4 py-3">
+              <p className="flex items-center gap-2 text-sm font-bold text-brand"><CheckCircle2 className="h-5 w-5" />{mine.status === "waitlist" ? t("party.onWaitlist") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
+              <button className="text-sm font-semibold text-muted-foreground hover:text-foreground" onClick={cancel}>{t("party.cancel")}</button>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-2">
+              <div className="flex h-11 items-center rounded-full border bg-card">
+                <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.max(0, guests - 1))} aria-label="-"><Minus className="h-4 w-4" /></button>
+                <span className="w-14 text-center text-xs font-semibold">{guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
+                <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.min(5, guests + 1))} aria-label="+"><Plus className="h-4 w-4" /></button>
               </div>
-              {cap > 0 && <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, ((counts?.going ?? 0) / cap) * 100)}%` }} /></div>}
-              {mine ? (
-                <div className="mt-4 flex items-center justify-between rounded-2xl bg-primary/10 p-3">
-                  <p className="text-sm font-semibold text-primary">{mine.status === "waitlist" ? t("party.onWaitlist") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
-                  <Button variant="ghost" size="sm" className="rounded-full" onClick={cancel}>{t("party.cancel")}</Button>
-                </div>
-              ) : (
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex items-center rounded-full border">
-                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setGuests(Math.max(0, guests - 1))} aria-label="-"><Minus className="h-4 w-4" /></Button>
-                    <span className="w-16 text-center text-xs">{guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
-                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setGuests(Math.min(5, guests + 1))} aria-label="+"><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  <Button className="flex-1 rounded-full" onClick={doRsvp} disabled={busy}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
-                </div>
-              )}
-              {myCheckin && <p className="mt-3 text-center text-sm font-semibold text-accent">{t("party.youCheckedIn")}</p>}
-              {user && !myCheckin && (live || mine) && (
-                <Button asChild variant="outline" className="mt-3 w-full rounded-full"><Link to="/checkin"><QrCode className="me-1.5 h-4 w-4" />{t("party.checkInHere")}</Link></Button>
-              )}
-              {goingProfiles && goingProfiles.length > 0 && (
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="flex -space-x-2 rtl:space-x-reverse">{goingProfiles.slice(0, 8).map((p) => <Initials key={p.user_id} name={p.full_name} />)}</div>
-                  {goingProfiles.length > 8 && <span className="text-xs text-muted-foreground">+{goingProfiles.length - 8}</span>}
-                </div>
-              )}
+              <Button className="flex-1" onClick={doRsvp} disabled={busy}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
             </div>
           )}
-
-          {/* Prediction */}
-          {f && !done && user && <PredictionInput fixture={f} />}
-
-          {/* AI & match-day features */}
-          {f && user && <PunditChat fixtureId={f.id} partyId={party.id} homeName={f.home_team_name} awayName={f.away_team_name} />}
-          {f && user && (live || done || party.is_demo) && <HalftimeQuiz fixtureId={f.id} />}
-          {user && (live || done || party.is_demo) && <MotmVote partyId={party.id} />}
-          {done && user && <RecapCard party={party} />}
-          {!user && (
-            <EmptyState title={t("party.signInFeatures")} body={t("party.signInFeaturesBody")} cta={{ to: `/auth?next=/party/${party.id}`, label: t("nav.signIn") }} />
+          {myCheckin && <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-gold-ink"><Stamp className="h-4 w-4" />{t("party.youCheckedIn")}</p>}
+          {user && !myCheckin && (live || mine) && (
+            <Button asChild variant="ink" className="mt-3 w-full"><Link to="/checkin"><QrCode />{t("party.checkInHere")}</Link></Button>
           )}
         </div>
+      )}
 
-        <aside className="space-y-4">
-          {party.venue && (
-            <div className="rounded-3xl border bg-card p-4">
-              <Link to={`/venues/${party.venue.id}`} className="font-semibold hover:text-primary">{venueName}</Link>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[party.venue.area, t(`city.${party.venue.city}` as never)].filter(Boolean).join(" · ")}</p>
+      <Tabs defaultValue="match" className="mt-6">
+        <TabsList className="w-full">
+          <TabsTrigger value="match">{t("party.tabMatch")}</TabsTrigger>
+          <TabsTrigger value="venue">{t("party.tabVenue")}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="host">{t("party.tabHost")}</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="match" className="space-y-3">
+          {!user ? (
+            <EmptyState title={t("party.signInFeatures")} body={t("party.signInFeaturesBody")} cta={{ to: `/auth?next=/party/${party.id}`, label: t("nav.signIn") }} />
+          ) : (
+            <>
+              {f && !done && <PredictionInput fixture={f} />}
+              {f && <PunditChat fixtureId={f.id} partyId={party.id} homeName={f.home_team_name} awayName={f.away_team_name} />}
+              {f && (live || done || party.is_demo) && <HalftimeQuiz fixtureId={f.id} />}
+              {(live || done || party.is_demo) && <MotmVote partyId={party.id} />}
+              {done && <RecapCard party={party} />}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="venue" className="space-y-3">
+          {party.venue ? (
+            <div className="card p-4">
+              <Link to={`/venues/${party.venue.id}`} className="text-lg font-bold hover:underline">{venueName}</Link>
+              <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{[party.venue.area, t(`city.${party.venue.city}` as never)].filter(Boolean).join(" · ")}</p>
               <div className="mt-3"><VenueFacts venue={party.venue} /></div>
               {party.venue.lat && party.venue.lng && (
-                <Button asChild variant="outline" size="sm" className="mt-3 w-full rounded-full">
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${party.venue.lat},${party.venue.lng}`} target="_blank" rel="noreferrer"><Navigation className="me-1.5 h-4 w-4" />{t("party.directions")}</a>
+                <Button asChild variant="outline" className="mt-4 w-full">
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${party.venue.lat},${party.venue.lng}`} target="_blank" rel="noreferrer"><Navigation />{t("party.directions")}</a>
                 </Button>
               )}
             </div>
+          ) : <EmptyState title={t("party.venueTbc")} />}
+          {loc(party, "notes", lang) && (
+            <div className="card p-4"><p className="eyebrow mb-1">{t("party.notes")}</p><p className="whitespace-pre-line text-sm">{loc(party, "notes", lang)}</p></div>
           )}
-          {loc(party, "notes", lang) && <div className="rounded-3xl border bg-card p-4 text-sm"><p className="whitespace-pre-line">{loc(party, "notes", lang)}</p></div>}
           {(offers ?? []).length > 0 && (
-            <div className="rounded-3xl border border-accent/30 bg-accent/5 p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-accent"><Gift className="h-4 w-4" />{t("party.perks")}</p>
+            <div className="rounded-2xl border border-gold/50 bg-gold-soft p-4">
+              <p className="flex items-center gap-2 text-sm font-bold text-gold-ink"><Gift className="h-4 w-4" />{t("party.perks")}</p>
               {offers!.map((o) => (
-                <div key={o.id} className="mt-2"><p className="text-sm font-medium">{loc(o, "title", lang)}</p><p className="text-xs text-muted-foreground">{loc(o, "details", lang)}</p></div>
+                <div key={o.id} className="mt-2"><p className="text-sm font-semibold">{loc(o, "title", lang)}</p><p className="text-xs text-muted-foreground">{loc(o, "details", lang)}</p></div>
               ))}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2">
-            <Button asChild variant="outline" className="rounded-full px-2"><a href={whatsappShare(`${shareText} ${url}`)} target="_blank" rel="noreferrer" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></a></Button>
-            <Button variant="outline" className="rounded-full px-2" aria-label={t("common.share")} onClick={async () => { const r = await shareOrCopy(shareText, url); if (r === "copied") toast.success(t("common.copied")); }}><Share2 className="h-4 w-4" /></Button>
-            <Button variant="outline" className="rounded-full px-2" aria-label={t("party.calendar")} onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus className="h-4 w-4" /></Button>
-          </div>
-          {isAdmin && (
-            <div className="rounded-3xl border bg-card p-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("party.checkinCode")}</p>
-              <p className="scoreboard mt-1 text-4xl font-bold tracking-[0.25em]" dir="ltr">{party.checkin_code}</p>
-              <div className="mx-auto mt-3 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={`${window.location.origin}/checkin/${party.checkin_code}`} size={168} /></div>
-              <p className="mt-2 text-xs text-muted-foreground">{t("party.showAtVenue")}</p>
-              <Button asChild variant="outline" size="sm" className="mt-3 rounded-full"><Link to={`/party/${party.id}/screen`}>{t("party.venueScreen")}</Link></Button>
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="host">
+            <div className="card p-5 text-center">
+              <p className="eyebrow">{t("party.checkinCode")}</p>
+              <p className="scoreboard mt-1 text-5xl font-bold tracking-[0.2em]" dir="ltr">{party.checkin_code}</p>
+              <div className="mx-auto mt-4 w-fit rounded-2xl border bg-white p-3"><QRCodeSVG value={`${window.location.origin}/checkin/${party.checkin_code}`} size={176} fgColor="#0B1220" /></div>
+              <p className="mt-3 text-sm text-muted-foreground">{t("party.showAtVenue")}</p>
+              <Button asChild variant="ink" className="mt-4"><Link to={`/party/${party.id}/screen`}><Tv />{t("party.venueScreen")}</Link></Button>
             </div>
-          )}
-        </aside>
-      </div>
+          </TabsContent>
+        )}
+      </Tabs>
     </AppShell>
   );
 }

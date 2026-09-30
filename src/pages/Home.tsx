@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { CalendarDays, Trophy, Tv, Users } from "lucide-react";
-import { AppShell } from "@/components/layout/AppShell";
+import { CalendarDays, ChevronRight, Trophy, Tv, Users } from "lucide-react";
+import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { TeamBadge } from "@/components/brand/TeamBadge";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { PartyCard } from "@/components/cards";
-import { CardSkeletons, Chip, EmptyState, Section } from "@/components/common/bits";
+import { CardSkeletons, Chip, EmptyState, Section, SeeAll } from "@/components/common/bits";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -43,87 +44,86 @@ function MatchDay() {
   const filtered = (upcoming ?? []).filter((p) => city === "all" || p.group?.city === city);
   const citiesWithParties = CITIES.filter((c) => (upcoming ?? []).some((p) => p.group?.city === c));
 
+  const heroParty = (nextParties ?? [])[0];
   return (
     <AppShell>
-      <div className="flex items-center gap-3">
-        {team && <TeamBadge shortName={team.short_name || "FC"} primary={team.primary_color} secondary={team.secondary_color} />}
-        <div>
-          <p className="text-sm text-muted-foreground">{formatDateTime(new Date(), { weekday: "long", day: "numeric", month: "long" })}</p>
-          <h1 className="text-2xl font-bold md:text-3xl">{t("home.welcome")}{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
-        </div>
-      </div>
+      <PageTitle eyebrow={formatDateTime(new Date(), { weekday: "long", day: "numeric", month: "long" })}
+        title={<>{t("home.welcome")}{profile?.full_name ? <>{lang === "ar" ? "، " : ", "}<span className="text-brand">{profile.full_name.split(" ")[0]}</span></> : ""}</>} />
 
       {profile?.favorite_team_id && (
-        <Section title={t("home.nextUp")} icon={<CalendarDays className="h-5 w-5 text-accent" />}>
+        <section>
           {nextLoading ? <CardSkeletons n={1} /> : next ? (
-            <div className="space-y-3">
-              <FixtureScoreboard fixture={next} />
-              {(nextParties ?? []).length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-2">{nextParties!.map((p) => <PartyCard key={p.id} party={p} />)}</div>
-              ) : (
-                <p className="rounded-2xl border border-dashed p-4 text-center text-sm text-muted-foreground">{t("home.noPartyYet")}</p>
-              )}
-            </div>
-          ) : <p className="text-sm text-muted-foreground">{t("home.noFixture")}</p>}
-        </Section>
+            <FixtureScoreboard fixture={next} footer={heroParty ? (
+              <Link to={`/party/${heroParty.id}`} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-white/60">{t("home.watchWith", { group: loc(heroParty.group, "name", lang) })}</p>
+                  <p className="truncate text-sm font-semibold">{loc(heroParty.venue, "name", lang)}</p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground">{t("home.openParty")}<ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" /></span>
+              </Link>
+            ) : <p className="text-center text-xs text-white/70">{t("home.noPartyYet")}</p>} />
+          ) : <EmptyState icon={<CalendarDays className="h-5 w-5" />} title={t("home.noFixture")} />}
+          {(nextParties ?? []).length > 1 && (
+            <div className="mt-3 grid gap-3">{nextParties!.slice(1).map((p) => <PartyCard key={p.id} party={p} />)}</div>
+          )}
+        </section>
       )}
 
-      <Section title={t("home.yourGroups")} icon={<Users className="h-5 w-5 text-primary" />}
-        action={<Link to="/groups" className="text-sm font-medium text-primary">{t("common.seeAll")}</Link>}>
+      <Section title={t("home.yourGroups")} action={(memberships ?? []).length > 0 ? <SeeAll to="/groups" label={t("common.seeAll")} /> : undefined}>
         {(memberships ?? []).length === 0 ? (
           <EmptyState icon={<Users className="h-5 w-5" />} title={t("home.noGroupsTitle")}
             body={team ? t("home.noGroupsBodyTeam", { team: loc(team, "name", lang) }) : t("home.noGroupsBody")}
             cta={{ to: "/groups", label: t("home.findGroup") }} />
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {memberships!.map((m) => m.group && (
-              <div key={m.id} className="rounded-2xl border bg-card p-4">
-                <Link to={`/g/${m.group.slug}`} className="flex items-center gap-3">
-                  <TeamBadge size="sm" shortName={m.group.team?.short_name || "FC"} primary={m.group.team?.primary_color} secondary={m.group.team?.secondary_color} />
-                  <span className="font-semibold">{loc(m.group, "name", lang)}</span>
-                  {m.role !== "member" && <span className="ms-auto rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{t(`role.${m.role}` as never)}</span>}
+          <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+            {memberships!.map((m) => {
+              if (!m.group) return null;
+              const np = nextByGroup.get(m.group_id);
+              return (
+                <Link key={m.id} to={`/g/${m.group.slug}`} className="card card-hover w-60 shrink-0 snap-start p-4">
+                  <div className="flex items-center gap-3">
+                    <TeamBadge size="sm" shortName={m.group.team?.short_name || "FC"} primary={m.group.team?.primary_color} secondary={m.group.team?.secondary_color} />
+                    <span className="min-w-0 flex-1 truncate font-bold">{loc(m.group, "name", lang)}</span>
+                  </div>
+                  <div className="mt-3 rounded-xl bg-surface px-3 py-2">
+                    <p className="eyebrow">{t("home.nextParty")}</p>
+                    <p className="mt-0.5 truncate text-sm font-semibold">{np ? formatDateTime(partyTime(np), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : <span className="font-medium text-muted-foreground">{t("home.noUpcoming")}</span>}</p>
+                  </div>
+                  {m.role !== "member" && <p className="mt-2 text-xs font-semibold text-gold-ink">{t(`role.${m.role}` as never)}</p>}
                 </Link>
-                {nextByGroup.get(m.group_id) ? (
-                  <Link to={`/party/${nextByGroup.get(m.group_id)!.id}`} className="mt-3 block rounded-xl bg-secondary/60 p-3 text-sm">
-                    <span className="text-muted-foreground">{t("home.nextParty")}: </span>
-                    <span className="font-medium">{nextByGroup.get(m.group_id)!.fixture ? `${nextByGroup.get(m.group_id)!.fixture!.home_team_name} v ${nextByGroup.get(m.group_id)!.fixture!.away_team_name}` : nextByGroup.get(m.group_id)!.title}</span>
-                    <span className="block text-xs text-muted-foreground">{formatDateTime(partyTime(nextByGroup.get(m.group_id)!))}</span>
-                  </Link>
-                ) : <p className="mt-3 text-xs text-muted-foreground">{t("home.noUpcoming")}</p>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Section>
 
-      <Section title={t("home.thisWeek")} icon={<Tv className="h-5 w-5 text-accent" />}>
+      <Section title={t("home.thisWeek")}>
         {citiesWithParties.length > 1 && (
-          <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
             <Chip active={city === "all"} onClick={() => setCity("all")}>{t("common.all")}</Chip>
             {citiesWithParties.map((c) => <Chip key={c} active={city === c} onClick={() => setCity(c)}>{t(`city.${c}` as never)}</Chip>)}
           </div>
         )}
         {upLoading ? <CardSkeletons /> : filtered.length ? (
-          <div className="grid gap-3 md:grid-cols-2">{filtered.slice(0, 12).map((p) => <PartyCard key={p.id} party={p} />)}</div>
+          <div className="grid gap-3">{filtered.slice(0, 6).map((p) => <PartyCard key={p.id} party={p} />)}</div>
         ) : <EmptyState icon={<Tv className="h-5 w-5" />} title={t("home.tonightEmpty")} />}
-        <p className="mt-2 text-xs text-muted-foreground">{t("home.localTime")}</p>
       </Section>
 
       {(cityBoard ?? []).length > 0 && (
-        <Section title={t("home.cityLeague", { city: t(`city.${myCity}` as never) })} icon={<Trophy className="h-5 w-5 text-accent" />}>
-          <div className="overflow-hidden rounded-2xl border bg-card">
+        <Section title={t("home.cityLeague", { city: t(`city.${myCity}` as never) })} icon={<Trophy className="h-5 w-5 text-gold-ink" />}>
+          <div className="card overflow-hidden">
             {cityBoard!.slice(0, 5).map((g, i) => (
-              <div key={g.group_id} className="flex items-center gap-3 border-b px-4 py-3 last:border-0">
-                <span className="scoreboard w-5 text-center font-bold text-muted-foreground">{i + 1}</span>
+              <Link to={`/groups`} key={g.group_id} className={cn("flex items-center gap-3 border-b px-4 py-3 last:border-0", myGroupIds.has(g.group_id) && "bg-brand-soft")}>
+                <span className={cn("scoreboard flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold", i === 0 ? "bg-gold text-accent-foreground" : "text-muted-foreground")}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{(lang === "ar" && g.name_ar) || g.name}</p>
+                  <p className="truncate font-semibold">{(lang === "ar" && g.name_ar) || g.name}</p>
                   <p className="text-xs text-muted-foreground">{g.team_name} · {t("home.members", { n: g.members })}</p>
                 </div>
-                <div className="text-end text-xs"><p className="scoreboard text-base font-bold">{g.caps}</p><p className="text-muted-foreground">{t("league.caps")}</p></div>
-                <div className="w-14 text-end text-xs"><p className="scoreboard text-base font-bold">{Number(g.avg_prediction_points).toFixed(1)}</p><p className="text-muted-foreground">{t("home.avgPts")}</p></div>
-              </div>
+                <div className="text-end"><p className="scoreboard text-xl font-bold leading-none">{g.caps}</p><p className="text-[10px] font-semibold text-muted-foreground">{t("league.caps")}</p></div>
+              </Link>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">{t("home.leagueHint")}</p>
         </Section>
       )}
     </AppShell>

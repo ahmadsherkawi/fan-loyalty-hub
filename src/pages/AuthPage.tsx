@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
-import { Wordmark } from "@/components/brand/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,9 +55,9 @@ export default function AuthPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto mt-4 max-w-sm rounded-3xl border bg-card bg-pitch-lines p-6">
-        <div className="mb-6 flex justify-center"><Wordmark /></div>
-        <h1 className="mb-6 text-center text-2xl font-bold">{mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</h1>
+      <div className="mx-auto mt-2 max-w-sm">
+        <h1 className="text-[28px] font-extrabold leading-tight">{mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</h1>
+        <p className="mb-6 mt-1.5 text-sm text-muted-foreground">{t("auth.sub")}</p>
         <Button type="button" variant="outline" className="w-full rounded-full" onClick={google}>{t("auth.google")}</Button>
         <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.or")}<span className="h-px flex-1 bg-border" /></div>
         <form onSubmit={submit} className="space-y-3">
@@ -67,9 +66,9 @@ export default function AuthPage() {
           )}
           <div className="space-y-1.5"><Label htmlFor="em">{t("auth.email")}</Label><Input id="em" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
           <div className="space-y-1.5"><Label htmlFor="pw">{t("auth.password")}</Label><Input id="pw" type="password" dir="ltr" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-          <Button type="submit" className="w-full rounded-full" disabled={busy}>{busy ? t("common.loading") : mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</Button>
+          <Button type="submit" size="lg" className="w-full" disabled={busy}>{busy ? t("common.loading") : mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</Button>
         </form>
-        <button className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
+        <button className="mt-5 w-full text-center text-sm font-semibold text-brand hover:underline" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
           {mode === "signup" ? t("auth.haveAccount") : t("auth.noAccount")}
         </button>
       </div>

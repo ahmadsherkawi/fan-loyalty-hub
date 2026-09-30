@@ -1,90 +1,99 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+/* Self-hosted fonts (work offline and in every preview) */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter-tight";
+@import "@fontsource/barlow-condensed/600.css";
+@import "@fontsource/barlow-condensed/700.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-500.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Jamhoor design tokens — "Floodlight White"
+  Ink  #0B1220  text, dark surfaces
+  Pitch green #00C566  primary actions (always with ink text)
+  Brand ink green #067A3C  green text/icons on white (5.4:1)
+  Gold #FFC53D  rewards only (caps, badges, perks) · gold ink #8A5A00 for text
+  Violet #5B3DF5  AI features only
+  Live red #D92D20
+  All text pairs are checked to WCAG AA (4.5:1) or better.
+*/
 @layer base {
-  /* Light (daytime pitch) */
   :root {
-    --background: 90 14% 96%;
-    --surface: 0 0% 100%;
-    --foreground: 150 20% 7%;
+    --background: 0 0% 100%;
+    --surface: 210 20% 97%;
+    --foreground: 220 49% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 150 20% 7%;
+    --card-foreground: 220 49% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 150 20% 7%;
-    --primary: 145 72% 34%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 140 12% 90%;
-    --secondary-foreground: 150 20% 10%;
-    --muted: 140 10% 91%;
-    --muted-foreground: 145 6% 38%;
-    --accent: 43 98% 46%;
-    --accent-foreground: 150 30% 6%;
-    --destructive: 0 72% 50%;
+    --popover-foreground: 220 49% 8%;
+    --primary: 150 100% 39%;
+    --primary-foreground: 220 49% 8%;
+    --brand: 148 90% 25%;
+    --brand-soft: 142 55% 94%;
+    --secondary: 210 20% 95%;
+    --secondary-foreground: 220 49% 8%;
+    --muted: 210 20% 95%;
+    --muted-foreground: 218 13% 41%;
+    --accent: 42 100% 62%;
+    --accent-foreground: 220 49% 8%;
+    --gold-ink: 39 100% 27%;
+    --gold-soft: 45 100% 93%;
+    --ai: 249 90% 60%;
+    --ai-soft: 254 100% 96%;
+    --live: 4 74% 49%;
+    --destructive: 4 74% 49%;
     --destructive-foreground: 0 0% 100%;
-    --border: 140 10% 86%;
-    --input: 140 10% 86%;
-    --ring: 145 72% 34%;
+    --border: 214 22% 91%;
+    --input: 214 20% 86%;
+    --ring: 150 100% 39%;
     --radius: 1rem;
-    --chalk: 150 20% 7% / 0.06;
-    --glow: 43 98% 50% / 0.12;
-  }
-
-  /* Dark — stadium at night (default) */
-  .dark {
-    --background: 150 20% 5%;
-    --surface: 150 18% 9%;
-    --foreground: 100 10% 95%;
-    --card: 150 18% 9%;
-    --card-foreground: 100 10% 95%;
-    --popover: 150 18% 9%;
-    --popover-foreground: 100 10% 95%;
-    --primary: 145 72% 42%;
-    --primary-foreground: 150 30% 5%;
-    --secondary: 150 14% 14%;
-    --secondary-foreground: 100 10% 95%;
-    --muted: 150 12% 13%;
-    --muted-foreground: 145 5% 57%;
-    --accent: 43 98% 48%;
-    --accent-foreground: 150 30% 5%;
-    --destructive: 0 70% 52%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 150 12% 16%;
-    --input: 150 12% 18%;
-    --ring: 145 72% 42%;
-    --chalk: 100 10% 95% / 0.05;
-    --glow: 43 98% 50% / 0.14;
   }
 
   * { @apply border-border; }
   html, body { overflow-x: clip; }
-  body { @apply bg-background text-foreground font-sans antialiased; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-feature-settings: "cv11", "ss01"; }
   h1, h2, h3, h4 { @apply font-display tracking-tight; }
-  html[lang="ar"] body, html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4 {
+  html[lang="ar"] body, html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, html[lang="ar"] .font-display {
     font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
     letter-spacing: 0;
   }
+  ::selection { background: hsl(var(--primary) / 0.3); }
+}
+
+@layer components {
+  /* The one card style used everywhere */
+  .card { @apply rounded-2xl border bg-card shadow-card; }
+  .card-hover { @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift; }
+  /* Small uppercase label above a section or number */
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground; }
+  html[lang="ar"] .eyebrow { @apply normal-case tracking-normal text-xs; }
 }
 
 @layer utilities {
-  /* Floodlight glow from the top corners */
-  .bg-floodlight {
+  /* Scoreboard numerals: condensed, tabular, sporty */
+  .scoreboard { font-family: "Barlow Condensed", "Inter Tight Variable", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  /* Dark "stadium" surface for the hero match card */
+  .bg-stadium {
+    background-color: hsl(var(--foreground));
     background-image:
-      radial-gradient(60% 40% at 15% -5%, hsl(var(--glow)), transparent 70%),
-      radial-gradient(60% 40% at 85% -5%, hsl(var(--glow)), transparent 70%);
+      radial-gradient(90% 70% at 50% -10%, hsl(var(--primary) / 0.28), transparent 60%),
+      linear-gradient(90deg, transparent calc(50% - 0.5px), rgb(255 255 255 / 0.06) calc(50% - 0.5px), rgb(255 255 255 / 0.06) calc(50% + 0.5px), transparent calc(50% + 0.5px));
   }
-  /* Chalk pitch lines: halfway line + centre circle */
-  .bg-pitch-lines {
+  /* Faint pitch grid for light hero areas */
+  .bg-grid {
     background-image:
-      radial-gradient(circle at 50% 50%, transparent 79px, hsl(var(--chalk)) 80px, hsl(var(--chalk)) 81px, transparent 82px),
-      linear-gradient(90deg, transparent calc(50% - 0.5px), hsl(var(--chalk)) calc(50% - 0.5px), hsl(var(--chalk)) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+      linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
-  .bg-pitch-stripes {
-    background-image: repeating-linear-gradient(90deg, hsl(var(--chalk)) 0 48px, transparent 48px 96px);
-  }
-  .scoreboard { font-family: "Space Grotesk", monospace; font-variant-numeric: tabular-nums; }
-  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem); }
-  @media (min-width: 768px) { .pb-safe { padding-bottom: 2rem; } }
+  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 6rem); }
+  @media (min-width: 768px) { .pb-safe { padding-bottom: 3rem; } }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
 }
