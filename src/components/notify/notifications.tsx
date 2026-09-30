@@ -30,6 +30,9 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   table_declined: { icon: <Utensils />, tone: "neutral" },
   table_cancelled: { icon: <Utensils />, tone: "neutral" },
   booking_withdrawn: { icon: <CalendarX2 />, tone: "neutral" },
+  screening_request: { icon: <Tv />, tone: "neutral" },
+  screening_accepted: { icon: <Tv />, tone: "brand" },
+  screening_declined: { icon: <Tv />, tone: "neutral" },
   venue_message: { icon: <MessageCircle />, tone: "neutral" },
   venue_reply: { icon: <MessageCircle />, tone: "brand" },
   party_rsvps: { icon: <Ticket />, tone: "brand" },
@@ -67,7 +70,7 @@ export function useNotificationText() {
       latest: String(d.latest ?? ""), seats: String(d.seats ?? 0), n: String(d.new_count ?? 1), reservations: String(d.reservations ?? 0),
       caps: String(d.caps ?? d.min_caps ?? ""), area: String(d.area ?? ""), note: String(d.note ?? ""),
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
-      size: String(d.size ?? ""), fan: String(d.fan ?? ""), reply: d.reply ? `· “${d.reply}”` : "",
+      size: String(d.size ?? ""), fan: String(d.fan ?? ""), count: String(d.count ?? 1), tv: pick("broadcaster"), reply: d.reply ? `· “${d.reply}”` : "",
     };
     const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle" : n.kind;
     const title = t(`notif.${k}.t` as TKey, vars);

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Check, CheckCircle2, ChevronDown, Clock, Gift, MapPin, Monitor, Plus, ScanLine, Trash2, Users, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, Clock, Gift, MapPin, Megaphone, Monitor, Plus, ScanLine, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, FeatureHeader } from "@/components/common/bits";
 import { GuestList } from "@/components/GuestList";
 import { TableRequests } from "@/components/venue/TableRequests";
+import { ScreeningRequests, useScreeningAsks } from "@/components/venue/ScreeningRequests";
 import { Inbox } from "@/components/venue/Inbox";
 import { ScreeningsEditor } from "@/components/venue/ScreeningsEditor";
 import { MenuEditor } from "@/components/venue/MenuEditor";
@@ -61,6 +62,7 @@ export default function VenueDashboard() {
     enabled: allowed,
     queryFn: async () => (await supabase.from("venue_pro_requests").select("id").eq("venue_id", id!).eq("status", "new").limit(1)).data ?? [],
   });
+  const { data: asks } = useScreeningAsks(id!, allowed);
   const unreadMsgs = (inbox ?? []).reduce((s, r) => s + (r.venue_unread ?? 0), 0);
 
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
@@ -106,7 +108,7 @@ export default function VenueDashboard() {
 
       <Tabs value={tab} onValueChange={(v) => { const n = new URLSearchParams(params); n.set("tab", v); n.delete("thread"); setParams(n, { replace: true }); }} className="mt-6">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="bookings" className="flex-none">{t("vdash.tabBookings")}{pending.length ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{pending.length}</span> : null}</TabsTrigger>
+          <TabsTrigger value="bookings" className="flex-none">{t("vdash.tabBookings")}{pending.length + (asks?.length ?? 0) ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{pending.length + (asks?.length ?? 0)}</span> : null}</TabsTrigger>
           <TabsTrigger value="inbox" className="flex-none">{t("vdash.tabInbox")}{unreadMsgs ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{unreadMsgs}</span> : null}</TabsTrigger>
           <TabsTrigger value="showing" className="flex-none">{t("vdash.tabShowing")}</TabsTrigger>
           <TabsTrigger value="menu" className="flex-none">{t("vdash.tabMenu")}</TabsTrigger>
@@ -122,6 +124,13 @@ export default function VenueDashboard() {
                 {pending.length ? <div className="space-y-3">{pending.map((b) => <RequestCard key={`${b.id}-${b.capacity}`} b={b} venueId={id!} located={venue!.lat != null && venue!.lng != null} />)}</div>
                   : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("vdash.noRequests")}</p>}
               </section>
+              {(asks ?? []).length > 0 && (
+                <section>
+                  <h2 className="mb-1 flex items-center gap-2 text-lg font-bold"><Megaphone className="h-5 w-5" />{t("askv.venueTitle")}</h2>
+                  <p className="mb-3 text-sm text-muted-foreground">{t("askv.venueSub")}</p>
+                  <ScreeningRequests venueId={id!} />
+                </section>
+              )}
               <section>
                 <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><CheckCircle2 className="h-5 w-5 text-brand" />{t("vdash.upcomingNights")}</h2>
                 {upcoming.length ? <div className="space-y-3">{upcoming.map((b) => <NightCard key={b.id} b={b} defaultOpen={focus === b.id} />)}</div>

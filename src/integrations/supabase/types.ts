@@ -75,6 +75,9 @@ export type Database = {
         [FK<"rsvps_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
       sync_state: Table<{ key: string; updated_at: string | null; value: Json }, "key" | "value">;
       teams: Table<{ country: string | null; created_at: string | null; football_data_id: number | null; id: string; league: string | null; name: string; name_ar: string | null; primary_color: string | null; secondary_color: string | null; short_name: string | null }, "name">;
+      competition_broadcasters: Table<{ competition_code: string; broadcaster: string; broadcaster_ar: string; free_to_air: boolean; updated_at: string | null }, "competition_code" | "broadcaster" | "broadcaster_ar">;
+      screening_requests: Table<{ id: string; venue_id: string; fixture_id: string; user_id: string; status: string; created_at: string; responded_at: string | null }, "venue_id" | "fixture_id" | "user_id",
+        [FK<"screening_requests_venue_id_fkey", "venue_id", "venues">, FK<"screening_requests_fixture_id_fkey", "fixture_id", "fixtures">]>;
       user_badges: Table<{ badge_key: string; earned_at: string | null; id: string; user_id: string }, "badge_key" | "user_id">;
       venue_offers: Table<{ active: boolean; created_at: string | null; details: string | null; details_ar: string | null; id: string; members_only: boolean; min_caps: number; repeatable: boolean; title: string; title_ar: string | null; venue_id: string },
         "title" | "venue_id",
@@ -116,6 +119,9 @@ export type Database = {
       mark_thread_read: { Args: { p_thread: string }; Returns: undefined };
       venue_inbox: { Args: { p_venue: string }; Returns: Json };
       venue_tables: { Args: { p_venue: string }; Returns: Json };
+      request_screening: { Args: { p_venue: string; p_fixture: string }; Returns: Json };
+      respond_screening: { Args: { p_venue: string; p_fixture: string; p_decision: string }; Returns: Json };
+      venue_screening_requests: { Args: { p_venue: string }; Returns: Json };
       post_to_party: { Args: { p_party: string; p_body?: string | null; p_photo_path?: string | null }; Returns: Json };
       hide_post: { Args: { p_post: string }; Returns: undefined };
       party_wall: { Args: { p_party: string }; Returns: Json };

@@ -1,12 +1,13 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Store, Volume2, VolumeX } from "lucide-react";
+import { ChevronRight, MapPin, Store, Volume2, VolumeX } from "lucide-react";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { PartyCard } from "@/components/cards";
 import { CardSkeletons, EmptyState, Section } from "@/components/common/bits";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { PredictionInput } from "@/components/match/PredictionInput";
 import { RequestTable } from "@/components/venue/RequestTable";
+import { AskVenueToShow, BroadcasterLine } from "@/components/match/AskVenue";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -37,6 +38,7 @@ export default function MatchPage() {
     <AppShell>
       <BackButton />
       <FixtureScoreboard fixture={fixture} />
+      {!isFinished(fixture.status) && <BroadcasterLine code={fixture.competition_code} className="mt-3 px-1" />}
       {user && !isFinished(fixture.status) && <div className="mt-4"><PredictionInput fixture={fixture} /></div>}
 
       <Section title={t("match.parties")}>
@@ -58,7 +60,8 @@ export default function MatchPage() {
             ))}
           </div>
         ) : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("match.noVenues")}</p>}
-        <Link to="/venues" className="mt-3 inline-block text-sm font-bold text-brand hover:underline">{t("match.allVenues")} →</Link>
+        <Link to="/venues" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand hover:underline">{t("match.allVenues")}<ChevronRight className="h-4 w-4 rtl:rotate-180" /></Link>
+        <div className="mt-4"><AskVenueToShow fixture={fixture} showingIds={new Set((showing ?? []).map((s) => s.venue?.id).filter(Boolean))} /></div>
       </Section>
     </AppShell>
   );
