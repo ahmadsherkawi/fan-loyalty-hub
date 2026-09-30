@@ -60,7 +60,7 @@ export type Database = {
         "away_score" | "fixture_id" | "home_score" | "user_id",
         [FK<"predictions_fixture_id_fkey", "fixture_id", "fixtures">]>;
       profile_private: Table<{ address: string | null; date_of_birth: string | null; email: string | null; phone: string | null; updated_at: string | null; user_id: string }, "user_id">;
-      profiles: Table<{ avatar_url: string | null; bio: string | null; city: string | null; country: string | null; created_at: string | null; favorite_team_id: string | null; full_name: string | null; id: string; notifications_enabled: boolean | null; onboarding_completed: boolean | null; onboarding_completed_at: string | null; onboarding_step: string | null; preferred_language: string | null; role: string; updated_at: string | null; user_id: string; username: string | null },
+      profiles: Table<{ avatar_url: string | null; bio: string | null; city: string | null; country: string | null; created_at: string | null; favorite_team_id: string | null; full_name: string | null; id: string; notifications_enabled: boolean | null; onboarding_completed: boolean | null; onboarding_completed_at: string | null; onboarding_step: string | null; preferred_language: string | null; role: string; updated_at: string | null; user_id: string; username: string | null; account_type: string },
         "user_id",
         [FK<"profiles_favorite_team_id_fkey", "favorite_team_id", "teams">]>;
       quiz_answers: Table<{ answers: Json; created_at: string | null; id: string; quiz_id: string; score: number; user_id: string },

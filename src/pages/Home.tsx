@@ -15,11 +15,14 @@ import {
   CITIES, loc, partyTime, useMyRewards, useMyVenues, useCityLeaderboard, useMyMemberships, useNextTeamFixture, usePartiesForFixture, useTeams, useUpcomingParties,
 } from "@/lib/data";
 import Landing from "./Landing";
+import { useAccount } from "@/lib/access";
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
-  if (loading) return null;
+  const acct = useAccount();
+  if (loading || (user && !acct.ready)) return null;
   if (!user) return <Landing />;
+  if (acct.isVenue) return acct.ready ? <Navigate to={acct.venueHome} replace /> : null;
   if (profile && !profile.onboarding_completed) return <Navigate to="/onboarding" replace />;
   return <MatchDay />;
 }
@@ -139,31 +142,11 @@ function MatchDay() {
 function ForYou() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
-  const { data: venues } = useMyVenues(user?.id);
   const { data: rewards } = useMyRewards(!!user);
-  const venue = venues?.[0];
-  const { data: stats } = useQuery({
-    queryKey: ["venue-stats", venue?.id],
-    enabled: !!venue,
-    queryFn: async () => (await supabase.rpc("venue_stats", { p_venue: venue!.id })).data as unknown as { pending_requests: number; upcoming_seats: number },
-  });
   const ready = (rewards ?? []).filter((r) => r.unlocked && r.min_caps > 0 && !(r.last?.status === "redeemed" && !r.repeatable));
-  if (!venue && !ready.length) return null;
+  if (!ready.length) return null;
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
-      {venue && (
-        <Link to={`/venue-dashboard/${venue.id}`} className="card card-hover flex items-center gap-3 p-4">
-          <IconDot><Store /></IconDot>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-bold">{loc(venue, "name", lang)}</p>
-            <p className="text-sm text-muted-foreground">
-              {stats?.pending_requests ? <span className="font-semibold text-live">{t("home.venueRequests", { n: stats.pending_requests })}</span> : t("home.venueNoRequests")}
-              {stats ? ` · ${t("home.venueSeats", { n: stats.upcoming_seats })}` : ""}
-            </p>
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground rtl:rotate-180" />
-        </Link>
-      )}
       {ready.length > 0 && (
         <Link to="/passport#rewards" className="card card-hover flex items-center gap-3 border-gold/60 bg-gold-soft p-4">
           <IconDot tone="gold" className="bg-gold text-accent-foreground"><Gift /></IconDot>

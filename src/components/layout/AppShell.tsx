@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, Home, QrCode, Tv, Users } from "lucide-react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, BookOpen, CalendarCheck2, Home, MessageCircle, QrCode, ScanLine, Store, Tv, Users, UtensilsCrossed } from "lucide-react";
+import { useAccount } from "@/lib/access";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Initials } from "@/components/common/bits";
 import { NotificationBell } from "@/components/notify/notifications";
@@ -37,15 +38,40 @@ export function LanguageToggle({ className }: { className?: string }) {
   );
 }
 
+/** Venue accounts get their own menu: everything points into the venue dashboard. */
+const VENUE_NAV: { tab: string; key: TKey; icon: typeof Home }[] = [
+  { tab: "bookings", key: "vnav.bookings", icon: CalendarCheck2 },
+  { tab: "inbox", key: "vnav.messages", icon: MessageCircle },
+  { tab: "rewards", key: "vnav.redeem", icon: ScanLine },
+  { tab: "menu", key: "vnav.menu", icon: UtensilsCrossed },
+  { tab: "venue", key: "vnav.venue", icon: Store },
+];
+function useVenueTab() {
+  const loc = useLocation();
+  if (!loc.pathname.startsWith("/venue-dashboard")) return loc.pathname === "/profile" ? "venue" : "";
+  return new URLSearchParams(loc.search).get("tab") ?? "bookings";
+}
+
 export function Header() {
   const { t } = useI18n();
   const { user, profile } = useAuth();
+  const acct = useAccount();
+  const vtab = useVenueTab();
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
       <TestModeBar />
       <div className="container flex h-14 items-center gap-3 md:h-16">
-        <Link to="/" aria-label="Jamhoor" className="min-w-0 shrink"><Wordmark /></Link>
-        {user && (
+        <Link to={acct.isVenue ? acct.venueHome : "/"} aria-label="Jamhoor" className="min-w-0 shrink"><Wordmark /></Link>
+        {acct.isVenue && (
+          <nav className="ms-6 hidden items-center gap-1 md:flex">
+            {VENUE_NAV.map(({ tab, key }) => (
+              <Link key={tab} to={tab === "venue" ? "/profile" : `${acct.venueHome}?tab=${tab}`} className={cn("rounded-full px-3.5 py-2 text-sm font-semibold transition-colors", vtab === tab ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                {t(key)}
+              </Link>
+            ))}
+          </nav>
+        )}
+        {user && !acct.isVenue && (
           <nav className="ms-6 hidden items-center gap-1 md:flex">
             {ALL.map(({ to, key }) => (
               <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => cn("rounded-full px-3.5 py-2 text-sm font-semibold transition-colors", isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
@@ -103,13 +129,42 @@ function BottomNav() {
   );
 }
 
+function VenueBottomNav() {
+  const { t } = useI18n();
+  const acct = useAccount();
+  const vtab = useVenueTab();
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-nav backdrop-blur-xl md:hidden">
+      <div className="grid grid-cols-5 items-end">
+        {VENUE_NAV.map(({ tab, key, icon: Icon }) => {
+          const active = vtab === tab;
+          const to = tab === "venue" ? "/profile" : `${acct.venueHome}?tab=${tab}`;
+          if (tab === "rewards") return (
+            <Link key={tab} to={to} className="flex flex-col items-center gap-1 pb-2 text-[11px] font-semibold text-foreground">
+              <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift ring-4 ring-background"><Icon className="h-6 w-6" strokeWidth={2.4} /></span>
+              {t(key)}
+            </Link>
+          );
+          return (
+            <Link key={tab} to={to} className={cn("flex flex-col items-center gap-1 pb-2 pt-2.5 text-[11px] font-semibold", active ? "text-foreground" : "text-muted-foreground")}>
+              <span className={cn("flex h-7 w-12 items-center justify-center rounded-full", active && "bg-brand-soft text-brand")}><Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} /></span>
+              {t(key)}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export function AppShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const { user } = useAuth();
+  const acct = useAccount();
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className={cn("container py-5 md:py-8", !wide && "max-w-3xl", user && "pb-safe")}>{children}</main>
-      {user && <BottomNav />}
+      {user && (acct.isVenue ? <VenueBottomNav /> : <BottomNav />)}
     </div>
   );
 }

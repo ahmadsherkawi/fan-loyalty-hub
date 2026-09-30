@@ -31,7 +31,8 @@ type VStats = {
 
 export default function VenueDashboard() {
   const { id } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "tables" ? "bookings" : params.get("tab") ?? "bookings";
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { data: venue, isLoading } = useQuery({
@@ -71,11 +72,10 @@ export default function VenueDashboard() {
 
   return (
     <AppShell>
-      <BackButton />
-      <PageTitle eyebrow={<Link to={`/venues/${venue!.id}`} className="text-brand">{loc(venue, "name", lang)}</Link>} title={t("page.venueDashboard")} />
+      <PageTitle eyebrow={loc(venue, "name", lang)} title={t("page.venueDashboard")} />
       <div className="-mt-2 mb-5 flex flex-wrap gap-2">
         <VenueSettings venue={venue!} />
-        <Button asChild variant="outline" size="sm"><Link to={`/venues/${venue!.id}`}>{t("vdash.viewPublic")}</Link></Button>
+        <Button asChild variant="outline" size="sm"><Link to={`/venues/${venue!.id}?preview=1`}>{t("vdash.viewPublic")}</Link></Button>
         <ProDialog venue={venue!} requested={(proReq ?? []).length > 0} onRequested={() => refetchPro()} />
       </div>
 
@@ -93,7 +93,7 @@ export default function VenueDashboard() {
         ))}
       </div>
 
-      <Tabs defaultValue={params.get("tab") === "inbox" ? "inbox" : "bookings"} className="mt-6">
+      <Tabs value={tab} onValueChange={(v) => { const n = new URLSearchParams(params); n.set("tab", v); n.delete("thread"); setParams(n, { replace: true }); }} className="mt-6">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="bookings" className="flex-none">{t("vdash.tabBookings")}{pending.length ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{pending.length}</span> : null}</TabsTrigger>
           <TabsTrigger value="inbox" className="flex-none">{t("vdash.tabInbox")}{unreadMsgs ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{unreadMsgs}</span> : null}</TabsTrigger>

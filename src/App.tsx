@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { FanOnly, VenueOnly } from "@/lib/access";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import Onboarding from "./pages/Onboarding";
@@ -41,20 +42,20 @@ const App = () => (
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/groups" element={<GroupsPage />} />
-                <Route path="/g/:slug" element={<GroupPage />} />
-                <Route path="/party/:id" element={<PartyPage />} />
+                <Route path="/groups" element={<FanOnly><GroupsPage /></FanOnly>} />
+                <Route path="/g/:slug" element={<FanOnly><GroupPage /></FanOnly>} />
+                <Route path="/party/:id" element={<FanOnly><PartyPage /></FanOnly>} />
                 <Route path="/party/:id/screen" element={<VenueScreen />} />
-                <Route path="/checkin" element={<CheckinPage />} />
-                <Route path="/checkin/:code" element={<CheckinPage />} />
-                <Route path="/predict" element={<PredictPage />} />
-                <Route path="/passport" element={<PassportPage />} />
-                <Route path="/venues" element={<VenuesPage />} />
+                <Route path="/checkin" element={<FanOnly><CheckinPage /></FanOnly>} />
+                <Route path="/checkin/:code" element={<FanOnly><CheckinPage /></FanOnly>} />
+                <Route path="/predict" element={<FanOnly><PredictPage /></FanOnly>} />
+                <Route path="/passport" element={<FanOnly><PassportPage /></FanOnly>} />
+                <Route path="/venues" element={<FanOnly><VenuesPage /></FanOnly>} />
                 <Route path="/venues/:id" element={<VenuePage />} />
-                <Route path="/match/:id" element={<MatchPage />} />
-                <Route path="/matches" element={<PredictPage />} />
-                <Route path="/organiser/:slug" element={<OrganiserPage />} />
-                <Route path="/venue-dashboard/:id" element={<VenueDashboard />} />
+                <Route path="/match/:id" element={<FanOnly><MatchPage /></FanOnly>} />
+                <Route path="/matches" element={<FanOnly><PredictPage /></FanOnly>} />
+                <Route path="/organiser/:slug" element={<FanOnly><OrganiserPage /></FanOnly>} />
+                <Route path="/venue-dashboard/:id" element={<VenueOnly><VenueDashboard /></VenueOnly>} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="*" element={<NotFound />} />

@@ -43,6 +43,7 @@ export default function Onboarding() {
   }, [teams, q]);
 
   if (!loading && !user) return <Navigate to="/auth" replace />;
+  if (profile?.account_type === "venue") return <VenueOnboarding />;
 
   const finish = async () => {
     if (!user) return;
@@ -118,6 +119,55 @@ export default function Onboarding() {
 
         <div className="sticky bottom-20 mt-8 md:bottom-4">
           <Button className="w-full rounded-full" size="lg" onClick={next} disabled={saving}>{step < 3 ? t("common.next") : t("common.finish")}</Button>
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
+/** Venue accounts set up their venue first, then land in the dashboard. */
+function VenueOnboarding() {
+  const { t } = useI18n();
+  const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const [f, setF] = useState({ name: "", area: "", city: "Dubai", capacity: "", screens: "", phone: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("venues").select("id").eq("owner_user_id", user.id).limit(1).then(({ data }) => { if (data?.[0]) navigate(`/venue-dashboard/${data[0].id}`, { replace: true }); });
+  }, [user, navigate]);
+  async function create() {
+    if (!user || !f.name.trim()) return;
+    setBusy(true);
+    const { data, error } = await supabase.from("venues").insert({
+      name: f.name.trim(), area: f.area || null, city: f.city, capacity: f.capacity ? Number(f.capacity) : null,
+      screens: f.screens ? Number(f.screens) : null, phone: f.phone || null, owner_user_id: user.id,
+    }).select("id").single();
+    if (error || !data) { setBusy(false); toast.error(t("common.error")); return; }
+    await supabase.from("profiles").update({ onboarding_completed: true }).eq("user_id", user.id);
+    await refreshProfile();
+    navigate(`/venue-dashboard/${data.id}?tab=showing`, { replace: true });
+  }
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-md">
+        <h1 className="text-[28px] font-extrabold leading-tight">{t("vonb.title")}</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">{t("vonb.sub")}</p>
+        <div className="mt-6 grid gap-3">
+          <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={t("venue.name")} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} placeholder={t("venue.area")} />
+            <select value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              {CITIES.filter((c) => c !== "Other").map((c) => <option key={c} value={c}>{t(`city.${c}` as TKey)}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input type="number" value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} placeholder={t("vset.capacity")} />
+            <Input type="number" value={f.screens} onChange={(e) => setF({ ...f, screens: e.target.value })} placeholder={t("venue.screensLabel")} />
+          </div>
+          <Input dir="ltr" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder={t("venue.phone")} />
+          <Button size="lg" onClick={create} disabled={busy || !f.name.trim()}>{t("vonb.create")}</Button>
+          <p className="text-xs text-muted-foreground">{t("vonb.next")}</p>
         </div>
       </div>
     </AppShell>

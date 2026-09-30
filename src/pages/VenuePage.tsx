@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { useAccount } from "@/lib/access";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Clock, Instagram, MapPin, MessageCircle, Navigation, Phone, Volume2, VolumeX } from "lucide-react";
+import { Clock, Instagram, MapPin, MessageCircle, Navigation, Phone, Volume2, VolumeX } from "lucide-react";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { TeamBadge } from "@/components/brand/TeamBadge";
 import { GroupCard, PartyCard, VenueFacts } from "@/components/cards";
@@ -26,6 +28,7 @@ export default function VenuePage() {
   const [params] = useSearchParams();
   const { t, lang, formatDateTime } = useI18n();
   const { user } = useAuth();
+  const acct = useAccount();
   const [chat, setChat] = useState(params.get("chat") === "1");
   const { data: venue, isLoading } = useQuery({
     queryKey: ["venue", id],
@@ -57,24 +60,32 @@ export default function VenuePage() {
     queryFn: async () => ((await supabase.from("groups").select(GROUP_SELECT).eq("home_venue_id", id!)).data ?? []) as unknown as GroupFull[],
   });
   const { data: parties } = useVenueParties(id);
-  const { data: myRewards } = useMyRewards(!!user);
+  const { data: myRewards } = useMyRewards(!!user && !acct.isVenue);
   const { data: myTables } = useQuery({
     queryKey: ["my-tables", id],
-    enabled: !!id && !!user,
+    enabled: !!id && !!user && !acct.isVenue,
     queryFn: async () => (await supabase.from("table_bookings").select("id, status, party_size, venue_reply, fixture:fixtures(home_team_name, away_team_name, kickoff_at)")
       .eq("venue_id", id!).eq("user_id", user!.id).neq("status", "cancelled").order("created_at", { ascending: false }).limit(3)).data ?? [],
   });
 
-  if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
+  if (isLoading || !acct.ready) return <AppShell><CardSkeletons /></AppShell>;
   if (!venue) return <AppShell><BackButton /><EmptyState title={t("venue.notFound")} /></AppShell>;
   const isOwner = !!user && venue.owner_user_id === user.id;
+  // Venue accounts only see their own page, as a read-only preview of what fans see
+  if (acct.isVenue && !isOwner) return <Navigate to={acct.venueHome} replace />;
+  const preview = acct.isVenue;
   const name = loc(venue, "name", lang);
   const wa = venue.whatsapp?.replace(/[^0-9]/g, "");
   const partyFixtures = new Set((parties ?? []).map((p) => p.fixture_id));
 
   return (
     <AppShell>
-      <BackButton />
+      {preview ? (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-ai-soft px-4 py-3 text-sm">
+          <span className="font-semibold text-ai">{t("venue.previewBanner")}</span>
+          <Button asChild size="sm" variant="ink"><Link to={acct.venueHome}>{t("venue.backToDashboard")}</Link></Button>
+        </div>
+      ) : <BackButton />}
       <div className="card overflow-hidden">
         {venue.cover_url && <img src={venue.cover_url} alt="" className="h-40 w-full object-cover" />}
         <div className="p-5">
@@ -87,14 +98,13 @@ export default function VenuePage() {
           {venue.opening_hours && <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground"><Clock className="h-4 w-4" />{venue.opening_hours}</p>}
           {loc(venue, "description", lang) && <p className="mt-3 text-sm">{loc(venue, "description", lang)}</p>}
           <div className="mt-4"><VenueFacts venue={venue} /></div>
-          <div className="no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5">
+          <div className={cn("no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5", preview && "pointer-events-none opacity-60")} aria-disabled={preview}>
             <Button size="sm" onClick={() => setChat(true)}><MessageCircle />{t("chat.message")}</Button>
             <RequestTable venueId={venue.id} venueName={name} fixtureId={null} trigger={<Button size="sm" variant="ink">{t("tables.request")}</Button>} />
             {venue.phone && <Button asChild variant="outline" size="sm"><a href={`tel:${venue.phone.replace(/\s/g, "")}`}><Phone />{t("venue.call")}</a></Button>}
             {wa && <Button asChild variant="outline" size="sm"><a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></Button>}
             {venue.lat && venue.lng && <Button asChild variant="outline" size="sm"><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation />{t("party.directions")}</a></Button>}
             {venue.instagram && <Button asChild variant="outline" size="sm"><a href={`https://instagram.com/${venue.instagram.replace("@", "")}`} target="_blank" rel="noreferrer"><Instagram />{venue.instagram}</a></Button>}
-            {isOwner && <Button asChild variant="outline" size="sm"><Link to={`/venue-dashboard/${venue.id}`}><BarChart3 />{t("page.venueDashboard")}</Link></Button>}
           </div>
         </div>
       </div>
@@ -127,7 +137,7 @@ export default function VenuePage() {
           {(parties ?? []).length > 0 && (
             <section>
               <h2 className="mb-2 eyebrow">{t("venue.partiesHere")}</h2>
-              <div className="grid gap-3">{parties!.map((p) => <PartyCard key={p.id} party={p} />)}</div>
+              <div className={cn("grid gap-3", preview && "pointer-events-none")}>{parties!.map((p) => <PartyCard key={p.id} party={p} />)}</div>
             </section>
           )}
           <section>
@@ -150,8 +160,8 @@ export default function VenuePage() {
                         <p className="truncate text-sm font-semibold">{f.home_team_name} v {f.away_team_name}</p>
                         <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">{s.sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{s.sound ? t("venue.withSound") : t("venue.noSound")} · {f.competition}</p>
                       </Link>
-                      <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} v ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
-                        trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />
+                      {!preview && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} v ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
+                        trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
                     </div>
                   );
                 })}
@@ -161,7 +171,7 @@ export default function VenuePage() {
           {(groups ?? []).length > 0 && (
             <section>
               <h2 className="mb-2 eyebrow">{t("venue.homeOf")}</h2>
-              <div className="grid gap-3">{groups!.map((g) => <GroupCard key={g.id} group={g} />)}</div>
+              <div className={cn("grid gap-3", preview && "pointer-events-none")}>{groups!.map((g) => <GroupCard key={g.id} group={g} />)}</div>
             </section>
           )}
         </TabsContent>
@@ -193,7 +203,7 @@ export default function VenuePage() {
         </TabsContent>
 
         <TabsContent value="rewards">
-          {(offers ?? []).length === 0 ? <EmptyState title={t("rewards.none")} /> : myRewards ? (
+          {(offers ?? []).length === 0 ? <EmptyState title={t("rewards.none")} /> : myRewards && !preview ? (
             <div className="space-y-2">{myRewards.filter((r) => r.venue_id === venue.id).map((r) => <RewardItem key={r.id} r={r} showVenue={false} />)}</div>
           ) : (
             <div className="card divide-y">{offers!.map((o) => (

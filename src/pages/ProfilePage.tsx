@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, Store } from "lucide-react";
 import { toast } from "sonner";
 import { Initials } from "@/components/common/bits";
-import { AppShell, BackButton, LanguageToggle } from "@/components/layout/AppShell";
+import { AppShell, BackButton, LanguageToggle, PageTitle } from "@/components/layout/AppShell";
+import { VenueSettings } from "@/components/venue/VenueSettings";
 import { GroupCard } from "@/components/cards";
 import { Section } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default function ProfilePage() {
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth?next=/profile" replace />;
+  if (profile?.account_type === "venue") return <VenueAccountPage venues={myVenues ?? []} />;
 
   async function save(patch: Record<string, string | null>) {
     const { error } = await supabase.from("profiles").update(patch).eq("user_id", user!.id);
@@ -81,15 +83,45 @@ export default function ProfilePage() {
           : <Button asChild variant="outline" className="rounded-full"><Link to="/groups">{t("home.findGroup")}</Link></Button>}
       </Section>
 
-      <Section title={t("profile.venues")} icon={<Store className="h-5 w-5 text-brand" />} action={<RegisterVenue />}>
-        {(myVenues ?? []).length ? (
-          <div className="grid gap-3 md:grid-cols-2">{myVenues!.map((v) => (
-            <Link key={v.id} to={`/venue-dashboard/${v.id}`} className="card p-4 card-hover"><p className="font-semibold">{loc(v, "name", lang)}</p><p className="text-xs text-muted-foreground">{t("page.venueDashboard")}</p></Link>
-          ))}</div>
-        ) : <p className="text-sm text-muted-foreground">{t("profile.venuesEmpty")}</p>}
-      </Section>
+      <div className="mt-9 flex items-center gap-3 rounded-2xl bg-surface p-4">
+        <Store className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <p className="flex-1 text-sm">{t("profile.runVenue")}</p>
+        <Button asChild size="sm" variant="outline"><Link to="/auth?mode=signup&type=venue" onClick={() => signOut()}>{t("profile.venueAccount")}</Link></Button>
+      </div>
 
       <Button variant="ghost" className="mt-10 w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={async () => { await signOut(); navigate("/"); }}>
+        <LogOut className="me-1.5 h-4 w-4 rtl:rotate-180" />{t("nav.signOut")}
+      </Button>
+    </AppShell>
+  );
+}
+
+/** The "Venue" tab for venue accounts: their venues, settings, language and sign out — no fan features. */
+function VenueAccountPage({ venues }: { venues: Venue[] }) {
+  const { t, lang } = useI18n();
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <AppShell>
+      <PageTitle eyebrow={t("vacct.eyebrow")} title={profile?.full_name ?? t("vnav.venue")} sub={user?.email} />
+      <div className="grid gap-3">
+        {venues.map((v) => (
+          <div key={v.id} className="card p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted"><Store className="h-5 w-5" /></span>
+              <div className="min-w-0 flex-1"><p className="truncate font-bold">{loc(v, "name", lang)}</p><p className="truncate text-xs text-muted-foreground">{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}</p></div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button asChild size="sm"><Link to={`/venue-dashboard/${v.id}`}>{t("page.venueDashboard")}</Link></Button>
+              <VenueSettings venue={v} />
+              <Button asChild size="sm" variant="outline"><Link to={`/venues/${v.id}?preview=1`}>{t("vdash.viewPublic")}</Link></Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3"><RegisterVenue /></div>
+      <div className="card mt-6 flex items-center justify-between p-4"><span className="text-sm font-semibold">{t("profile.language")}</span><LanguageToggle /></div>
+      <Button variant="ghost" className="mt-8 w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={async () => { await signOut(); navigate("/"); }}>
         <LogOut className="me-1.5 h-4 w-4 rtl:rotate-180" />{t("nav.signOut")}
       </Button>
     </AppShell>

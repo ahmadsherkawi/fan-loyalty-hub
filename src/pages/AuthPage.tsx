@@ -17,6 +17,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [kind, setKind] = useState<"fan" | "venue">(params.get("type") === "venue" ? "venue" : "fan");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function AuthPage() {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: `${window.location.origin}/onboarding`, data: { full_name: fullName } },
+          options: { emailRedirectTo: `${window.location.origin}/onboarding`, data: { full_name: fullName, account_type: kind } },
         });
         if (error) throw error;
         if (!data.session) toast.success(t("auth.checkEmail"));
@@ -62,7 +63,18 @@ export default function AuthPage() {
         <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.or")}<span className="h-px flex-1 bg-border" /></div>
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
-            <div className="space-y-1.5"><Label htmlFor="fn">{t("auth.fullName")}</Label><Input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("auth.iAm")}>
+              {(["fan", "venue"] as const).map((k) => (
+                <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)}
+                  className={`rounded-2xl border p-3 text-start ${kind === k ? "border-foreground ring-2 ring-foreground/10" : ""}`}>
+                  <span className="block text-sm font-bold">{t(k === "fan" ? "auth.asFan" : "auth.asVenue")}</span>
+                  <span className="block text-xs text-muted-foreground">{t(k === "fan" ? "auth.asFanSub" : "auth.asVenueSub")}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {mode === "signup" && (
+            <div className="space-y-1.5"><Label htmlFor="fn">{kind === "venue" ? t("auth.contactName") : t("auth.fullName")}</Label><Input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
           )}
           <div className="space-y-1.5"><Label htmlFor="em">{t("auth.email")}</Label><Input id="em" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
           <div className="space-y-1.5"><Label htmlFor="pw">{t("auth.password")}</Label><Input id="pw" type="password" dir="ltr" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
