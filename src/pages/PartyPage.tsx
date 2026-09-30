@@ -9,8 +9,7 @@ import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { VenueFacts } from "@/components/cards";
 import { CardSkeletons, DemoChip, EmptyState, FeatureHeader } from "@/components/common/bits";
 import { MatchWall } from "@/components/party/MatchWall";
-import { DemoClock } from "@/components/party/DemoClock";
-import { phaseOf, type Phase } from "@/lib/matchPhase";
+import { checkinWindow, phaseOf, type Phase } from "@/lib/matchPhase";
 import { GuestList } from "@/components/GuestList";
 import { cn } from "@/lib/utils";
 import { PunditChat } from "@/components/ai/PunditChat";
@@ -36,7 +35,6 @@ export default function PartyPage() {
   const { data: counts } = usePartyCounts(id);
   const { data: isAdmin } = useIsGroupAdmin(party?.group_id, user?.id);
   const [guests, setGuests] = useState(0);
-  const [demoPhase, setDemoPhase] = useState<Phase | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data: rsvps } = useQuery({
@@ -69,14 +67,16 @@ export default function PartyPage() {
   const shareText = t("party.shareText", { match: title, venue: venueName || "", time: formatDateTime(when) });
   const cap = party.capacity ?? 0;
   const isVenueOwner = !!user && party.venue?.owner_user_id === user.id;
-  const phase: Phase = party.is_demo && demoPhase ? demoPhase : phaseOf(f);
+  const phase: Phase = phaseOf(f);
+  const win = checkinWindow(when);
+  const rsvpClosed = new Date(when).getTime() <= Date.now();
 
   async function doRsvp() {
     if (!user) { navigate(`/auth?next=/party/${party!.id}`); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("rsvp", { p_party: party!.id, p_guests: guests });
     setBusy(false);
-    if (error) return toast.error(t("common.error"));
+    if (error) return toast.error(error.message.includes("closed") ? t("party.rsvpClosed") : error.message.includes("declined") ? t("party.venue_declinedSub") : t("common.error"));
     toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : party!.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
@@ -154,6 +154,8 @@ export default function PartyPage() {
               </div>
               <button className="text-sm font-semibold text-muted-foreground hover:text-foreground" onClick={cancel}>{t("party.cancel")}</button>
             </div>
+          ) : rsvpClosed ? (
+            <p className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-surface py-3 text-sm font-semibold text-muted-foreground"><Clock className="h-4 w-4" />{t("party.rsvpClosed")}</p>
           ) : (
             <div className="mt-4 flex items-center gap-2">
               <div className="flex h-11 items-center rounded-full border bg-card">
@@ -165,9 +167,10 @@ export default function PartyPage() {
             </div>
           )}
           {myCheckin && <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-gold-ink"><Stamp className="h-4 w-4" />{t("party.youCheckedIn")}</p>}
-          {user && !myCheckin && (live || mine) && (
-            <Button asChild variant="ink" className="mt-3 w-full"><Link to="/checkin"><QrCode />{t("party.checkInHere")}</Link></Button>
-          )}
+          {user && !myCheckin && (live || mine) && party.venue_status === "confirmed" && (win === "open"
+            ? <Button asChild variant="ink" className="mt-3 w-full"><Link to="/checkin"><QrCode />{t("party.checkInHere")}</Link></Button>
+            : win === "early" ? <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground"><QrCode className="h-3.5 w-3.5" />{t("party.checkinOpensAt", { time: formatDateTime(new Date(new Date(when).getTime() - 3 * 3600e3).toISOString(), { weekday: "short", hour: "2-digit", minute: "2-digit" }) })}</p>
+            : null)}
         </div>
       )}
 
@@ -184,11 +187,10 @@ export default function PartyPage() {
             <EmptyState title={t("party.signInFeatures")} body={t("party.signInFeaturesBody")} cta={{ to: `/auth?next=/party/${party.id}`, label: t("nav.signIn") }} />
           ) : (
             <>
-              {party.is_demo && f && <DemoClock value={phase} onChange={setDemoPhase} />}
               {f && !done && <PredictionInput fixture={f} />}
               {f && <PunditChat fixtureId={f.id} partyId={party.id} homeName={f.home_team_name} awayName={f.away_team_name} />}
-              {f && <HalftimeQuiz fixtureId={f.id} partyId={party.id} phase={phase} />}
-              {f && <MotmVote partyId={party.id} fixture={f} phase={phase} />}
+              {f && <HalftimeQuiz fixtureId={f.id} partyId={party.id} phase={phase} kickoff={f.kickoff_at} />}
+              {f && <MotmVote partyId={party.id} fixture={f} phase={phase} checkedIn={!!myCheckin} />}
               {done && <RecapCard party={party} />}
             </>
           )}
@@ -239,11 +241,10 @@ export default function PartyPage() {
                 <div><p className="scoreboard text-2xl font-bold leading-none">{counts?.checked_in ?? 0}</p><p className="mt-1 text-[11px] text-muted-foreground">{t("vdash.arrived")}</p></div>
               </div>
             </div>
-            {isVenueOwner && <div className="card overflow-hidden"><GuestList partyId={party.id} /></div>}
+            {isVenueOwner && <div className="card overflow-hidden"><GuestList partyId={party.id} kickoff={when} confirmed={party.venue_status === "confirmed"} /></div>}
             <div className="card p-5 text-center">
               <FeatureHeader icon={<Tv />} title={t("party.venueScreen")} sub={t("party.screenHowTo")} />
               <Button asChild variant="ink" className="mt-4 w-full"><Link to={`/party/${party.id}/screen`}><Tv />{t("party.openScreen")}</Link></Button>
-              {party.is_demo && <p className="mt-3 text-xs text-muted-foreground">{t("party.demoCode", { code: party.checkin_code })}</p>}
             </div>
           </TabsContent>
         )}

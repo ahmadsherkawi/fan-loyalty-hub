@@ -46,7 +46,7 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
     setBusy(true);
     const { data, error } = await supabase.rpc("claim_reward", { p_offer: r.id });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("members") ? t("rewards.joinFirst") : t("common.error"));
+    if (error) return toast.error(error.message.includes("members") ? t("rewards.joinFirst") : error.message.includes("tomorrow") ? t("rewards.tomorrow") : error.message.includes("already used") ? t("rewards.used") : error.message.includes("not enough") ? t("rewards.needMore") : t("common.error"));
     setCode(data as unknown as Code);
     qc.invalidateQueries({ queryKey: ["my-rewards"] });
   }

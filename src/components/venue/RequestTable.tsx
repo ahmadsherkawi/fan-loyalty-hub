@@ -24,7 +24,7 @@ export function RequestTable({ venueId, venueName, fixtureId, matchLabel, trigge
     setBusy(true);
     const { error } = await supabase.rpc("request_table", { p_venue: venueId, p_fixture: fixtureId, p_size: size, p_note: note });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("already") ? t("tables.already") : t("common.error"));
+    if (error) return toast.error(error.message.includes("already requested") ? t("tables.already") : error.message.includes("limit") ? t("tables.limit") : error.message.includes("started") ? t("tables.started") : t("common.error"));
     toast.success(t("tables.sent", { venue: venueName }));
     qc.invalidateQueries({ queryKey: ["my-tables"] });
     setOpen(false); setNote("");

@@ -236,7 +236,7 @@ function NightCard({ b, past, defaultOpen }: { b: Booking; past?: boolean; defau
           {!past && <Button asChild variant="ink" size="sm"><Link to={`/party/${b.id}/screen`}><Monitor />{t("vdash.screen")}</Link></Button>}
         </div>
       </div>
-      {open && <GuestList partyId={b.id} />}
+      {open && <GuestList partyId={b.id} kickoff={b.kickoff} confirmed={b.venue_status === "confirmed"} />}
     </div>
   );
 }

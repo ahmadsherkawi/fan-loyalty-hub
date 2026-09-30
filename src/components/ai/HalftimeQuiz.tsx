@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Check, Lock, X } from "lucide-react";
-import { quizOpen, type Phase } from "@/lib/matchPhase";
+import { matchNightOver, quizOpen, type Phase } from "@/lib/matchPhase";
 import { FeatureHeader } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 type Q = { q: string; options: string[] };
 type Quiz = { id: string; questions: Q[]; sponsor_name: string | null };
 
-export function HalftimeQuiz({ fixtureId, partyId, phase }: { fixtureId: string; partyId?: string; phase: Phase }) {
+export function HalftimeQuiz({ fixtureId, partyId, phase, kickoff }: { fixtureId: string; partyId?: string; phase: Phase; kickoff?: string | null }) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -55,8 +55,8 @@ export function HalftimeQuiz({ fixtureId, partyId, phase }: { fixtureId: string;
     <div className="card p-4">
       <FeatureHeader icon={<Brain />} tone="ai" ai title={t("quiz.title")} sub={quiz?.sponsor_name ? t("quiz.presentedBy", { sponsor: quiz.sponsor_name }) : t("quiz.sub")} />
 
-      {!started && (quizOpen(phase) ? <Button variant="ai" className="mt-4 w-full" onClick={() => setStarted(true)}>{t("quiz.start")}</Button>
-        : <p className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-surface py-3 text-sm font-semibold text-muted-foreground"><Lock className="h-4 w-4" />{t("quiz.locked")}</p>)}
+      {!started && (quizOpen(phase) && !matchNightOver(kickoff) ? <Button variant="ai" className="mt-4 w-full" onClick={() => setStarted(true)}>{t("quiz.start")}</Button>
+        : <p className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-surface py-3 text-sm font-semibold text-muted-foreground"><Lock className="h-4 w-4" />{matchNightOver(kickoff) ? t("quiz.closed") : t("quiz.locked")}</p>)}
       {started && isFetching && <p className="mt-4 animate-pulse text-sm text-muted-foreground">{t("quiz.generating")}</p>}
       {started && error && <p className="mt-4 text-sm text-destructive">{t("quiz.error")}</p>}
 

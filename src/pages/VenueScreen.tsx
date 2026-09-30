@@ -7,9 +7,10 @@ import { TeamBadge } from "@/components/brand/TeamBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { isFinished, isLive, loc, useParty, usePartyCounts } from "@/lib/data";
+import { isFinished, isLive, loc, partyTime, useParty, usePartyCounts } from "@/lib/data";
+import { checkinWindow } from "@/lib/matchPhase";
 
-type Token = { code: string; seconds_left: number; is_demo: boolean; demo_code: string | null };
+type Token = { code: string; seconds_left: number };
 
 /**
  * Full-screen display for the venue TV. The check-in code rotates every 30 seconds,
@@ -43,6 +44,8 @@ export default function VenueScreen() {
   const f = party.fixture;
   const team = party.group?.team;
   const url = token ? `${window.location.origin}/checkin/${token.code}` : "";
+  const kickoff = partyTime(party);
+  const win = party.venue_status !== "confirmed" ? "unconfirmed" : checkinWindow(kickoff);
   return (
     <div className="flex min-h-screen flex-col bg-foreground p-8 text-white"
       style={{ backgroundImage: `radial-gradient(70% 50% at 50% 0%, ${team?.primary_color ?? "#00C566"}55, transparent 70%)` }}>
@@ -62,6 +65,12 @@ export default function VenueScreen() {
           <p className="mt-10 text-lg text-white/60">{t("screen.checkedIn")}</p>
           <p className="scoreboard text-[9rem] font-bold leading-none text-primary">{counts?.checked_in ?? 0}</p>
         </div>
+        {win !== "open" ? (
+          <div className="w-[320px] rounded-3xl border border-white/15 p-8 text-center">
+            <p className="text-2xl font-semibold">{win === "early" ? t("screen.opensLater") : win === "closed" ? t("screen.closed") : t("screen.notConfirmed")}</p>
+            {win === "early" && <p className="mt-2 text-white/60">{t("checkin.window")}</p>}
+          </div>
+        ) : (
         <div className="w-[320px] text-center">
           <div className="rounded-3xl bg-white p-6">{token ? <QRCodeSVG value={url} size={260} fgColor="#0B1220" /> : <div className="h-[260px] w-[260px]" />}</div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15"><div className="h-full bg-primary transition-[width] duration-1000 ease-linear" style={{ width: `${(left / 30) * 100}%` }} /></div>
@@ -69,6 +78,7 @@ export default function VenueScreen() {
           <p className="mt-1 text-white/60">{t("screen.orCode")} <span className="scoreboard text-2xl font-bold tracking-[0.2em] text-white" dir="ltr">{token?.code ?? "······"}</span></p>
           <p className="mt-1 text-xs text-white/40">{t("screen.rotates", { n: left })}</p>
         </div>
+        )}
       </div>
       <p className="text-center text-sm text-white/60">{t("brand.tagline")}</p>
     </div>

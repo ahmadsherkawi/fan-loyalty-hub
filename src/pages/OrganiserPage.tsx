@@ -99,7 +99,7 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
       group_id: groupId, fixture_id: draft.fixture_id, venue_id: draft.venue_id || null, title: draft.title || null,
       notes: draft.notes || null, capacity: draft.capacity ? Number(draft.capacity) : null, created_by: user.id,
     }).select("id").single();
-    if (error || !party) { setSaving(false); return toast.error(t("common.error")); }
+    if (error || !party) { setSaving(false); return toast.error(error?.message.includes("limit") ? t("org.pendingLimit") : t("common.error")); }
     if (draft.announcement_en || draft.announcement_ar) {
       await supabase.from("announcements").insert({
         group_id: groupId, author_id: user.id, title: draft.title || null, body: draft.announcement_en || draft.announcement_ar,
@@ -297,7 +297,7 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
   if (!upcoming.length) return null;
   async function move(partyId: string, venueId: string) {
     const { error } = await supabase.from("watch_parties").update({ venue_id: venueId }).eq("id", partyId);
-    if (error) return toast.error(t("common.error"));
+    if (error) return toast.error(error.message.includes("limit") ? t("org.pendingLimit") : t("common.error"));
     setMoving(null);
     toast.success(t("org.requestSent", { venue: loc(venues?.find((v) => v.id === venueId), "name", lang) }));
     qc.invalidateQueries({ queryKey: ["parties-group", groupId] });

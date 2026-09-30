@@ -8,18 +8,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { FixtureWithTeams } from "@/lib/data";
-import { motmOpen, type Phase } from "@/lib/matchPhase";
+import { matchNightOver, motmOpen, type Phase } from "@/lib/matchPhase";
 import { cn } from "@/lib/utils";
 
 type Player = { name: string; position: string | null };
 
 /** Fans pick the man of the match from the two squads — voting opens in the second half. */
-export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture: FixtureWithTeams; phase: Phase }) {
+export function MotmVote({ partyId, fixture, phase, checkedIn }: { partyId: string; fixture: FixtureWithTeams; phase: Phase; checkedIn: boolean }) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
-  const open = motmOpen(phase);
+  const over = matchNightOver(fixture.kickoff_at);
+  const open = motmOpen(phase) && !over;
+  const canVote = open && checkedIn;
   const { data: votes } = useQuery({
     queryKey: ["motm", partyId],
     enabled: !!user,
@@ -28,7 +30,7 @@ export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture
   });
   const { data: squads } = useQuery({
     queryKey: ["squads", fixture.id],
-    enabled: !!user && open,
+    enabled: !!user && canVote,
     staleTime: 60 * 60_000,
     queryFn: async () => {
       const { data } = await supabase.functions.invoke("jamhoor-ai", { body: { action: "squad", fixture_id: fixture.id } });
@@ -52,7 +54,7 @@ export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture
     const { error } = mine
       ? await supabase.from("motm_votes").update({ player_name: player }).eq("watch_party_id", partyId).eq("user_id", user.id)
       : await supabase.from("motm_votes").insert({ watch_party_id: partyId, user_id: user.id, player_name: player });
-    if (error) return toast.error(error.message.includes("second half") ? t("motm.locked") : t("common.error"));
+    if (error) return toast.error(error.message.includes("second half") ? t("motm.locked") : error.message.includes("check in") ? t("motm.checkInFirst") : error.message.includes("closed") ? t("motm.closed") : t("common.error"));
     toast.success(t("motm.voted", { name: player }));
     qc.invalidateQueries({ queryKey: ["motm", partyId] });
   }
@@ -60,8 +62,8 @@ export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture
   if (!user) return null;
   return (
     <div className="card p-4">
-      <FeatureHeader icon={<Star />} tone="gold" title={t("motm.title")} sub={open ? (mine ? t("motm.yourVote", { name: mine.player_name }) : t("motm.subOpen")) : t("motm.locked")}
-        action={!open ? <Lock className="h-4 w-4 text-muted-foreground" /> : undefined} />
+      <FeatureHeader icon={<Star />} tone="gold" title={t("motm.title")} sub={over ? t("motm.closed") : !open ? t("motm.locked") : mine ? t("motm.yourVote", { name: mine.player_name }) : checkedIn ? t("motm.subOpen") : t("motm.checkInFirst")}
+        action={!canVote ? <Lock className="h-4 w-4 text-muted-foreground" /> : undefined} />
       {tally.length > 0 && (
         <div className="mt-4 space-y-2">
           {tally.slice(0, 3).map(([p, n], i) => (
@@ -72,7 +74,7 @@ export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture
           ))}
         </div>
       )}
-      {open && (
+      {canVote && (
         <div className="mt-4">
           <div className="relative">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
