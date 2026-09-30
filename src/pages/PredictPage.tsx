@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Target } from "lucide-react";
+import { ChevronRight, Store, Target, Tv } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { PredictionInput } from "@/components/match/PredictionInput";
 import { CardSkeletons, Chip, EmptyState } from "@/components/common/bits";
@@ -37,6 +39,13 @@ export default function PredictPage() {
       .order("created_at", { ascending: false }).limit(100)).data ?? []) as unknown as { id: string; home_score: number; away_score: number; points: number | null; fixture: FixtureWithTeams }[],
   });
 
+  const { data: screenCounts } = useQuery({
+    queryKey: ["screen-counts"],
+    queryFn: async () => {
+      const rows = (await supabase.from("venue_screenings").select("fixture_id")).data ?? [];
+      const m = new Map<string, number>(); rows.forEach((r) => m.set(r.fixture_id, (m.get(r.fixture_id) ?? 0) + 1)); return m;
+    },
+  });
   const comps = COMP_ORDER.filter((c) => (fixtures ?? []).some((f) => f.competition_code === c));
   const list = (fixtures ?? []).filter((f) => comp === "mine"
     ? (f.home_team_id && myTeamIds.has(f.home_team_id)) || (f.away_team_id && myTeamIds.has(f.away_team_id))
@@ -50,7 +59,7 @@ export default function PredictPage() {
 
   return (
     <AppShell>
-      <PageTitle title={t("page.predict")} sub={t("predict.hint")} />
+      <PageTitle title={t("page.predict")} sub={t("matches.sub")} action={<Button asChild variant="outline" size="sm"><Link to="/venues"><Store />{t("venues.title")}</Link></Button>} />
       <div className="grid grid-cols-3 divide-x rounded-2xl bg-foreground py-4 text-center text-background rtl:divide-x-reverse divide-white/10">
         {[{ v: total, l: t("league.pts") }, { v: exact, l: t("league.exact") }, { v: (mine ?? []).length, l: t("predict.made") }].map((s) => (
           <div key={s.l}><p className="scoreboard text-3xl font-bold leading-none">{s.v}</p><p className="mt-1 text-xs text-background/60">{s.l}</p></div>
@@ -74,6 +83,10 @@ export default function PredictPage() {
                   <div key={f.id} className="card p-3">
                     <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{f.competition}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
                     <PredictionInput fixture={f} compact bare />
+                    <Link to={`/match/${f.id}`} className="mt-2 flex items-center justify-between rounded-lg bg-surface px-3 py-2 text-xs font-semibold">
+                      <span className="flex items-center gap-1.5"><Tv className="h-3.5 w-3.5" />{screenCounts?.get(f.id) ? t("matches.venuesShowing", { n: screenCounts.get(f.id)! }) : t("matches.whereToWatch")}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground rtl:rotate-180" />
+                    </Link>
                   </div>
                 ))}
               </div>

@@ -23,6 +23,8 @@ const OrganiserPage = lazy(() => import("./pages/OrganiserPage"));
 const VenueDashboard = lazy(() => import("./pages/VenueDashboard"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const VenuesPage = lazy(() => import("./pages/VenuesPage"));
+const MatchPage = lazy(() => import("./pages/MatchPage"));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } } });
 
@@ -47,7 +49,10 @@ const App = () => (
                 <Route path="/checkin/:code" element={<CheckinPage />} />
                 <Route path="/predict" element={<PredictPage />} />
                 <Route path="/passport" element={<PassportPage />} />
+                <Route path="/venues" element={<VenuesPage />} />
                 <Route path="/venues/:id" element={<VenuePage />} />
+                <Route path="/match/:id" element={<MatchPage />} />
+                <Route path="/matches" element={<PredictPage />} />
                 <Route path="/organiser/:slug" element={<OrganiserPage />} />
                 <Route path="/venue-dashboard/:id" element={<VenueDashboard />} />
                 <Route path="/profile" element={<ProfilePage />} />

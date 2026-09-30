@@ -236,31 +236,7 @@ export function whatsappShare(text: string) {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
-export async function shareOrCopy(text: string, url: string) {
-  const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
-  if (nav.share) {
-    try { await nav.share({ text, url }); return "shared"; } catch { /* cancelled */ }
-  }
-  await navigator.clipboard.writeText(`${text} ${url}`);
-  return "copied";
-}
-
-export function downloadIcs(title: string, start: string, durationMin: number, location: string, url: string) {
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const s = new Date(start), e = new Date(s.getTime() + durationMin * 60000);
-  const ics = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jamhoor//EN", "BEGIN:VEVENT",
-    `UID:${crypto.randomUUID()}@jamhoor`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(s)}`, `DTEND:${fmt(e)}`,
-    `SUMMARY:${title.replace(/[,;]/g, " ")}`, `LOCATION:${location.replace(/[,;]/g, " ")}`, `URL:${url}`,
-    "END:VEVENT", "END:VCALENDAR",
-  ].join("\r\n");
-  const blob = new Blob([ics], { type: "text/calendar" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "jamhoor-watch-party.ics";
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
+export { shareOrCopy, downloadIcs } from "@/lib/share";
 
 /* ───────────── Bookings, guest lists, rewards, notifications ───────────── */
 

@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, Home, QrCode, Target, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Home, QrCode, Tv, Users } from "lucide-react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Initials } from "@/components/common/bits";
 import { NotificationBell } from "@/components/notify/notifications";
@@ -16,7 +16,7 @@ const LEFT: NavItem[] = [
   { to: "/groups", key: "nav.groups", icon: Users },
 ];
 const RIGHT: NavItem[] = [
-  { to: "/predict", key: "nav.predict", icon: Target },
+  { to: "/predict", key: "nav.predict", icon: Tv },
   { to: "/passport", key: "nav.passport", icon: BookOpen },
 ];
 const ALL = [...LEFT, { to: "/checkin", key: "nav.checkin" as TKey, icon: QrCode }, ...RIGHT];

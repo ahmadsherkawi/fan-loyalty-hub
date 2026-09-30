@@ -1,57 +1,102 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star } from "lucide-react";
+import { Lock, Search, Star } from "lucide-react";
+import { toast } from "sonner";
 import { FeatureHeader } from "@/components/common/bits";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import type { FixtureWithTeams } from "@/lib/data";
+import { motmOpen, type Phase } from "@/lib/matchPhase";
+import { cn } from "@/lib/utils";
 
-export function MotmVote({ partyId }: { partyId: string }) {
-  const { t } = useI18n();
+type Player = { name: string; position: string | null };
+
+/** Fans pick the man of the match from the two squads — voting opens in the second half. */
+export function MotmVote({ partyId, fixture, phase }: { partyId: string; fixture: FixtureWithTeams; phase: Phase }) {
+  const { t, lang } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [name, setName] = useState("");
+  const [q, setQ] = useState("");
+  const open = motmOpen(phase);
   const { data: votes } = useQuery({
     queryKey: ["motm", partyId],
     enabled: !!user,
-    refetchInterval: 30_000,
+    refetchInterval: open ? 20_000 : false,
     queryFn: async () => (await supabase.from("motm_votes").select("user_id, player_name").eq("watch_party_id", partyId)).data ?? [],
   });
+  const { data: squads } = useQuery({
+    queryKey: ["squads", fixture.id],
+    enabled: !!user && open,
+    staleTime: 60 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.functions.invoke("jamhoor-ai", { body: { action: "squad", fixture_id: fixture.id } });
+      return ((data as { squads?: Record<string, Player[]> })?.squads ?? {}) as Record<string, Player[]>;
+    },
+  });
   const mine = votes?.find((v) => v.user_id === user?.id);
-  const tally = Object.entries((votes ?? []).reduce<Record<string, number>>((acc, v) => {
-    const k = v.player_name.trim(); acc[k] = (acc[k] ?? 0) + 1; return acc;
-  }, {})).sort((a, b) => b[1] - a[1]);
   const total = votes?.length ?? 0;
+  const tally = Object.entries((votes ?? []).reduce<Record<string, number>>((acc, v) => { acc[v.player_name] = (acc[v.player_name] ?? 0) + 1; return acc; }, {}))
+    .sort((a, b) => b[1] - a[1]);
+  const teams = [
+    { id: fixture.home_team_id, name: (lang === "ar" && fixture.home_team?.name_ar) || fixture.home_team?.name || fixture.home_team_name },
+    { id: fixture.away_team_id, name: (lang === "ar" && fixture.away_team?.name_ar) || fixture.away_team?.name || fixture.away_team_name },
+  ];
+  const lists = useMemo(() => teams.map((tm) => ({
+    ...tm, players: (squads?.[tm.id ?? ""] ?? []).filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase())),
+  })), [squads, q, teams[0].id, teams[1].id]);
 
   async function vote(player: string) {
-    const p = player.trim();
-    if (!user || !p) return;
-    if (mine) await supabase.from("motm_votes").update({ player_name: p }).eq("watch_party_id", partyId).eq("user_id", user.id);
-    else await supabase.from("motm_votes").insert({ watch_party_id: partyId, user_id: user.id, player_name: p });
-    setName("");
+    if (!user) return;
+    const { error } = mine
+      ? await supabase.from("motm_votes").update({ player_name: player }).eq("watch_party_id", partyId).eq("user_id", user.id)
+      : await supabase.from("motm_votes").insert({ watch_party_id: partyId, user_id: user.id, player_name: player });
+    if (error) return toast.error(error.message.includes("second half") ? t("motm.locked") : t("common.error"));
+    toast.success(t("motm.voted", { name: player }));
     qc.invalidateQueries({ queryKey: ["motm", partyId] });
   }
 
   if (!user) return null;
   return (
     <div className="card p-4">
-      <FeatureHeader icon={<Star />} tone="gold" title={t("motm.title")} sub={mine ? t("motm.yourVote", { name: mine.player_name }) : t("motm.sub")} />
+      <FeatureHeader icon={<Star />} tone="gold" title={t("motm.title")} sub={open ? (mine ? t("motm.yourVote", { name: mine.player_name }) : t("motm.subOpen")) : t("motm.locked")}
+        action={!open ? <Lock className="h-4 w-4 text-muted-foreground" /> : undefined} />
       {tally.length > 0 && (
         <div className="mt-4 space-y-2">
-          {tally.slice(0, 5).map(([p, n]) => (
-            <button key={p} onClick={() => vote(p)} className="block w-full text-start">
-              <div className="flex justify-between text-sm"><span className="font-medium">{p}</span><span className="scoreboard text-muted-foreground">{n}</span></div>
+          {tally.slice(0, 3).map(([p, n], i) => (
+            <div key={p}>
+              <div className="flex justify-between text-sm"><span className={cn("font-medium", i === 0 && "font-bold")}>{p}</span><span className="scoreboard text-muted-foreground">{Math.round((n / total) * 100)}%</span></div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gold" style={{ width: `${(n / total) * 100}%` }} /></div>
-            </button>
+            </div>
           ))}
         </div>
       )}
-      <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); vote(name); }}>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("motm.placeholder")} className="rounded-full" maxLength={40} />
-        <Button type="submit" variant="ink" className="shrink-0" disabled={!name.trim()}>{t("motm.vote")}</Button>
-      </form>
+      {open && (
+        <div className="mt-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("motm.search")} className="ps-9" />
+          </div>
+          <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+            {!squads ? <p className="text-sm text-muted-foreground">{t("common.loading")}</p> : lists.map((tm) => tm.players.length > 0 && (
+              <div key={tm.id}>
+                <p className="eyebrow mb-1.5">{tm.name}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tm.players.map((p) => (
+                    <button key={p.name} onClick={() => vote(p.name)}
+                      className={cn("rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors", mine?.player_name === p.name ? "border-gold bg-gold text-accent-foreground" : "bg-card hover:border-gold")}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {squads && lists.every((l) => !l.players.length) && <p className="text-sm text-muted-foreground">{q ? t("motm.noMatch") : t("motm.noSquad")}</p>}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("motm.squadNote")}</p>
+        </div>
+      )}
     </div>
   );
 }

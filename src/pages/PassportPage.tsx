@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Award, Download, Gift, Lock, MapPin, Share2, Stamp } from "lucide-react";
 import { RewardItem, RewardsSummary } from "@/components/rewards/Rewards";
-import { toPng } from "html-to-image";
+import { toast } from "sonner";
+import { useShareableImage } from "@/lib/share";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -41,14 +42,12 @@ export default function PassportPage() {
     queryFn: async () => (await supabase.rpc("my_passport")).data as unknown as Passport,
   });
 
-  async function image() { return cardRef.current ? toPng(cardRef.current, { pixelRatio: 2, cacheBust: true }) : null; }
-  async function download() { const u = await image(); if (!u) return; const a = document.createElement("a"); a.href = u; a.download = "jamhoor-passport.png"; a.click(); }
+  const img = useShareableImage(cardRef, "jamhoor-passport.png", [pp, lang, team?.id]);
   async function share() {
-    const u = await image(); if (!u) return;
-    const file = new File([await (await fetch(u)).blob()], "jamhoor-passport.png", { type: "image/png" });
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-    if (nav.canShare?.({ files: [file] })) await navigator.share({ files: [file] }).catch(() => undefined); else download();
+    const r = await img.share(t("passport.shareText"));
+    if (r === "notready") toast(t("common.preparing")); else if (r === "downloaded") toast.success(t("common.saved"));
   }
+  function download() { if (!img.download()) toast(t("common.preparing")); }
 
   if (!user) return <AppShell><EmptyState title={t("passport.signIn")} cta={{ to: "/auth?next=/passport", label: t("nav.signIn") }} /></AppShell>;
   return (

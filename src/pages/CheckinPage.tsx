@@ -13,6 +13,14 @@ import { useMyRewards, useParty } from "@/lib/data";
 
 type Result = { checkin_id: string; watch_party_id: string; group_id: string; caps: number };
 
+/** Ask the phone where it is (to prove you're at the venue). Resolves null if refused or unavailable. */
+function getPosition(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((res) => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 });
+  });
+}
+
 export default function CheckinPage() {
   const { code: codeParam } = useParams();
   const { t, lang } = useI18n();
@@ -33,10 +41,13 @@ export default function CheckinPage() {
     if (clean.length < 4) return;
     if (!user) { navigate(`/auth?next=/checkin/${clean}`); return; }
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("check_in", { p_code: clean });
+    const pos = await getPosition();
+    const { data, error } = await supabase.rpc("check_in", { p_code: clean, p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null });
     setBusy(false);
     if (error) {
-      setErr(error.message.includes("invalid") ? t("checkin.invalid") : error.message.includes("open from") ? t("checkin.window") : t("common.error"));
+      const m = error.message;
+      setErr(m.includes("location required") ? t("checkin.needLocation") : m.includes("too far") ? t("checkin.tooFar")
+        : m.includes("use live code") ? t("checkin.useLive") : m.includes("invalid") ? t("checkin.invalid") : t("common.error"));
       return;
     }
     setResult(data as unknown as Result);

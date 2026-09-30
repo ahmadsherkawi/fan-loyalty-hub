@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Download, Image as ImageIcon, Share2 } from "lucide-react";
 import { FeatureHeader } from "@/components/common/bits";
-import { toPng } from "html-to-image";
+import { toast } from "sonner";
+import { useShareableImage } from "@/lib/share";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -31,22 +32,12 @@ export function RecapCard({ party }: { party: PartyFull }) {
     setStats((data as { stats: Stats }).stats);
   }
 
-  async function asImage() {
-    if (!cardRef.current) return null;
-    return toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
-  }
-  async function download() {
-    const url = await asImage(); if (!url) return;
-    const a = document.createElement("a"); a.href = url; a.download = "jamhoor-recap.png"; a.click();
-  }
+  const img = useShareableImage(cardRef, "jamhoor-recap.png", [recap, stats, lang]);
   async function share() {
-    const url = await asImage(); if (!url) return;
-    const blob = await (await fetch(url)).blob();
-    const file = new File([blob], "jamhoor-recap.png", { type: "image/png" });
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-    if (nav.canShare?.({ files: [file] })) await navigator.share({ files: [file] }).catch(() => undefined);
-    else download();
+    const r = await img.share();
+    if (r === "notready") toast(t("common.preparing")); else if (r === "downloaded") toast.success(t("common.saved"));
   }
+  function download() { if (!img.download()) toast(t("common.preparing")); }
 
   const headline = recap ? (lang === "ar" ? recap.headline_ar : recap.headline_en) : "";
   const body = recap ? (lang === "ar" ? recap.body_ar : recap.body_en) : "";

@@ -94,7 +94,7 @@ export default function GroupPage() {
             {me ? (
               <span className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-brand-soft text-sm font-bold text-brand"><CheckCircle2 className="h-4 w-4" />{t("group.youreMember")}</span>
             ) : <Button className="flex-1" onClick={join}>{t("group.join")}</Button>}
-            <Button variant="outline" size="icon" className="h-11 w-11" aria-label={t("common.share")} onClick={async () => { const r = await shareOrCopy(shareText, shareUrl); if (r === "copied") toast.success(t("common.copied")); }}><Share2 /></Button>
+            <Button variant="outline" size="icon" className="h-11 w-11" aria-label={t("common.share")} onClick={async () => { const r = await shareOrCopy(shareText, shareUrl); if (r === "copied") toast.success(t("common.copied")); else if (r === "failed") toast.error(t("common.error")); }}><Share2 /></Button>
             <Button asChild variant="outline" size="icon" className="h-11 w-11"><a href={whatsappShare(`${shareText} ${shareUrl}`)} target="_blank" rel="noreferrer" aria-label="WhatsApp"><MessageCircle /></a></Button>
           </div>
           {me && me.role === "member" && <button className="mt-2 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground" onClick={leave}>{t("group.leave")}</button>}

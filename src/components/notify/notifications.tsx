@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
+import { Clock, MessageCircle, Utensils, Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
 import { IconDot } from "@/components/common/bits";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -24,6 +24,12 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   reward_unlocked: { icon: <Gift />, tone: "gold" },
   reward_redeemed: { icon: <Gift />, tone: "gold" },
   cap_earned: { icon: <Stamp />, tone: "gold" },
+  moved_to_waitlist: { icon: <Clock />, tone: "neutral" },
+  table_request: { icon: <Utensils />, tone: "neutral" },
+  table_confirmed: { icon: <Utensils />, tone: "brand" },
+  table_declined: { icon: <Utensils />, tone: "neutral" },
+  venue_message: { icon: <MessageCircle />, tone: "neutral" },
+  venue_reply: { icon: <MessageCircle />, tone: "brand" },
 };
 
 export function useUnreadCount() {
@@ -55,6 +61,7 @@ export function useNotificationText() {
       latest: String(d.latest ?? ""), seats: String(d.seats ?? 0), n: String(d.new_count ?? 1), reservations: String(d.reservations ?? 0),
       caps: String(d.caps ?? d.min_caps ?? ""), area: String(d.area ?? ""), note: String(d.note ?? ""),
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
+      size: String(d.size ?? ""), fan: String(d.fan ?? ""), reply: d.reply ? `· “${d.reply}”` : "",
     };
     const k = n.kind;
     const title = t(`notif.${k}.t` as TKey, vars);

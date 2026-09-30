@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import confetti from "canvas-confetti";
+import { useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CheckCircle2, Gift, Lock, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +27,19 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
   const used = r.last?.status === "redeemed" && !r.repeatable;
   const live = r.last?.status === "issued" && new Date(r.last.expires_at) > new Date();
   const missing = Math.max(0, r.min_caps - r.caps);
+  // While the code is on screen, watch for the venue redeeming it so the fan sees it happen live
+  const { data: status } = useQuery({
+    queryKey: ["redemption", code?.code],
+    enabled: !!code,
+    refetchInterval: (q) => (q.state.data?.status === "redeemed" ? false : 3000),
+    queryFn: async () => (await supabase.from("reward_redemptions").select("status, redeemed_at").eq("code", code!.code).maybeSingle()).data,
+  });
+  const redeemedNow = status?.status === "redeemed";
+  useEffect(() => {
+    if (!redeemedNow) return;
+    confetti({ particleCount: 120, spread: 70, origin: { y: 0.4 }, colors: ["#FFC53D", "#00C566", "#0B1220"] });
+    qc.invalidateQueries({ queryKey: ["my-rewards"] });
+  }, [redeemedNow, qc]);
 
   async function claim() {
     if (live && r.last) { setCode({ code: r.last.code, expires_at: r.last.expires_at }); return; }
@@ -60,10 +75,21 @@ export function RewardItem({ r, showVenue = true }: { r: RewardRow; showVenue?: 
       <Dialog open={!!code} onOpenChange={(o) => !o && setCode(null)}>
         <DialogContent className="max-w-sm rounded-3xl text-center">
           <DialogHeader><DialogTitle className="text-center">{title}</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">{t("rewards.showAt", { venue })}</p>
-          <p className="scoreboard mt-2 text-5xl font-bold tracking-[0.2em]" dir="ltr">{code?.code}</p>
-          <div className="mx-auto mt-2 w-fit rounded-2xl border bg-white p-3"><QRCodeSVG value={code?.code ?? ""} size={150} fgColor="#0B1220" /></div>
-          {code && <p className="text-xs text-muted-foreground">{t("rewards.validUntil", { date: formatDateTime(code.expires_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) })}</p>}
+          {redeemedNow ? (
+            <div className="py-6">
+              <CheckCircle2 className="mx-auto h-16 w-16 text-brand" />
+              <p className="mt-3 text-xl font-extrabold">{t("rewards.redeemedNow")}</p>
+              <p className="text-sm text-muted-foreground">{venue}{status?.redeemed_at ? ` · ${formatDateTime(status.redeemed_at, { hour: "2-digit", minute: "2-digit" })}` : ""}</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">{t("rewards.showAt", { venue })}</p>
+              <p className="scoreboard mt-2 text-5xl font-bold tracking-[0.2em]" dir="ltr">{code?.code}</p>
+              <div className="mx-auto mt-2 w-fit rounded-2xl border bg-white p-3"><QRCodeSVG value={`jamhoor-reward:${code?.code ?? ""}`} size={150} fgColor="#0B1220" /></div>
+              {code && <p className="text-xs text-muted-foreground">{t("rewards.validUntil", { date: formatDateTime(code.expires_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) })}</p>}
+              <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" />{t("rewards.waiting")}</p>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

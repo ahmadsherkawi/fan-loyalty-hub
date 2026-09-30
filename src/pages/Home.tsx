@@ -101,7 +101,7 @@ function MatchDay() {
         )}
       </Section>
 
-      <Section title={t("home.thisWeek")}>
+      <Section title={t("home.thisWeek")} action={<SeeAll to="/venues" label={t("venues.title")} />}>
         {citiesWithParties.length > 1 && (
           <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
             <Chip active={city === "all"} onClick={() => setCity("all")}>{t("common.all")}</Chip>

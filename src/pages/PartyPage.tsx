@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarPlus, CalendarX2, CheckCircle2, Clock, TicketCheck, Users, Gift, MapPin, MessageCircle, Minus, Navigation, Plus, QrCode, Share2, Stamp, Tv } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { VenueFacts } from "@/components/cards";
-import { CardSkeletons, DemoChip, EmptyState, FeatureHeader, Initials } from "@/components/common/bits";
+import { CardSkeletons, DemoChip, EmptyState, FeatureHeader } from "@/components/common/bits";
+import { MatchWall } from "@/components/party/MatchWall";
+import { DemoClock } from "@/components/party/DemoClock";
+import { phaseOf, type Phase } from "@/lib/matchPhase";
 import { GuestList } from "@/components/GuestList";
 import { cn } from "@/lib/utils";
 import { PunditChat } from "@/components/ai/PunditChat";
@@ -21,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  downloadIcs, isFinished, isLive, loc, partyTime, shareOrCopy, useIsGroupAdmin, useParty, usePartyCounts, useProfilesByIds, whatsappShare,
+  downloadIcs, isFinished, isLive, loc, partyTime, shareOrCopy, useIsGroupAdmin, useParty, usePartyCounts, whatsappShare,
 } from "@/lib/data";
 
 export default function PartyPage() {
@@ -34,12 +36,13 @@ export default function PartyPage() {
   const { data: counts } = usePartyCounts(id);
   const { data: isAdmin } = useIsGroupAdmin(party?.group_id, user?.id);
   const [guests, setGuests] = useState(0);
+  const [demoPhase, setDemoPhase] = useState<Phase | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data: rsvps } = useQuery({
     queryKey: ["rsvps", id],
     enabled: !!id && !!user,
-    queryFn: async () => (await supabase.from("rsvps").select("*").eq("watch_party_id", id!).neq("status", "cancelled").order("created_at")).data ?? [],
+    queryFn: async () => (await supabase.from("rsvps").select("*").eq("watch_party_id", id!).eq("user_id", user!.id).neq("status", "cancelled")).data ?? [],
   });
   const { data: myCheckin } = useQuery({
     queryKey: ["my-checkin", id, user?.id],
@@ -51,8 +54,6 @@ export default function PartyPage() {
     enabled: !!party?.venue_id,
     queryFn: async () => (await supabase.from("venue_offers").select("*").eq("venue_id", party!.venue_id!).eq("active", true).order("min_caps")).data ?? [],
   });
-  const goingIds = (rsvps ?? []).filter((r) => r.status === "going").map((r) => r.user_id);
-  const { data: goingProfiles } = useProfilesByIds(goingIds);
   const mine = rsvps?.find((r) => r.user_id === user?.id);
 
   if (isLoading) return <AppShell><CardSkeletons n={3} /></AppShell>;
@@ -67,6 +68,8 @@ export default function PartyPage() {
   const url = `${window.location.origin}/party/${party.id}`;
   const shareText = t("party.shareText", { match: title, venue: venueName || "", time: formatDateTime(when) });
   const cap = party.capacity ?? 0;
+  const isVenueOwner = !!user && party.venue?.owner_user_id === user.id;
+  const phase: Phase = party.is_demo && demoPhase ? demoPhase : phaseOf(f);
 
   async function doRsvp() {
     if (!user) { navigate(`/auth?next=/party/${party!.id}`); return; }
@@ -83,7 +86,7 @@ export default function PartyPage() {
   }
 
   const pct = cap ? Math.min(100, ((counts?.going ?? 0) / cap) * 100) : 0;
-  const share = async () => { const r = await shareOrCopy(shareText, url); if (r === "copied") toast.success(t("common.copied")); };
+  const share = async () => { const r = await shareOrCopy(shareText, url); if (r === "copied") toast.success(t("common.copied")); else if (r === "failed") toast.error(t("common.error")); };
 
   return (
     <AppShell>
@@ -138,9 +141,6 @@ export default function PartyPage() {
               {cap ? <span className="scoreboard text-xl text-muted-foreground">/ {cap}</span> : null}</span>
               <span className="ms-1 text-sm font-medium text-muted-foreground">{t("party.goingCount")}</span>
             </div>
-            {goingProfiles && goingProfiles.length > 0 && (
-              <div className="flex -space-x-2 rtl:space-x-reverse">{goingProfiles.slice(0, 4).map((p) => <Initials key={p.user_id} name={p.full_name} />)}</div>
-            )}
           </div>
           {cap > 0 && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>}
           {counts?.waitlist ? <p className="mt-2 text-xs text-muted-foreground">{t("party.waitlistCount", { n: counts.waitlist })}</p> : null}
@@ -174,8 +174,9 @@ export default function PartyPage() {
       <Tabs defaultValue="match" className="mt-6">
         <TabsList className="w-full">
           <TabsTrigger value="match">{t("party.tabMatch")}</TabsTrigger>
+          <TabsTrigger value="wall">{t("party.tabWall")}</TabsTrigger>
           <TabsTrigger value="venue">{t("party.tabVenue")}</TabsTrigger>
-          {isAdmin && <TabsTrigger value="host">{t("party.tabHost")}</TabsTrigger>}
+          {(isAdmin || isVenueOwner) && <TabsTrigger value="host">{t("party.tabHost")}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="match" className="space-y-3">
@@ -183,14 +184,17 @@ export default function PartyPage() {
             <EmptyState title={t("party.signInFeatures")} body={t("party.signInFeaturesBody")} cta={{ to: `/auth?next=/party/${party.id}`, label: t("nav.signIn") }} />
           ) : (
             <>
+              {party.is_demo && f && <DemoClock value={phase} onChange={setDemoPhase} />}
               {f && !done && <PredictionInput fixture={f} />}
               {f && <PunditChat fixtureId={f.id} partyId={party.id} homeName={f.home_team_name} awayName={f.away_team_name} />}
-              {f && (live || done || party.is_demo) && <HalftimeQuiz fixtureId={f.id} />}
-              {(live || done || party.is_demo) && <MotmVote partyId={party.id} />}
+              {f && <HalftimeQuiz fixtureId={f.id} partyId={party.id} phase={phase} />}
+              {f && <MotmVote partyId={party.id} fixture={f} phase={phase} />}
               {done && <RecapCard party={party} />}
             </>
           )}
         </TabsContent>
+
+        <TabsContent value="wall"><MatchWall partyId={party.id} checkedIn={!!myCheckin} isHost={!!isAdmin || isVenueOwner} /></TabsContent>
 
         <TabsContent value="venue" className="space-y-3">
           {party.venue ? (
@@ -222,23 +226,24 @@ export default function PartyPage() {
           )}
         </TabsContent>
 
-        {isAdmin && (
+        {(isAdmin || isVenueOwner) && (
           <TabsContent value="host" className="space-y-3">
-            {party.venue_status === "declined" && (
+            {isAdmin && party.venue_status === "declined" && (
               <Button asChild variant="ink" className="w-full"><Link to={`/organiser/${party.group?.slug}?party=${party.id}`}>{t("party.pickAnotherVenue")}</Link></Button>
             )}
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between p-4">
-                <FeatureHeader icon={<Users />} title={t("vdash.guestList")} sub={t("party.guestListSub")} />
+            <div className="card p-4">
+              <FeatureHeader icon={<Users />} title={t("party.turnout")} sub={isVenueOwner ? t("party.guestListSub") : t("party.privacyNote")} />
+              <div className="mt-4 grid grid-cols-3 divide-x rounded-xl bg-surface py-3 text-center rtl:divide-x-reverse">
+                <div><p className="scoreboard text-2xl font-bold leading-none">{counts?.going ?? 0}</p><p className="mt-1 text-[11px] text-muted-foreground">{t("vdash.seatsTotal", { n: "" }).trim()}</p></div>
+                <div><p className="scoreboard text-2xl font-bold leading-none">{counts?.waitlist ?? 0}</p><p className="mt-1 text-[11px] text-muted-foreground">{t("party.waitlistShort")}</p></div>
+                <div><p className="scoreboard text-2xl font-bold leading-none">{counts?.checked_in ?? 0}</p><p className="mt-1 text-[11px] text-muted-foreground">{t("vdash.arrived")}</p></div>
               </div>
-              <GuestList partyId={party.id} />
             </div>
+            {isVenueOwner && <div className="card overflow-hidden"><GuestList partyId={party.id} /></div>}
             <div className="card p-5 text-center">
-              <p className="eyebrow">{t("party.checkinCode")}</p>
-              <p className="scoreboard mt-1 text-5xl font-bold tracking-[0.2em]" dir="ltr">{party.checkin_code}</p>
-              <div className="mx-auto mt-4 w-fit rounded-2xl border bg-white p-3"><QRCodeSVG value={`${window.location.origin}/checkin/${party.checkin_code}`} size={176} fgColor="#0B1220" /></div>
-              <p className="mt-3 text-sm text-muted-foreground">{t("party.showAtVenue")}</p>
-              <Button asChild variant="ink" className="mt-4"><Link to={`/party/${party.id}/screen`}><Tv />{t("party.venueScreen")}</Link></Button>
+              <FeatureHeader icon={<Tv />} title={t("party.venueScreen")} sub={t("party.screenHowTo")} />
+              <Button asChild variant="ink" className="mt-4 w-full"><Link to={`/party/${party.id}/screen`}><Tv />{t("party.openScreen")}</Link></Button>
+              {party.is_demo && <p className="mt-3 text-xs text-muted-foreground">{t("party.demoCode", { code: party.checkin_code })}</p>}
             </div>
           </TabsContent>
         )}

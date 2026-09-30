@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, FeatureHeader } from "@/components/common/bits";
 import { GuestList } from "@/components/GuestList";
+import { TableRequests } from "@/components/venue/TableRequests";
+import { Inbox } from "@/components/venue/Inbox";
+import { ScreeningsEditor } from "@/components/venue/ScreeningsEditor";
+import { MenuEditor } from "@/components/venue/MenuEditor";
+import { ProDialog, VenueSettings } from "@/components/venue/VenueSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +47,18 @@ export default function VenueDashboard() {
     queryFn: async () => (await supabase.rpc("venue_stats", { p_venue: id! })).data as unknown as VStats,
   });
   const { data: bookings, isLoading: bLoading } = useVenueBookings(id, allowed);
+  const { data: inbox } = useQuery({
+    queryKey: ["venue-inbox", id],
+    enabled: allowed,
+    refetchInterval: 20_000,
+    queryFn: async () => ((await supabase.rpc("venue_inbox", { p_venue: id! })).data ?? []) as unknown as { venue_unread: number }[],
+  });
+  const { data: proReq, refetch: refetchPro } = useQuery({
+    queryKey: ["pro-req", id],
+    enabled: allowed,
+    queryFn: async () => (await supabase.from("venue_pro_requests").select("id").eq("venue_id", id!).limit(1)).data ?? [],
+  });
+  const unreadMsgs = (inbox ?? []).reduce((s, r) => s + (r.venue_unread ?? 0), 0);
 
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
   if (!allowed) return <AppShell><BackButton /><EmptyState title={t("vdash.notAllowed")} /></AppShell>;
@@ -56,6 +73,11 @@ export default function VenueDashboard() {
     <AppShell>
       <BackButton />
       <PageTitle eyebrow={<Link to={`/venues/${venue!.id}`} className="text-brand">{loc(venue, "name", lang)}</Link>} title={t("page.venueDashboard")} />
+      <div className="-mt-2 mb-5 flex flex-wrap gap-2">
+        <VenueSettings venue={venue!} />
+        <Button asChild variant="outline" size="sm"><Link to={`/venues/${venue!.id}`}>{t("vdash.viewPublic")}</Link></Button>
+        <ProDialog venue={venue!} requested={(proReq ?? []).length > 0} onRequested={() => refetchPro()} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
@@ -71,11 +93,14 @@ export default function VenueDashboard() {
         ))}
       </div>
 
-      <Tabs defaultValue="bookings" className="mt-6">
-        <TabsList className="w-full">
-          <TabsTrigger value="bookings">{t("vdash.tabBookings")}{pending.length ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{pending.length}</span> : null}</TabsTrigger>
-          <TabsTrigger value="rewards">{t("vdash.tabRewards")}</TabsTrigger>
-          <TabsTrigger value="insights">{t("vdash.tabInsights")}</TabsTrigger>
+      <Tabs defaultValue={params.get("tab") === "inbox" ? "inbox" : "bookings"} className="mt-6">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="bookings" className="flex-none">{t("vdash.tabBookings")}{pending.length ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{pending.length}</span> : null}</TabsTrigger>
+          <TabsTrigger value="inbox" className="flex-none">{t("vdash.tabInbox")}{unreadMsgs ? <span className="ms-1.5 rounded-full bg-live px-1.5 text-[11px] font-bold text-white">{unreadMsgs}</span> : null}</TabsTrigger>
+          <TabsTrigger value="showing" className="flex-none">{t("vdash.tabShowing")}</TabsTrigger>
+          <TabsTrigger value="menu" className="flex-none">{t("vdash.tabMenu")}</TabsTrigger>
+          <TabsTrigger value="rewards" className="flex-none">{t("vdash.tabRewards")}</TabsTrigger>
+          <TabsTrigger value="insights" className="flex-none">{t("vdash.tabInsights")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookings" className="space-y-8">
@@ -90,6 +115,10 @@ export default function VenueDashboard() {
                 <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><CheckCircle2 className="h-5 w-5 text-brand" />{t("vdash.upcomingNights")}</h2>
                 {upcoming.length ? <div className="space-y-3">{upcoming.map((b) => <NightCard key={b.id} b={b} defaultOpen={focus === b.id} />)}</div>
                   : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("vdash.noUpcoming")}</p>}
+              </section>
+              <section>
+                <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><Users className="h-5 w-5" />{t("tables.title")}</h2>
+                <TableRequests venueId={id!} />
               </section>
               {past.length > 0 && (
                 <section>
@@ -107,8 +136,11 @@ export default function VenueDashboard() {
           )}
         </TabsContent>
 
+        <TabsContent value="inbox"><Inbox venueId={id!} venueName={loc(venue, "name", lang)} initialThread={params.get("thread")} /></TabsContent>
+        <TabsContent value="showing"><ScreeningsEditor venueId={id!} /></TabsContent>
+        <TabsContent value="menu"><MenuEditor venueId={id!} /></TabsContent>
         <TabsContent value="rewards"><RewardsPanel venueId={id!} /></TabsContent>
-        <TabsContent value="insights"><Insights stats={stats} />{!venue!.is_pro && <ProCard />}</TabsContent>
+        <TabsContent value="insights"><Insights stats={stats} /></TabsContent>
       </Tabs>
     </AppShell>
   );
@@ -141,10 +173,11 @@ function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
   const qc = useQueryClient();
   const [area, setArea] = useState("");
   const [note, setNote] = useState("");
+  const [seats, setSeats] = useState(String(b.capacity ?? ""));
   const [busy, setBusy] = useState<string | null>(null);
   async function answer(decision: "confirmed" | "declined") {
     setBusy(decision);
-    const { error } = await supabase.rpc("respond_booking", { p_party: b.id, p_decision: decision, p_note: note, p_area: area });
+    const { error } = await supabase.rpc("respond_booking", { p_party: b.id, p_decision: decision, p_note: note, p_area: area, p_capacity: seats ? Number(seats) : null });
     setBusy(null);
     if (error) return toast.error(t("common.error"));
     toast.success(decision === "confirmed" ? t("vdash.confirmedToast", { group: b.group_name }) : t("vdash.declinedToast"));
@@ -163,6 +196,11 @@ function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
           <div><p className="scoreboard text-xl font-bold leading-none">{b.group_members}</p><p className="mt-1 text-[11px] text-muted-foreground">{t("vdash.groupSize")}</p></div>
         </div>
         <div className="mt-4 grid gap-2">
+          <label className="flex items-center gap-3 rounded-xl border px-3">
+            <span className="flex-1 text-sm font-semibold">{t("vdash.seatsYouGive")}</span>
+            <Input type="number" min={1} value={seats} onChange={(e) => setSeats(e.target.value)} className="h-10 w-24 border-0 text-end scoreboard text-lg font-bold focus-visible:ring-0" />
+          </label>
+          {b.seats > Number(seats || 0) && seats && <p className="text-xs font-medium text-destructive">{t("vdash.overbookWarn", { n: b.seats - Number(seats) })}</p>}
           <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder={t("vdash.areaPlaceholder")} />
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("vdash.notePlaceholder")} />
         </div>
@@ -192,6 +230,7 @@ function NightCard({ b, past, defaultOpen }: { b: Booking; past?: boolean; defau
           {!past && <p className="text-end text-xs text-muted-foreground"><span className="scoreboard block text-xl font-bold text-foreground">{b.checked_in}</span>{t("vdash.arrived")}</p>}
         </div>
         {!past && b.capacity ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div> : null}
+        {!past && <SeatsEditor b={b} />}
         <div className="mt-4 flex gap-2">
           <Button variant="outline" size="sm" className="flex-1" onClick={() => setOpen(!open)}><Users />{t("vdash.guestList")}<ChevronDown className={cn("transition-transform", open && "rotate-180")} /></Button>
           {!past && <Button asChild variant="ink" size="sm"><Link to={`/party/${b.id}/screen`}><Monitor />{t("vdash.screen")}</Link></Button>}
@@ -248,8 +287,9 @@ function RewardsPanel({ venueId }: { venueId: string }) {
         <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); redeem(); }}>
           <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))} placeholder="A1B2C3" dir="ltr"
             className="scoreboard h-12 flex-1 border-white/20 bg-white/10 text-center text-2xl font-bold tracking-[0.3em] text-white placeholder:text-white/30" />
-          <Button type="submit" className="h-12" disabled={code.length < 6}>{t("vdash.redeem")}</Button>
+          <Button id="redeem-submit" type="submit" className="h-12" disabled={code.length < 6}>{t("vdash.redeem")}</Button>
         </form>
+        <ScanButton onCode={(c) => { setCode(c); setTimeout(() => document.getElementById("redeem-submit")?.click(), 50); }} />
         {err && <p className="mt-3 rounded-lg bg-live/20 px-3 py-2 text-sm font-semibold">{err}</p>}
         {result && (
           <div className="mt-3 flex items-center gap-3 rounded-xl bg-primary px-4 py-3 text-primary-foreground">
@@ -353,13 +393,47 @@ function Insights({ stats }: { stats?: VStats }) {
   );
 }
 
-function ProCard() {
+/** Opens the camera and reads a fan's reward QR (jamhoor-reward:CODE). */
+function ScanButton({ onCode }: { onCode: (code: string) => void }) {
   const { t } = useI18n();
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    let scanner: { stop: () => Promise<void>; clear: () => void } | null = null;
+    let stopped = false;
+    import("html5-qrcode").then(({ Html5Qrcode }) => {
+      if (stopped) return;
+      const s = new Html5Qrcode("reward-reader");
+      scanner = s as unknown as typeof scanner;
+      s.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, (text) => {
+        const m = text.match(/([A-Z0-9]{6})$/i);
+        if (m) { setOn(false); onCode(m[1].toUpperCase()); }
+      }, () => undefined).catch(() => { setOn(false); toast.error(t("checkin.noCamera")); });
+    });
+    return () => { stopped = true; scanner?.stop().then(() => scanner?.clear()).catch(() => undefined); };
+  }, [on, onCode, t]);
+  return on ? (
+    <div className="mt-3"><div id="reward-reader" className="overflow-hidden rounded-2xl" /><Button variant="ghost" className="mt-2 w-full text-white hover:bg-white/10 hover:text-white" onClick={() => setOn(false)}>{t("checkin.stopScan")}</Button></div>
+  ) : <Button variant="ghost" className="mt-2 w-full text-white/80 hover:bg-white/10 hover:text-white" onClick={() => setOn(true)}><ScanLine />{t("vdash.scanFanCode")}</Button>;
+}
+
+function SeatsEditor({ b }: { b: Booking }) {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState(false);
+  const [v, setV] = useState(String(b.capacity ?? ""));
+  async function save() {
+    const { error } = await supabase.rpc("set_party_capacity", { p_party: b.id, p_capacity: Number(v) });
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("vdash.seatsSaved")); setEdit(false);
+    qc.invalidateQueries({ queryKey: ["venue-bookings"] });
+  }
+  if (!edit) return <button onClick={() => setEdit(true)} className="mt-2 text-xs font-semibold text-brand hover:underline">{t("vdash.changeSeats")}</button>;
   return (
-    <div className="mt-4 rounded-3xl border border-gold/50 bg-gold-soft p-5">
-      <p className="font-display text-lg font-bold">{t("vdash.proTitle")}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{t("vdash.proBody")}</p>
-      <Button className="mt-3" variant="ink" onClick={() => toast.success(t("vdash.proThanks"))}>{t("vdash.proCta")}</Button>
+    <div className="mt-2 flex items-center gap-2">
+      <Input type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} className="h-9 w-24" />
+      <Button size="sm" onClick={save} disabled={!v}>{t("profile.save")}</Button>
+      <Button size="sm" variant="ghost" onClick={() => setEdit(false)}>{t("common.cancel")}</Button>
     </div>
   );
 }
