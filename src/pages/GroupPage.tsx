@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { TeamBadge } from "@/components/brand/TeamBadge";
 import { LeaderboardTable, PartyCard, VenueCard } from "@/components/cards";
-import { CardSkeletons, DemoChip, EmptyState, Initials } from "@/components/common/bits";
+import { CardSkeletons, Chip, DemoChip, EmptyState, Initials } from "@/components/common/bits";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +23,7 @@ export default function GroupPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: group, isLoading, error } = useGroup(slug);
+  const [sort, setSort] = useState<"points" | "caps">("points");
   const { data: parties } = useGroupParties(group?.id);
   const { data: isAdmin } = useIsGroupAdmin(group?.id, user?.id);
   const { data: members } = useQuery({
@@ -128,7 +130,7 @@ export default function GroupPage() {
 
         <TabsContent value="league">
           {!user ? <EmptyState title={t("group.signInLeague")} cta={{ to: `/auth?next=/g/${slug}`, label: t("nav.signIn") }} />
-            : board?.length ? <LeaderboardTable rows={board} currentUserId={user.id} /> : <EmptyState title={t("league.empty")} cta={{ to: "/predict", label: t("league.makePrediction") }} />}
+            : board?.length ? <><div className="mb-3 flex gap-2"><Chip active={sort === "points"} onClick={() => setSort("points")}>{t("league.byPoints")}</Chip><Chip active={sort === "caps"} onClick={() => setSort("caps")}>{t("league.byCaps")}</Chip></div><LeaderboardTable rows={board} currentUserId={user.id} sortBy={sort} /></> : <EmptyState title={t("league.empty")} cta={{ to: "/predict", label: t("league.makePrediction") }} />}
           <p className="mt-2 text-xs text-muted-foreground">{t("league.rules")}</p>
         </TabsContent>
 

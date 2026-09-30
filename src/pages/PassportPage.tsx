@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Award, Download, Lock, MapPin, Share2, Stamp } from "lucide-react";
+import { Award, Download, Gift, Lock, MapPin, Share2, Stamp } from "lucide-react";
+import { RewardItem, RewardsSummary } from "@/components/rewards/Rewards";
 import { toPng } from "html-to-image";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { loc, useTeams } from "@/lib/data";
+import { loc, useMyRewards, useTeams } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 type Passport = {
@@ -28,6 +29,12 @@ export default function PassportPage() {
   const { data: teams } = useTeams();
   const team = teams?.find((x) => x.id === profile?.favorite_team_id);
   const cardRef = useRef<HTMLDivElement>(null);
+  const { data: rewards } = useMyRewards(!!user);
+  const [showAll, setShowAll] = useState(false);
+  const [showPerks, setShowPerks] = useState(false);
+  useEffect(() => {
+    if (rewards && window.location.hash === "#rewards") document.getElementById("rewards")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [rewards]);
   const { data: pp, isLoading } = useQuery({
     queryKey: ["passport", user?.id],
     enabled: !!user,
@@ -69,6 +76,18 @@ export default function PassportPage() {
             <Button variant="outline" className="flex-1" onClick={download}><Download />{t("recap.download")}</Button>
             <Button className="flex-1" onClick={share}><Share2 />{t("common.share")}</Button>
           </div>
+
+          <section id="rewards" className="mt-9">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><Gift className="h-5 w-5 text-gold-ink" />{t("rewards.title")}</h2>
+            {rewards && <RewardsSummary rewards={rewards} caps={pp.caps} />}
+            <div className="mt-3 space-y-2">
+              {(rewards ?? []).filter((r) => r.min_caps > 0 || showPerks).slice(0, showAll ? 99 : 5).map((r) => <RewardItem key={r.id} r={r} />)}
+            </div>
+            <div className="mt-2 flex gap-2">
+              {!showAll && (rewards ?? []).filter((r) => r.min_caps > 0 || showPerks).length > 5 && <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>{t("rewards.showAll")}</Button>}
+              <Button variant="ghost" size="sm" onClick={() => setShowPerks(!showPerks)}>{showPerks ? t("rewards.hidePerks") : t("rewards.showPerks")}</Button>
+            </div>
+          </section>
 
           <h2 className="mt-9 flex items-center gap-2 text-lg font-bold"><Award className="h-5 w-5 text-gold-ink" />{t("passport.badges")}</h2>
           <div className="mt-3 grid grid-cols-3 gap-3 md:grid-cols-5">

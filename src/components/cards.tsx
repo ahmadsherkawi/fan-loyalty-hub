@@ -47,9 +47,11 @@ export function PartyCard({ party, showGroup = true }: { party: PartyFull; showG
           <span aria-hidden>·</span>
           <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{loc(party.venue, "name", lang) || t("party.venueTbc")}</span>
         </p>
-        {(showGroup && party.group) || live || party.is_demo ? (
-          <div className="mt-1.5 flex items-center gap-1.5">
+        {(showGroup && party.group) || live || party.is_demo || (!done && party.venue_status !== "confirmed" && party.venue_status !== "none") ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {live && <LivePill />}
+            {!done && party.venue_status === "pending" && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t("org.status_pending")}</span>}
+            {!done && party.venue_status === "declined" && <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">{t("org.status_declined")}</span>}
             {showGroup && party.group && <span className="truncate text-xs font-semibold text-brand">{loc(party.group, "name", lang)}</span>}
             <DemoChip show={party.is_demo} />
           </div>
@@ -125,8 +127,9 @@ export function VenueCard({ venue }: { venue: Venue }) {
 
 const podium = ["bg-gold text-accent-foreground", "bg-[#D9DEE5] text-foreground", "bg-[#E8C9A8] text-foreground"];
 
-export function LeaderboardTable({ rows, currentUserId }: { rows: LeaderRow[]; currentUserId?: string }) {
+export function LeaderboardTable({ rows: input, currentUserId, sortBy = "points" }: { rows: LeaderRow[]; currentUserId?: string; sortBy?: "points" | "caps" }) {
   const { t } = useI18n();
+  const rows = [...input].sort((a, b) => sortBy === "caps" ? b.caps - a.caps || b.prediction_points - a.prediction_points : b.prediction_points - a.prediction_points || b.exact_scores - a.exact_scores);
   return (
     <div className="card overflow-hidden">
       <div className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem] gap-2 border-b bg-surface px-4 py-2.5 eyebrow">
@@ -136,9 +139,9 @@ export function LeaderboardTable({ rows, currentUserId }: { rows: LeaderRow[]; c
         <div key={r.user_id} className={cn("grid grid-cols-[2rem_1fr_3rem_3rem_3rem] items-center gap-2 border-b px-4 py-3 text-sm last:border-0", r.user_id === currentUserId && "bg-brand-soft")}>
           <span className={cn("scoreboard flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold", podium[i] ?? "text-muted-foreground")}>{i + 1}</span>
           <span className="flex min-w-0 items-center gap-2"><Initials name={r.full_name} className="h-7 w-7" /><span className="truncate font-medium">{r.full_name ?? "—"}</span></span>
-          <span className="scoreboard text-end text-lg font-bold">{r.prediction_points}</span>
+          <span className={cn("scoreboard text-end text-lg", sortBy === "points" ? "font-bold" : "text-muted-foreground")}>{r.prediction_points}</span>
           <span className="scoreboard text-end text-lg text-muted-foreground">{r.exact_scores}</span>
-          <span className="scoreboard text-end text-lg text-muted-foreground">{r.caps}</span>
+          <span className={cn("scoreboard text-end text-lg", sortBy === "caps" ? "font-bold" : "text-muted-foreground")}>{r.caps}</span>
         </div>
       ))}
     </div>

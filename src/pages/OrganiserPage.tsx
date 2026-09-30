@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { MessageCircle, Sparkles, Wand2 } from "lucide-react";
+import { CalendarX2, Clock, MessageCircle, Sparkles, TicketCheck, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, BackButton, PageTitle } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, FeatureHeader, Initials } from "@/components/common/bits";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { FIXTURE_SELECT, loc, useGroup, useIsGroupAdmin, useProfilesByIds, useVenues, whatsappShare, type FixtureWithTeams } from "@/lib/data";
+import { FIXTURE_SELECT, isFinished, loc, partyTime, useGroupParties, useGroup, useIsGroupAdmin, useProfilesByIds, useVenues, whatsappShare, type FixtureWithTeams } from "@/lib/data";
 
 type Stats = {
   members: number; paid: number; new_last_30d: number; parties: number; total_checkins: number;
@@ -45,7 +46,7 @@ export default function OrganiserPage() {
           <TabsTrigger value="members">{t("org.tabMembers")}</TabsTrigger>
           <TabsTrigger value="news">{t("org.tabNews")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="party"><PartyCreator groupId={group.id} teamId={group.team_id} city={group.city} homeVenueId={group.home_venue_id} slug={group.slug} /></TabsContent>
+        <TabsContent value="party" className="space-y-6"><MatchNights groupId={group.id} city={group.city} /><PartyCreator groupId={group.id} teamId={group.team_id} city={group.city} homeVenueId={group.home_venue_id} slug={group.slug} /></TabsContent>
         <TabsContent value="stats"><StatsPanel groupId={group.id} /></TabsContent>
         <TabsContent value="members"><MembersPanel groupId={group.id} dues={group.dues_amount_aed} /></TabsContent>
         <TabsContent value="news"><NewsPanel groupId={group.id} slug={group.slug} /></TabsContent>
@@ -116,8 +117,9 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
   if (created) {
     return (
       <div className="card p-5 text-center">
-        <p className="text-lg font-semibold">{t("org.partyCreated")}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{t("org.nowShare")}</p>
+        <p className="text-lg font-bold">{t("org.partyCreated")}</p>
+        {draft.venue_id && <p className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground"><Clock className="h-3.5 w-3.5" />{t("org.requestSent", { venue: loc(venues?.find((v) => v.id === draft.venue_id), "name", lang) })}</p>}
+        <p className="mt-2 text-sm text-muted-foreground">{t("org.nowShare")}</p>
         <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-surface p-4 font-sans text-start text-sm" dir="auto">{created.text}</pre>
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           <Button asChild className="rounded-full"><a href={whatsappShare(created.text)} target="_blank" rel="noreferrer"><MessageCircle className="me-1.5 h-4 w-4" />{t("org.postWhatsapp")}</a></Button>
@@ -279,5 +281,60 @@ function NewsPanel({ groupId, slug }: { groupId: string; slug: string }) {
       <Button className="rounded-full" onClick={post} disabled={!(en || ar)}>{t("org.post")}</Button>
       {posted && <Button asChild variant="outline" className="rounded-full"><a href={whatsappShare(posted)} target="_blank" rel="noreferrer"><MessageCircle className="me-1.5 h-4 w-4" />{t("org.postWhatsapp")}</a></Button>}
     </div>
+  );
+}
+
+/** The organiser's upcoming match nights with the venue's answer, and a quick way to move a declined booking. */
+function MatchNights({ groupId, city }: { groupId: string; city: string }) {
+  const { t, lang, formatDateTime } = useI18n();
+  const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const { data: parties } = useGroupParties(groupId);
+  const { data: venues } = useVenues(city);
+  const [moving, setMoving] = useState<string | null>(params.get("party"));
+  const upcoming = (parties ?? []).filter((p) => !isFinished(p.fixture?.status) && p.status !== "finished" && p.status !== "cancelled")
+    .sort((a, b) => new Date(partyTime(a)).getTime() - new Date(partyTime(b)).getTime());
+  if (!upcoming.length) return null;
+  async function move(partyId: string, venueId: string) {
+    const { error } = await supabase.from("watch_parties").update({ venue_id: venueId }).eq("id", partyId);
+    if (error) return toast.error(t("common.error"));
+    setMoving(null);
+    toast.success(t("org.requestSent", { venue: loc(venues?.find((v) => v.id === venueId), "name", lang) }));
+    qc.invalidateQueries({ queryKey: ["parties-group", groupId] });
+  }
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-bold">{t("org.matchNights")}</h2>
+      <div className="card divide-y">
+        {upcoming.map((p) => {
+          const st = p.venue_status;
+          return (
+            <div key={p.id} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <Link to={`/party/${p.id}`} className="block truncate font-semibold hover:underline">{p.fixture ? `${p.fixture.home_team_name} v ${p.fixture.away_team_name}` : p.title}</Link>
+                  <p className="truncate text-xs text-muted-foreground">{formatDateTime(partyTime(p))} · {loc(p.venue, "name", lang) || t("party.venueTbc")}</p>
+                </div>
+                <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
+                  st === "confirmed" ? "bg-brand-soft text-brand" : st === "declined" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>
+                  {st === "confirmed" ? <TicketCheck className="h-3.5 w-3.5" /> : st === "declined" ? <CalendarX2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                  {t(`org.status_${st}` as never)}
+                </span>
+              </div>
+              {st === "confirmed" && p.reserved_area && <p className="mt-1 text-xs text-brand">{p.reserved_area}</p>}
+              {st === "declined" && p.venue_note && <p className="mt-1 text-xs text-destructive">{p.venue_note}</p>}
+              {(st === "declined" || moving === p.id) && (
+                <div className="mt-2">
+                  <Select onValueChange={(v) => move(p.id, v)}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder={t("org.moveTo")} /></SelectTrigger>
+                    <SelectContent>{(venues ?? []).filter((v) => v.id !== p.venue_id).map((v) => <SelectItem key={v.id} value={v.id}>{loc(v, "name", lang)}{v.area ? ` · ${v.area}` : ""}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

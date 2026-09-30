@@ -38,6 +38,10 @@ export type Database = {
       groups: Table<{ city: string; created_at: string | null; created_by: string | null; description: string | null; description_ar: string | null; dues_amount_aed: number | null; home_venue_id: string | null; id: string; instagram: string | null; is_demo: boolean; is_official: boolean; name: string; name_ar: string | null; slug: string; team_id: string | null; visibility: string; whatsapp_link: string | null },
         "name" | "slug",
         [FK<"groups_home_venue_id_fkey", "home_venue_id", "venues">, FK<"groups_team_id_fkey", "team_id", "teams">]>;
+      notifications: Table<{ created_at: string; data: Json; id: string; kind: string; link: string | null; read_at: string | null; updated_at: string; user_id: string }, "kind" | "user_id">;
+      reward_redemptions: Table<{ code: string; created_at: string; expires_at: string; id: string; offer_id: string; redeemed_at: string | null; status: string; user_id: string; venue_id: string },
+        "offer_id" | "user_id" | "venue_id",
+        [FK<"reward_redemptions_offer_id_fkey", "offer_id", "venue_offers">, FK<"reward_redemptions_venue_id_fkey", "venue_id", "venues">]>;
       motm_votes: Table<{ created_at: string | null; id: string; player_name: string; user_id: string; watch_party_id: string },
         "player_name" | "user_id" | "watch_party_id",
         [FK<"motm_votes_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
@@ -61,11 +65,11 @@ export type Database = {
       sync_state: Table<{ key: string; updated_at: string | null; value: Json }, "key" | "value">;
       teams: Table<{ country: string | null; created_at: string | null; football_data_id: number | null; id: string; league: string | null; name: string; name_ar: string | null; primary_color: string | null; secondary_color: string | null; short_name: string | null }, "name">;
       user_badges: Table<{ badge_key: string; earned_at: string | null; id: string; user_id: string }, "badge_key" | "user_id">;
-      venue_offers: Table<{ active: boolean; created_at: string | null; details: string | null; details_ar: string | null; id: string; members_only: boolean; title: string; title_ar: string | null; venue_id: string },
+      venue_offers: Table<{ active: boolean; created_at: string | null; details: string | null; details_ar: string | null; id: string; members_only: boolean; min_caps: number; repeatable: boolean; title: string; title_ar: string | null; venue_id: string },
         "title" | "venue_id",
         [FK<"venue_offers_venue_id_fkey", "venue_id", "venues">]>;
       venues: Table<{ address: string | null; alcohol_free: boolean | null; area: string | null; capacity: number | null; city: string; created_at: string | null; description: string | null; description_ar: string | null; family_friendly: boolean | null; has_sound: boolean | null; id: string; instagram: string | null; is_demo: boolean; is_pro: boolean; lat: number | null; lng: number | null; name: string; name_ar: string | null; owner_user_id: string | null; phone: string | null; screens: number | null; venue_type: string }, "name">;
-      watch_parties: Table<{ capacity: number | null; checkin_code: string; created_at: string | null; created_by: string | null; fixture_id: string | null; group_id: string; id: string; is_demo: boolean; notes: string | null; notes_ar: string | null; starts_at: string | null; status: string; title: string | null; venue_id: string | null },
+      watch_parties: Table<{ capacity: number | null; checkin_code: string; created_at: string | null; created_by: string | null; fixture_id: string | null; group_id: string; id: string; is_demo: boolean; notes: string | null; notes_ar: string | null; starts_at: string | null; status: string; title: string | null; venue_id: string | null; venue_status: string; venue_note: string | null; reserved_area: string | null; venue_responded_at: string | null },
         "group_id",
         [FK<"watch_parties_fixture_id_fkey", "fixture_id", "fixtures">, FK<"watch_parties_group_id_fkey", "group_id", "groups">, FK<"watch_parties_venue_id_fkey", "venue_id", "venues">]>;
     };
@@ -74,7 +78,7 @@ export type Database = {
       can_see_group: { Args: { p_group: string }; Returns: boolean };
       cancel_rsvp: { Args: { p_party: string }; Returns: undefined };
       check_in: { Args: { p_code: string }; Returns: Json };
-      city_leaderboard: { Args: { p_city?: string }; Returns: { avg_prediction_points: number; caps: number; group_id: string; members: number; name: string; name_ar: string; team_name: string }[] };
+      city_leaderboard: { Args: { p_city?: string }; Returns: { avg_prediction_points: number; caps: number; group_id: string; slug: string; members: number; name: string; name_ar: string; team_name: string; team_short: string; team_color: string }[] };
       get_current_profile_id: { Args: never; Returns: string };
       group_leaderboard: { Args: { p_group: string }; Returns: { avatar_url: string; caps: number; exact_scores: number; full_name: string; prediction_points: number; quiz_points: number; user_id: string }[] };
       group_stats: { Args: { p_group: string }; Returns: Json };
@@ -89,6 +93,14 @@ export type Database = {
       rsvp: { Args: { p_guests?: number; p_party: string }; Returns: Json };
       submit_quiz: { Args: { p_answers: Json; p_quiz: string }; Returns: Json };
       venue_stats: { Args: { p_venue: string }; Returns: Json };
+      venue_bookings: { Args: { p_venue: string }; Returns: Json };
+      respond_booking: { Args: { p_party: string; p_decision: string; p_note?: string | null; p_area?: string | null }; Returns: Json };
+      party_guest_list: { Args: { p_party: string }; Returns: Json };
+      mark_arrived: { Args: { p_party: string; p_user: string }; Returns: Json };
+      my_rewards: { Args: never; Returns: Json };
+      claim_reward: { Args: { p_offer: string }; Returns: Json };
+      redeem_reward: { Args: { p_venue: string; p_code: string }; Returns: Json };
+      my_caps: { Args: { p_user?: string }; Returns: number };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

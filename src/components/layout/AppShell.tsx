@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, Home, QrCode, Target, Users } from "lucide-react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Initials } from "@/components/common/bits";
+import { NotificationBell } from "@/components/notify/notifications";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +54,7 @@ export function Header() {
         )}
         <div className="ms-auto flex shrink-0 items-center gap-2">
           <LanguageToggle />
+          {user && <NotificationBell />}
           {user ? (
             <Link to="/profile" aria-label={t("nav.profile")} className="rounded-full ring-offset-2 transition hover:ring-2 hover:ring-border">
               <Initials name={profile?.full_name || user.email} className="h-9 w-9 bg-foreground text-background ring-0" />

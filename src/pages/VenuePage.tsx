@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { GROUP_SELECT, loc, useVenueParties, type GroupFull, type Venue } from "@/lib/data";
+import { GROUP_SELECT, loc, useMyRewards, useVenueParties, type GroupFull, type Venue } from "@/lib/data";
+import { RewardItem } from "@/components/rewards/Rewards";
 
 export default function VenuePage() {
   const { id } = useParams();
@@ -30,6 +31,7 @@ export default function VenuePage() {
     queryFn: async () => ((await supabase.from("groups").select(GROUP_SELECT).eq("home_venue_id", id!)).data ?? []) as unknown as GroupFull[],
   });
   const { data: parties } = useVenueParties(id);
+  const { data: myRewards } = useMyRewards(!!user);
 
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
   if (!venue) return <AppShell><BackButton /><EmptyState title={t("venue.notFound")} /></AppShell>;
@@ -41,7 +43,7 @@ export default function VenuePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold">{loc(venue, "name", lang)}</h1>
           <DemoChip show={venue.is_demo} />
-          {venue.is_pro && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-foreground">PRO</span>}
+          {venue.is_pro && <span className="rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-background">PRO</span>}
         </div>
         <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{[venue.area, t(`city.${venue.city}` as never)].filter(Boolean).join(" · ")}</p>
         {loc(venue, "description", lang) && <p className="mt-3 text-sm">{loc(venue, "description", lang)}</p>}
@@ -54,10 +56,18 @@ export default function VenuePage() {
         </div>
       </div>
       {(offers ?? []).length > 0 && (
-        <Section title={t("party.perks")} icon={<Gift className="h-5 w-5 text-gold-ink" />}>
-          <div className="grid gap-3 md:grid-cols-2">{offers!.map((o) => (
-            <div key={o.id} className="rounded-2xl border border-gold/50 bg-gold-soft p-4"><p className="font-medium">{loc(o, "title", lang)}</p><p className="text-sm text-muted-foreground">{loc(o, "details", lang)}</p></div>
-          ))}</div>
+        <Section title={t("rewards.atVenue")} icon={<Gift className="h-5 w-5 text-gold-ink" />}>
+          {myRewards ? (
+            <div className="space-y-2">{myRewards.filter((r) => r.venue_id === venue.id).map((r) => <RewardItem key={r.id} r={r} showVenue={false} />)}</div>
+          ) : (
+            <div className="card divide-y">{[...offers!].sort((a, b) => a.min_caps - b.min_caps).map((o) => (
+              <div key={o.id} className="flex items-center gap-3 px-4 py-3">
+                <span className={o.min_caps ? "scoreboard flex h-10 w-10 items-center justify-center rounded-xl bg-gold text-lg font-bold" : "flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand"}>{o.min_caps || <Gift className="h-5 w-5" />}</span>
+                <div className="min-w-0"><p className="font-semibold">{loc(o, "title", lang)}</p><p className="text-xs text-muted-foreground">{o.min_caps ? t("rewards.unlockAt", { n: o.min_caps }) : t("rewards.memberPerk")}</p></div>
+              </div>
+            ))}</div>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">{t("rewards.howCaps")}</p>
         </Section>
       )}
       <Section title={t("venue.upcoming")}>

@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { CalendarDays, ChevronRight, Trophy, Tv, Users } from "lucide-react";
+import { CalendarDays, ChevronRight, Gift, Store, Trophy, Tv, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { TeamBadge } from "@/components/brand/TeamBadge";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { PartyCard } from "@/components/cards";
-import { CardSkeletons, Chip, EmptyState, Section, SeeAll } from "@/components/common/bits";
+import { CardSkeletons, Chip, EmptyState, IconDot, Section, SeeAll } from "@/components/common/bits";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  CITIES, loc, partyTime, useCityLeaderboard, useMyMemberships, useNextTeamFixture, usePartiesForFixture, useTeams, useUpcomingParties,
+  CITIES, loc, partyTime, useMyRewards, useMyVenues, useCityLeaderboard, useMyMemberships, useNextTeamFixture, usePartiesForFixture, useTeams, useUpcomingParties,
 } from "@/lib/data";
 import Landing from "./Landing";
 
@@ -69,6 +71,8 @@ function MatchDay() {
         </section>
       )}
 
+      <ForYou />
+
       <Section title={t("home.yourGroups")} action={(memberships ?? []).length > 0 ? <SeeAll to="/groups" label={t("common.seeAll")} /> : undefined}>
         {(memberships ?? []).length === 0 ? (
           <EmptyState icon={<Users className="h-5 w-5" />} title={t("home.noGroupsTitle")}
@@ -113,8 +117,9 @@ function MatchDay() {
         <Section title={t("home.cityLeague", { city: t(`city.${myCity}` as never) })} icon={<Trophy className="h-5 w-5 text-gold-ink" />}>
           <div className="card overflow-hidden">
             {cityBoard!.slice(0, 5).map((g, i) => (
-              <Link to={`/groups`} key={g.group_id} className={cn("flex items-center gap-3 border-b px-4 py-3 last:border-0", myGroupIds.has(g.group_id) && "bg-brand-soft")}>
+              <Link to={`/g/${g.slug}`} key={g.group_id} className={cn("flex items-center gap-3 border-b px-4 py-3 transition-colors last:border-0 hover:bg-surface", myGroupIds.has(g.group_id) && "bg-brand-soft")}>
                 <span className={cn("scoreboard flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold", i === 0 ? "bg-gold text-accent-foreground" : "text-muted-foreground")}>{i + 1}</span>
+                <TeamBadge size="xs" shortName={g.team_short || "FC"} primary={g.team_color} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{(lang === "ar" && g.name_ar) || g.name}</p>
                   <p className="text-xs text-muted-foreground">{g.team_name} · {t("home.members", { n: g.members })}</p>
@@ -127,5 +132,48 @@ function MatchDay() {
         </Section>
       )}
     </AppShell>
+  );
+}
+
+/** Shortcuts that tie the roles together: venue owners see requests, fans see rewards they can use. */
+function ForYou() {
+  const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const { data: venues } = useMyVenues(user?.id);
+  const { data: rewards } = useMyRewards(!!user);
+  const venue = venues?.[0];
+  const { data: stats } = useQuery({
+    queryKey: ["venue-stats", venue?.id],
+    enabled: !!venue,
+    queryFn: async () => (await supabase.rpc("venue_stats", { p_venue: venue!.id })).data as unknown as { pending_requests: number; upcoming_seats: number },
+  });
+  const ready = (rewards ?? []).filter((r) => r.unlocked && r.min_caps > 0 && !(r.last?.status === "redeemed" && !r.repeatable));
+  if (!venue && !ready.length) return null;
+  return (
+    <div className="mt-4 grid gap-3 md:grid-cols-2">
+      {venue && (
+        <Link to={`/venue-dashboard/${venue.id}`} className="card card-hover flex items-center gap-3 p-4">
+          <IconDot><Store /></IconDot>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-bold">{loc(venue, "name", lang)}</p>
+            <p className="text-sm text-muted-foreground">
+              {stats?.pending_requests ? <span className="font-semibold text-live">{t("home.venueRequests", { n: stats.pending_requests })}</span> : t("home.venueNoRequests")}
+              {stats ? ` · ${t("home.venueSeats", { n: stats.upcoming_seats })}` : ""}
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground rtl:rotate-180" />
+        </Link>
+      )}
+      {ready.length > 0 && (
+        <Link to="/passport#rewards" className="card card-hover flex items-center gap-3 border-gold/60 bg-gold-soft p-4">
+          <IconDot tone="gold" className="bg-gold text-accent-foreground"><Gift /></IconDot>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">{t("rewards.ready", { n: ready.length })}</p>
+            <p className="truncate text-sm text-muted-foreground">{ready.map((r) => (lang === "ar" && r.title_ar) || r.title).join(" · ")}</p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground rtl:rotate-180" />
+        </Link>
+      )}
+    </div>
   );
 }

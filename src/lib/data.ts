@@ -206,7 +206,7 @@ export function useGroupLeaderboard(groupId?: string, enabled = true) {
   });
 }
 
-export type CityRow = { group_id: string; name: string; name_ar: string | null; team_name: string | null; members: number; caps: number; avg_prediction_points: number };
+export type CityRow = { group_id: string; slug: string; team_short: string | null; team_color: string | null; name: string; name_ar: string | null; team_name: string | null; members: number; caps: number; avg_prediction_points: number };
 export function useCityLeaderboard(city: string) {
   return useQuery({
     queryKey: ["city-leaderboard", city],
@@ -260,4 +260,63 @@ export function downloadIcs(title: string, start: string, durationMin: number, l
   a.download = "jamhoor-watch-party.ics";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ───────────── Bookings, guest lists, rewards, notifications ───────────── */
+
+export type Booking = {
+  id: string; title: string | null; capacity: number | null; status: string; venue_status: "pending" | "confirmed" | "declined" | "none";
+  venue_note: string | null; reserved_area: string | null; checkin_code: string; created_at: string; kickoff: string | null; pending: boolean;
+  home_team_name: string | null; away_team_name: string | null; competition: string | null; fixture_status: string | null; home_score: number | null; away_score: number | null;
+  group_id: string; group_name: string; group_name_ar: string | null; group_slug: string; group_members: number; organiser: string | null;
+  reservations: number; seats: number; waitlist: number; checked_in: number;
+};
+export function useVenueBookings(venueId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["venue-bookings", venueId],
+    enabled: !!venueId && enabled,
+    refetchInterval: 20_000,
+    queryFn: async () => ((await unwrap(supabase.rpc("venue_bookings", { p_venue: venueId! }))) ?? []) as unknown as Booking[],
+  });
+}
+
+export type Guest = { user_id: string; full_name: string | null; guests: number; status: "going" | "waitlist"; created_at: string; member_number: number | null; caps: number; arrived: boolean };
+export function useGuestList(partyId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["guest-list", partyId],
+    enabled: !!partyId && enabled,
+    refetchInterval: 15_000,
+    queryFn: async () => ((await unwrap(supabase.rpc("party_guest_list", { p_party: partyId! }))) ?? []) as unknown as Guest[],
+  });
+}
+
+export type RewardRow = {
+  id: string; title: string; title_ar: string | null; details: string | null; details_ar: string | null; min_caps: number; members_only: boolean; repeatable: boolean;
+  venue_id: string; venue_name: string; venue_name_ar: string | null; venue_area: string | null; caps: number; unlocked: boolean;
+  last: { code: string; status: "issued" | "redeemed" | "expired"; expires_at: string; redeemed_at: string | null } | null;
+};
+export function useMyRewards(enabled = true) {
+  return useQuery({
+    queryKey: ["my-rewards"],
+    enabled,
+    queryFn: async () => ((await unwrap(supabase.rpc("my_rewards"))) ?? []) as unknown as RewardRow[],
+  });
+}
+
+export type Notification = { id: string; kind: string; data: Record<string, unknown>; link: string | null; read_at: string | null; created_at: string; updated_at: string };
+export function useNotifications(userId?: string) {
+  return useQuery({
+    queryKey: ["notifications", userId],
+    enabled: !!userId,
+    refetchInterval: 30_000,
+    queryFn: () => unwrap<Notification[]>(supabase.from("notifications").select("*").order("updated_at", { ascending: false }).limit(50) as never),
+  });
+}
+
+export function useMyVenues(userId?: string) {
+  return useQuery({
+    queryKey: ["my-venues", userId],
+    enabled: !!userId,
+    queryFn: () => unwrap<Venue[]>(supabase.from("venues").select("*").eq("owner_user_id", userId!).order("name")),
+  });
 }

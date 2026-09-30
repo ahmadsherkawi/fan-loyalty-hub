@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, CheckCircle2, Gift, MapPin, MessageCircle, Minus, Navigation, Plus, QrCode, Share2, Stamp, Tv } from "lucide-react";
+import { CalendarPlus, CalendarX2, CheckCircle2, Clock, TicketCheck, Users, Gift, MapPin, MessageCircle, Minus, Navigation, Plus, QrCode, Share2, Stamp, Tv } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { VenueFacts } from "@/components/cards";
-import { CardSkeletons, DemoChip, EmptyState, Initials } from "@/components/common/bits";
+import { CardSkeletons, DemoChip, EmptyState, FeatureHeader, Initials } from "@/components/common/bits";
+import { GuestList } from "@/components/GuestList";
+import { cn } from "@/lib/utils";
 import { PunditChat } from "@/components/ai/PunditChat";
 import { HalftimeQuiz } from "@/components/ai/HalftimeQuiz";
 import { MotmVote } from "@/components/ai/MotmVote";
@@ -47,7 +49,7 @@ export default function PartyPage() {
   const { data: offers } = useQuery({
     queryKey: ["offers", party?.venue_id],
     enabled: !!party?.venue_id,
-    queryFn: async () => (await supabase.from("venue_offers").select("*").eq("venue_id", party!.venue_id!).eq("active", true)).data ?? [],
+    queryFn: async () => (await supabase.from("venue_offers").select("*").eq("venue_id", party!.venue_id!).eq("active", true).order("min_caps")).data ?? [],
   });
   const goingIds = (rsvps ?? []).filter((r) => r.status === "going").map((r) => r.user_id);
   const { data: goingProfiles } = useProfilesByIds(goingIds);
@@ -72,7 +74,7 @@ export default function PartyPage() {
     const { data, error } = await supabase.rpc("rsvp", { p_party: party!.id, p_guests: guests });
     setBusy(false);
     if (error) return toast.error(t("common.error"));
-    toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : t("party.youreGoing"));
+    toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : party!.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
   async function cancel() {
@@ -108,6 +110,25 @@ export default function PartyPage() {
         <Button variant="outline" size="sm" onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
       </div>
 
+      {party.venue && party.venue_status !== "none" && !done && (
+        <div className={cn("mt-4 flex items-start gap-3 rounded-2xl px-4 py-3",
+          party.venue_status === "confirmed" ? "bg-brand-soft" : party.venue_status === "declined" ? "bg-destructive/10" : "bg-surface")}>
+          {party.venue_status === "confirmed" ? <TicketCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+            : party.venue_status === "declined" ? <CalendarX2 className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            : <Clock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />}
+          <div className="min-w-0 text-sm">
+            <p className={cn("font-bold", party.venue_status === "confirmed" ? "text-brand" : party.venue_status === "declined" ? "text-destructive" : "")}>
+              {t(`party.venue_${party.venue_status}` as never, { venue: venueName })}
+            </p>
+            <p className="text-muted-foreground">
+              {party.venue_status === "confirmed" ? [party.reserved_area, party.venue_note].filter(Boolean).join(" · ") || t("party.venue_confirmedSub")
+                : party.venue_status === "declined" ? party.venue_note || t("party.venue_declinedSub")
+                : t("party.venue_pendingSub")}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* RSVP — the one thing every visitor needs */}
       {!done && (
         <div className="card mt-4 p-4">
@@ -127,7 +148,10 @@ export default function PartyPage() {
 
           {mine ? (
             <div className="mt-4 flex items-center justify-between rounded-xl bg-brand-soft px-4 py-3">
-              <p className="flex items-center gap-2 text-sm font-bold text-brand"><CheckCircle2 className="h-5 w-5" />{mine.status === "waitlist" ? t("party.onWaitlist") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
+              <div>
+                <p className="flex items-center gap-2 text-sm font-bold text-brand"><CheckCircle2 className="h-5 w-5" />{mine.status === "waitlist" ? t("party.onWaitlist") : party.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing")}{mine.guests ? ` (+${mine.guests})` : ""}</p>
+                {mine.status === "going" && party.venue_status === "pending" && <p className="ms-7 text-xs text-muted-foreground">{t("party.seatHeldSub")}</p>}
+              </div>
               <button className="text-sm font-semibold text-muted-foreground hover:text-foreground" onClick={cancel}>{t("party.cancel")}</button>
             </div>
           ) : (
@@ -137,7 +161,7 @@ export default function PartyPage() {
                 <span className="w-14 text-center text-xs font-semibold">{guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
                 <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.min(5, guests + 1))} aria-label="+"><Plus className="h-4 w-4" /></button>
               </div>
-              <Button className="flex-1" onClick={doRsvp} disabled={busy}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
+              <Button className="flex-1" onClick={doRsvp} disabled={busy || party.venue_status === "declined"}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
             </div>
           )}
           {myCheckin && <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-gold-ink"><Stamp className="h-4 w-4" />{t("party.youCheckedIn")}</p>}
@@ -188,14 +212,27 @@ export default function PartyPage() {
             <div className="rounded-2xl border border-gold/50 bg-gold-soft p-4">
               <p className="flex items-center gap-2 text-sm font-bold text-gold-ink"><Gift className="h-4 w-4" />{t("party.perks")}</p>
               {offers!.map((o) => (
-                <div key={o.id} className="mt-2"><p className="text-sm font-semibold">{loc(o, "title", lang)}</p><p className="text-xs text-muted-foreground">{loc(o, "details", lang)}</p></div>
+                <div key={o.id} className="mt-2 flex items-start justify-between gap-3">
+                  <div><p className="text-sm font-semibold">{loc(o, "title", lang)}</p><p className="text-xs text-muted-foreground">{loc(o, "details", lang)}</p></div>
+                  <span className="shrink-0 rounded-md bg-card px-1.5 py-0.5 text-[10px] font-bold text-gold-ink">{o.min_caps ? t("rewards.unlockAt", { n: o.min_caps }) : t("rewards.memberPerk")}</span>
+                </div>
               ))}
+              {party.venue && <Link to={`/venues/${party.venue.id}`} className="mt-3 inline-block text-sm font-bold text-gold-ink hover:underline">{t("party.seeRewards")}</Link>}
             </div>
           )}
         </TabsContent>
 
         {isAdmin && (
-          <TabsContent value="host">
+          <TabsContent value="host" className="space-y-3">
+            {party.venue_status === "declined" && (
+              <Button asChild variant="ink" className="w-full"><Link to={`/organiser/${party.group?.slug}?party=${party.id}`}>{t("party.pickAnotherVenue")}</Link></Button>
+            )}
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between p-4">
+                <FeatureHeader icon={<Users />} title={t("vdash.guestList")} sub={t("party.guestListSub")} />
+              </div>
+              <GuestList partyId={party.id} />
+            </div>
             <div className="card p-5 text-center">
               <p className="eyebrow">{t("party.checkinCode")}</p>
               <p className="scoreboard mt-1 text-5xl font-bold tracking-[0.2em]" dir="ltr">{party.checkin_code}</p>

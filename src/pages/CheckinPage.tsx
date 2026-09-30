@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2 } from "lucide-react";
+import { Camera, CheckCircle2, Gift } from "lucide-react";
 import confetti from "canvas-confetti";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useParty } from "@/lib/data";
+import { useMyRewards, useParty } from "@/lib/data";
 
 type Result = { checkin_id: string; watch_party_id: string; group_id: string; caps: number };
 
 export default function CheckinPage() {
   const { code: codeParam } = useParams();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -26,6 +26,7 @@ export default function CheckinPage() {
   const [scanning, setScanning] = useState(false);
   const autoTried = useRef(false);
   const { data: party } = useParty(result?.watch_party_id);
+  const { data: rewards } = useMyRewards(!!result);
 
   async function submit(c = code) {
     const clean = c.trim().toUpperCase();
@@ -84,6 +85,24 @@ export default function CheckinPage() {
           <h1 className="mt-7 text-3xl font-extrabold">{t("checkin.success")}</h1>
           <p className="mt-2 text-muted-foreground">{party?.fixture ? `${party.fixture.home_team_name} v ${party.fixture.away_team_name}` : ""}{party?.venue ? ` · ${party.venue.name}` : ""}</p>
           <p className="mt-3 inline-flex rounded-full bg-brand-soft px-3 py-1 text-sm font-bold text-brand">+1 {t("league.caps")}</p>
+          {(() => {
+            const rw = rewards ?? [];
+            const fresh = rw.filter((r) => r.min_caps > 0 && r.min_caps === result.caps);
+            const next = rw.filter((r) => r.min_caps > result.caps).sort((a, b) => a.min_caps - b.min_caps)[0];
+            if (fresh.length) return (
+              <Link to="/passport#rewards" className="mt-6 flex items-center gap-3 rounded-2xl bg-gold px-4 py-3 text-start text-accent-foreground">
+                <Gift className="h-6 w-6 shrink-0" />
+                <div><p className="font-bold">{t("checkin.unlocked", { title: (lang === "ar" && fresh[0].title_ar) || fresh[0].title })}</p><p className="text-sm">{(lang === "ar" && fresh[0].venue_name_ar) || fresh[0].venue_name}</p></div>
+              </Link>
+            );
+            if (next) return (
+              <div className="mt-6 rounded-2xl bg-surface px-4 py-3 text-start">
+                <p className="text-sm font-semibold">{t("checkin.nextReward", { n: next.min_caps - result.caps, title: (lang === "ar" && next.title_ar) || next.title })}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gold" style={{ width: `${(result.caps / next.min_caps) * 100}%` }} /></div>
+              </div>
+            );
+            return null;
+          })()}
           <div className="mt-8 grid gap-3">
             <Button asChild size="lg"><Link to={`/party/${result.watch_party_id}`}>{t("checkin.toParty")}</Link></Button>
             <Button asChild variant="outline" size="lg"><Link to="/passport">{t("checkin.toPassport")}</Link></Button>
