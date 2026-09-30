@@ -9,6 +9,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { toast } from "sonner";
 
+/** Turn on once Google is set up in Supabase (Authentication → Providers → Google). */
+const GOOGLE_ENABLED = false;
+
 export default function AuthPage() {
   const { t, lang } = useI18n();
   const { user, profile, loading, profileReady } = useAuth();
@@ -67,7 +70,7 @@ export default function AuthPage() {
       <div className="mx-auto mt-2 max-w-sm">
         <h1 className="text-[28px] font-extrabold leading-tight">{mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</h1>
         <p className="mb-6 mt-1.5 text-sm text-muted-foreground">{t("auth.sub")}</p>
-        {!(mode === "signup" && kind === "venue") && (<>
+        {GOOGLE_ENABLED && !(mode === "signup" && kind === "venue") && (<>
           <Button type="button" variant="outline" className="w-full rounded-full" onClick={google}>{t("auth.google")}</Button>
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("auth.or")}<span className="h-px flex-1 bg-border" /></div>
         </>)}
