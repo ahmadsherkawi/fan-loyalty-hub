@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 export default function AuthPage() {
   const { t, lang } = useI18n();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileReady } = useAuth();
   const [params] = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">(params.get("mode") === "signup" ? "signup" : "signin");
   const [email, setEmail] = useState("");
@@ -26,10 +26,10 @@ export default function AuthPage() {
 
   const rawNext = params.get("next");
   const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
-  if (next) { try { localStorage.setItem("jamhoor.next", next); } catch { /* private mode */ } }
+  const rememberNext = () => { try { if (next) localStorage.setItem("jamhoor.next", next); else localStorage.removeItem("jamhoor.next"); } catch { /* private mode */ } };
   if (!loading && user) {
-    if (!profile) return <AppShell><div className="mx-auto mt-10 h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" /></AppShell>;
-    return <Navigate to={!profile.onboarding_completed ? `/onboarding${next ? `?next=${encodeURIComponent(next)}` : ""}` : next ?? "/"} replace />;
+    if (!profileReady) return <AppShell><div className="mx-auto mt-10 h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" /></AppShell>;
+    return <Navigate to={profile && !profile.onboarding_completed ? `/onboarding${next ? `?next=${encodeURIComponent(next)}` : ""}` : next ?? "/"} replace />;
   }
   const nextQ = next ? `?next=${encodeURIComponent(next)}` : "";
 
@@ -38,6 +38,7 @@ export default function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
+        rememberNext();
         const { data, error } = await supabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: `${window.location.origin}/onboarding${nextQ}`, data: { full_name: fullName, account_type: kind, preferred_language: lang } },
@@ -56,6 +57,7 @@ export default function AuthPage() {
   };
 
   const google = async () => {
+    rememberNext();
     const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth${nextQ}` } });
     if (error) toast.error(error.message.toLowerCase().includes("provider") ? t("auth.googleUnavailable") : t("auth.error"));
   };

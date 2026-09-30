@@ -84,6 +84,7 @@ export default function VenueDashboard() {
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-bold">{t("vdash.setLocationTitle")}</p>
             <p className="text-muted-foreground">{t("vdash.setLocationBody")}</p>
+            <div className="mt-2"><VenueSettings venue={venue!} /></div>
           </div>
         </div>
       )}
@@ -117,7 +118,7 @@ export default function VenueDashboard() {
             <>
               <section>
                 <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><Clock className="h-5 w-5" />{t("vdash.needsAnswer")}</h2>
-                {pending.length ? <div className="space-y-3">{pending.map((b) => <RequestCard key={b.id} b={b} venueId={id!} />)}</div>
+                {pending.length ? <div className="space-y-3">{pending.map((b) => <RequestCard key={`${b.id}-${b.capacity}`} b={b} venueId={id!} located={venue!.lat != null && venue!.lng != null} />)}</div>
                   : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("vdash.noRequests")}</p>}
               </section>
               <section>
@@ -176,7 +177,7 @@ function BookingHead({ b }: { b: Booking }) {
   );
 }
 
-function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
+function RequestCard({ b, venueId, located }: { b: Booking; venueId: string; located: boolean }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [area, setArea] = useState("");
@@ -186,7 +187,7 @@ function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
   async function answer(decision: "confirmed" | "declined") {
     if (decision === "confirmed" && seats && Number(seats) < 1) return toast.error(t("vdash.seatsMin"));
     setBusy(decision);
-    const { error } = await supabase.rpc("respond_booking", { p_party: b.id, p_decision: decision, p_note: note, p_area: area, p_capacity: seats ? Number(seats) : null });
+    const { error } = await supabase.rpc("respond_booking", { p_party: b.id, p_decision: decision, p_note: note, p_area: area, p_capacity: seats ? Math.round(Number(seats)) : null });
     setBusy(null);
     if (error) {
       const m = error.message;
@@ -218,7 +219,7 @@ function RequestCard({ b, venueId }: { b: Booking; venueId: string }) {
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("vdash.notePlaceholder")} />
         </div>
         <div className="mt-3 flex gap-2">
-          <Button className="flex-1" onClick={() => answer("confirmed")} disabled={!!busy}><Check />{busy === "confirmed" ? t("common.loading") : t("vdash.confirm")}</Button>
+          <Button className="flex-1" onClick={() => answer("confirmed")} disabled={!!busy || !located} title={!located ? t("vdash.setLocationTitle") : undefined}><Check />{busy === "confirmed" ? t("common.loading") : t("vdash.confirm")}</Button>
           <Button variant="outline" onClick={() => answer("declined")} disabled={!!busy}><X />{t("vdash.decline")}</Button>
         </div>
       </div>
@@ -303,7 +304,10 @@ function RewardsPanel({ venueId }: { venueId: string }) {
   }
   async function remove(oid: string) {
     const { error } = await supabase.from("venue_offers").delete().eq("id", oid);
-    if (error && error.message.includes("history")) { await supabase.from("venue_offers").update({ active: false }).eq("id", oid); toast.success(t("vdash.rewardSwitchedOff")); }
+    if (error && error.message.includes("history")) {
+      const { error: offErr } = await supabase.from("venue_offers").update({ active: false }).eq("id", oid);
+      if (offErr) toast.error(t("common.error")); else toast.success(t("vdash.rewardSwitchedOff"));
+    }
     else if (error) toast.error(t("common.error"));
     setConfirmDel(null);
     refreshOffers();

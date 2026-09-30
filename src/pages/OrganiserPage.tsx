@@ -106,7 +106,7 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
       group_id: groupId, fixture_id: draft.fixture_id, venue_id: draft.venue_id || null, title: draft.title || null,
       notes: draft.notes || null, capacity: Number(draft.capacity) >= 1 ? Math.round(Number(draft.capacity)) : null, created_by: user.id,
     }).select("id").single();
-    if (error || !party) { setSaving(false); return toast.error(error?.message.includes("limit") ? t("org.pendingLimit") : t("common.error")); }
+    if (error || !party) { setSaving(false); return toast.error(error?.message.includes("limit") ? t("org.pendingLimit") : error?.message.includes("started") ? t("vdash.tooLate") : t("common.error")); }
     if (draft.announcement_en || draft.announcement_ar) {
       const { error: aErr } = await supabase.from("announcements").insert({
         group_id: groupId, author_id: user.id, title: draft.title || null, body: draft.announcement_en || draft.announcement_ar,
@@ -316,7 +316,7 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
   if (!upcoming.length) return null;
   async function move(partyId: string, venueId: string) {
     const { error } = await supabase.from("watch_parties").update({ venue_id: venueId }).eq("id", partyId);
-    if (error) return toast.error(error.message.includes("limit") ? t("org.pendingLimit") : t("common.error"));
+    if (error) return toast.error(error.message.includes("limit") ? t("org.pendingLimit") : error.message.includes("started") ? t("vdash.tooLate") : t("common.error"));
     setMoving(null);
     toast.success(t("org.requestSent", { venue: loc(venues.find((v) => v.id === venueId), "name", lang) }));
     qc.invalidateQueries();
@@ -327,6 +327,7 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
       <div className="card divide-y">
         {upcoming.map((p) => {
           const st = p.venue_status;
+          const started = new Date(partyTime(p)).getTime() <= Date.now();
           return (
             <div key={p.id} className="px-4 py-3">
               <div className="flex items-center gap-3">
@@ -342,7 +343,7 @@ function MatchNights({ groupId, city }: { groupId: string; city: string }) {
               </div>
               {st === "confirmed" && p.reserved_area && <p className="mt-1 text-xs text-brand">{p.reserved_area}</p>}
               {st === "declined" && p.venue_note && <p className="mt-1 text-xs text-destructive">{p.venue_note}</p>}
-              {(st === "declined" || st === "none" || moving === p.id) ? (
+              {started ? null : (st === "declined" || st === "none" || moving === p.id) ? (
                 <div className="mt-2">
                   <Select onValueChange={(v) => move(p.id, v)}>
                     <SelectTrigger className="h-10"><SelectValue placeholder={st === "none" ? t("org.pickVenueNow") : t("org.moveTo")} /></SelectTrigger>

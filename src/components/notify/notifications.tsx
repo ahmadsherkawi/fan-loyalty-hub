@@ -29,6 +29,7 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   table_confirmed: { icon: <Utensils />, tone: "brand" },
   table_declined: { icon: <Utensils />, tone: "neutral" },
   table_cancelled: { icon: <Utensils />, tone: "neutral" },
+  booking_withdrawn: { icon: <CalendarX2 />, tone: "neutral" },
   venue_message: { icon: <MessageCircle />, tone: "neutral" },
   venue_reply: { icon: <MessageCircle />, tone: "brand" },
   party_rsvps: { icon: <Ticket />, tone: "brand" },

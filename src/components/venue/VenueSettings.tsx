@@ -38,10 +38,10 @@ export function VenueSettings({ venue }: { venue: Venue }) {
     if (!f.name.trim()) return toast.error(t("vset.nameRequired"));
     setSaving(true);
     const { error } = await supabase.from("venues").update({
-      name: f.name.trim(), name_ar: f.name_ar.trim() || null, area: f.area.trim() || null, city: f.city, screens: f.screens ? Math.max(0, Number(f.screens)) : null,
+      name: f.name.trim(), name_ar: f.name_ar.trim() || null, area: f.area.trim() || null, city: f.city, screens: f.screens ? Math.max(0, Math.round(Number(f.screens))) : null,
       has_sound: f.has_sound, alcohol_free: f.alcohol_free, family_friendly: f.family_friendly,
       phone: f.phone || null, whatsapp: f.whatsapp || null, instagram: f.instagram || null, website: f.website || null, opening_hours: f.opening_hours || null,
-      description: f.description || null, description_ar: f.description_ar || null, lat: f.lat, lng: f.lng, capacity: f.capacity ? Math.max(1, Number(f.capacity)) : null,
+      description: f.description || null, description_ar: f.description_ar || null, lat: f.lat, lng: f.lng, capacity: f.capacity ? Math.max(1, Math.round(Number(f.capacity))) : null,
     }).eq("id", venue.id);
     setSaving(false);
     if (error) return toast.error(t("common.error"));

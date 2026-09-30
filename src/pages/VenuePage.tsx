@@ -31,7 +31,7 @@ export default function VenuePage() {
   const { user } = useAuth();
   const acct = useAccount();
   const qc = useQueryClient();
-  const [chat, setChat] = useState(params.get("chat") === "1");
+  const [chatParam, setChat] = useState(params.get("chat") === "1");
   const { data: venue, isLoading } = useQuery({
     queryKey: ["venue", id],
     enabled: !!id,
@@ -87,6 +87,7 @@ export default function VenuePage() {
   const name = loc(venue, "name", lang);
   const wa = venue.whatsapp?.replace(/[^0-9]/g, "");
   const joined = !!venue.owner_user_id;
+  const chat = chatParam && joined;
   const partyFixtures = new Set((parties ?? []).map((p) => p.fixture_id));
 
   return (

@@ -47,10 +47,10 @@ export function EditPartyButtons({ party, size = "sm", compact }: { party: Edita
   }
   async function cancelParty() {
     setBusy(true);
-    const { error } = await supabase.from("watch_parties").update({ status: "cancelled" }).eq("id", party.id);
+    const { data, error } = await supabase.from("watch_parties").update({ status: "cancelled" }).eq("id", party.id).select("status").maybeSingle();
     setBusy(false);
     setAsk(false);
-    if (error) return toast.error(t("common.error"));
+    if (error || data?.status !== "cancelled") { refresh(); return toast.error(t("party.cantCancel")); }
     toast.success(t("party.cancelledToast"));
     refresh();
   }

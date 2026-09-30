@@ -11,6 +11,8 @@ interface AuthValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /** True once the signed-in user's profile has been fetched (it may still be null if the row is missing). */
+  profileReady: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -22,11 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadedUid, setLoadedUid] = useState<string | null>(null);
   const user = session?.user ?? null;
 
   const loadProfile = useCallback(async (uid: string) => {
     const { data } = await supabase.from("profiles").select("*").eq("user_id", uid).maybeSingle();
     setProfile(data ?? null);
+    setLoadedUid(uid);
     if (data?.preferred_language === "en" || data?.preferred_language === "ar") setLang(data.preferred_language);
   }, [setLang]);
 
@@ -57,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => { await supabase.auth.signOut(); setProfile(null); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, profileReady: !user || loadedUid === user.id, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

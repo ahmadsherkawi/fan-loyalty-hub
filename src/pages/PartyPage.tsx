@@ -80,7 +80,7 @@ export default function PartyPage() {
     setBusy(true);
     const { data, error } = await supabase.rpc("rsvp", { p_party: party!.id, p_guests: guests });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("reservations closed") ? t("party.rsvpClosed") : error.message.includes("party closed") ? t("party.cancelledBanner") : error.message.includes("declined") ? t("party.fanDeclined") : t("common.error"));
+    if (error) return toast.error(error.message.includes("reservations closed") ? t("party.rsvpClosed") : error.message.includes("party closed") ? t("party.cancelledBanner") : error.message.includes("declined") ? t("party.venueCantHost") : t("common.error"));
     toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : party!.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
@@ -114,7 +114,7 @@ export default function PartyPage() {
       ) : <h1 className="text-2xl font-extrabold">{title}</h1>}
 
       {/* Quick actions — always labelled */}
-      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+      <div className={cn("no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4", cancelled && "hidden")}>
         <Button asChild variant="outline" size="sm"><a href={whatsappShare(`${shareText} ${url}`)} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></Button>
         <Button variant="outline" size="sm" onClick={share}><Share2 />{t("common.share")}</Button>
         <Button variant="outline" size="sm" onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
@@ -188,7 +188,7 @@ export default function PartyPage() {
         </div>
       )}
 
-      <Tabs defaultValue="match" className="mt-6">
+      {!cancelled && <Tabs defaultValue="match" className="mt-6">
         <TabsList className="w-full">
           <TabsTrigger value="match">{t("party.tabMatch")}</TabsTrigger>
           <TabsTrigger value="wall">{t("party.tabWall")}</TabsTrigger>
@@ -263,7 +263,7 @@ export default function PartyPage() {
             </div>
           </TabsContent>
         )}
-      </Tabs>
+      </Tabs>}
     </AppShell>
   );
 }
