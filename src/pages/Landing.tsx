@@ -12,7 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
 import { FIXTURE_SELECT, loc, useUpcomingParties, type FixtureWithTeams } from "@/lib/data";
 
-const BIG = ["CL", "PL", "PD", "UPL", "SPL", "ULC", "SA", "BL1", "FL1", "ACL"];
+// Priority order: one game from each, the first six competitions that have a game coming up
+const BIG = ["PL", "CL", "UPL", "ULC", "SPL", "PD", "ACL", "SA", "BL1", "FL1"];
 
 /** Live numbers for the hero: how many venues fans can find right now. */
 function useDirectoryStats() {
@@ -35,11 +36,11 @@ function useBigGames() {
       const now = new Date();
       const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT)
         .in("competition_code", BIG).gte("kickoff_at", now.toISOString()).lte("kickoff_at", new Date(now.getTime() + 21 * 864e5).toISOString())
-        .order("kickoff_at").limit(120);
+        .order("kickoff_at").limit(400);
       const all = (data ?? []) as unknown as FixtureWithTeams[];
-      // One or two per competition so the strip mixes leagues, then by kick-off
-      const per = new Map<string, number>();
-      const pick = all.filter((f) => { const n = per.get(f.competition_code ?? "") ?? 0; per.set(f.competition_code ?? "", n + 1); return n < 2; }).slice(0, 6);
+      // The next game of each competition, most-watched competitions first, then shown in kick-off order
+      const pick = BIG.map((c) => all.find((f) => f.competition_code === c)).filter((f): f is FixtureWithTeams => !!f).slice(0, 6)
+        .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
       const ids = pick.map((f) => f.id);
       const { data: sc } = ids.length ? await supabase.from("venue_screenings").select("fixture_id").in("fixture_id", ids) : { data: [] };
       const showing = new Map<string, number>();
