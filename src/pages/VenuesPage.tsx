@@ -75,8 +75,8 @@ export default function VenuesPage() {
           );
         }) : <EmptyState icon={<Store className="h-5 w-5" />} title={t("venues.empty")} />}
       </div>
-      <Link to="/auth?mode=signup&type=venue" className="mt-6 block rounded-2xl bg-surface p-4 text-center text-sm">
-        <span className="font-semibold">{t("venues.ownVenue")}</span> <span className="text-brand">{t("landing.venueCta")} →</span>
+      <Link to="/claim" className="mt-6 block rounded-2xl bg-surface p-4 text-center text-sm">
+        <span className="font-semibold">{t("venues.ownVenue")}</span> <span className="text-brand">{t("landing.findYourVenue")} →</span>
       </Link>
     </AppShell>
   );
