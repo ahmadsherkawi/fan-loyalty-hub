@@ -24,7 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  downloadIcs, isFinished, isLive, loc, partyTime, shareOrCopy, useIsGroupAdmin, useParty, usePartyCounts, whatsappShare,
+  addToCalendar, isFinished, siteUrl, isLive, loc, partyTime, shareOrCopy, useIsGroupAdmin, useParty, usePartyCounts, whatsappShare,
 } from "@/lib/data";
 
 export default function PartyPage() {
@@ -69,7 +69,7 @@ export default function PartyPage() {
   const title = f ? `${homeN} ${t("common.vs")} ${awayN}` : party.title ?? t("page.party");
   const cancelled = party.status === "cancelled";
   const venueName = loc(party.venue, "name", lang);
-  const url = `${window.location.origin}/party/${party.id}`;
+  const url = siteUrl(`/party/${party.id}`);
   const shareText = t("party.shareText", { match: title, venue: venueName || "", time: formatDateTime(when) });
   const cap = party.capacity ?? 0;
   const isVenueOwner = !!user && party.venue?.owner_user_id === user.id;
@@ -130,7 +130,7 @@ export default function PartyPage() {
       <div className={cn("no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4", cancelled && "hidden")}>
         <Button asChild variant="outline" size="sm"><a href={whatsappShare(`${shareText} ${url}`)} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></Button>
         <Button variant="outline" size="sm" onClick={share}><Share2 />{t("common.share")}</Button>
-        <Button variant="outline" size="sm" onClick={() => downloadIcs(title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
+        <Button variant="outline" size="sm" onClick={() => addToCalendar(party.id, title, when, 150, [venueName, party.venue?.area].filter(Boolean).join(", "), url)}><CalendarPlus />{t("party.calendar")}</Button>
       </div>
 
       {cancelled && (

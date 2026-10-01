@@ -7,7 +7,7 @@ import { TeamBadge } from "@/components/brand/TeamBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { isFinished, isLive, loc, partyTime, useParty, usePartyCounts } from "@/lib/data";
+import { siteUrl, isFinished, isLive, loc, partyTime, useParty, usePartyCounts } from "@/lib/data";
 import { checkinWindow } from "@/lib/matchPhase";
 
 type Token = { code: string; seconds_left: number };
@@ -43,7 +43,7 @@ export default function VenueScreen() {
   if (!party) return <Centered>{t("common.loading")}</Centered>;
   const f = party.fixture;
   const team = party.group?.team;
-  const url = token ? `${window.location.origin}/checkin/${token.code}` : "";
+  const url = token ? siteUrl(`/checkin/${token.code}`) : "";
   const kickoff = partyTime(party);
   const win = party.venue_status !== "confirmed" ? "unconfirmed" : checkinWindow(kickoff);
   return (

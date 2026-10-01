@@ -907,4 +907,6 @@ export const ar: Record<TKey, string> = {
   "notif.table_cancelled_late.t": "ألغى {fan} طاولة في وقت متأخر",
   "notif.table_cancelled_late.b": "مجموعة من {size} · {match} · قبل أقل من ٣ ساعات من الانطلاق",
   "notif.freeUntil": "الإلغاء مجاني حتى {time}",
+  "share.saveTitle": "احفظ بطاقتك",
+  "share.holdToSave": "اضغط مطولاً على الصورة لحفظها أو مشاركتها.",
 };

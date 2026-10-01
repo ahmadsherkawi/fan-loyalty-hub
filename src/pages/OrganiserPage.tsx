@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { FIXTURE_SELECT, isFinished, loc, partyTime, useGroupParties, useGroup, useIsGroupAdmin, useProfilesByIds, useVenues, whatsappShare, type FixtureWithTeams } from "@/lib/data";
+import { FIXTURE_SELECT, siteUrl, isFinished, loc, partyTime, useGroupParties, useGroup, useIsGroupAdmin, useProfilesByIds, useVenues, whatsappShare, type FixtureWithTeams } from "@/lib/data";
 
 type Stats = {
   members: number; paid: number; new_last_30d: number; parties: number; total_checkins: number;
@@ -115,7 +115,7 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
       if (aErr) toast.error(t("org.announceFailed"));
     }
     setSaving(false);
-    const url = `${window.location.origin}/party/${party.id}`;
+    const url = siteUrl(`/party/${party.id}`);
     const text = `${lang === "ar" ? draft.announcement_ar || draft.announcement_en : draft.announcement_en || draft.announcement_ar}\n\n${url}`;
     setCreated({ id: party.id, text });
     qc.invalidateQueries();
@@ -285,7 +285,7 @@ function NewsPanel({ groupId, slug }: { groupId: string; slug: string }) {
     setBusy(false);
     if (error) return toast.error(t("common.error"));
     qc.invalidateQueries({ queryKey: ["announcements", groupId] });
-    setPosted(`${title ? `${title}\n` : ""}${lang === "ar" ? ar || en : en || ar}\n\n${window.location.origin}/g/${slug}`);
+    setPosted(`${title ? `${title}\n` : ""}${lang === "ar" ? ar || en : en || ar}\n\n${siteUrl(`/g/${slug}`)}`);
     setTitle(""); setEn(""); setAr("");
     toast.success(t("org.posted"));
   }

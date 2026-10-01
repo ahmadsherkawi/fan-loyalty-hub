@@ -3,6 +3,7 @@ import { Download, Image as ImageIcon, Share2 } from "lucide-react";
 import { FeatureHeader } from "@/components/common/bits";
 import { toast } from "sonner";
 import { useShareableImage } from "@/lib/share";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -74,6 +75,7 @@ export function RecapCard({ party }: { party: PartyFull }) {
           </div>
         </>
       )}
+      <ImagePreview url={img.preview} onClose={img.closePreview} />
     </div>
   );
 }

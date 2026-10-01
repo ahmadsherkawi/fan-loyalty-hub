@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  isFinished, loc, partyTime, shareOrCopy, useGroup, useGroupLeaderboard, useGroupParties, useIsGroupAdmin, useProfilesByIds, whatsappShare,
+  isFinished, loc, partyTime, shareOrCopy, siteUrl, useGroup, useGroupLeaderboard, useGroupParties, useIsGroupAdmin, useProfilesByIds, whatsappShare,
 } from "@/lib/data";
 
 export default function GroupPage() {
@@ -64,7 +64,7 @@ export default function GroupPage() {
     qc.invalidateQueries();
   }
   const shareText = t("group.shareText", { name: loc(group, "name", lang) });
-  const shareUrl = `${window.location.origin}/g/${slug}`;
+  const shareUrl = siteUrl(`/g/${slug}`);
 
   if (isLoading) return <AppShell><CardSkeletons n={3} /></AppShell>;
   if (error || !group) return <AppShell><BackButton /><EmptyState title={t("group.notFound")} cta={{ to: "/groups", label: t("page.groups") }} /></AppShell>;

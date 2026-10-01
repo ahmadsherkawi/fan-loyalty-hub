@@ -4,6 +4,7 @@ import { Award, Download, Gift, Lock, MapPin, Share2, Stamp } from "lucide-react
 import { RewardItem, RewardsSummary } from "@/components/rewards/Rewards";
 import { toast } from "sonner";
 import { useShareableImage } from "@/lib/share";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { TeamBadge } from "@/components/brand/TeamBadge";
@@ -122,6 +123,7 @@ export default function PassportPage() {
           <BookingRecord />
         </>
       )}
+      <ImagePreview url={img.preview} onClose={img.closePreview} />
     </AppShell>
   );
 }

@@ -905,6 +905,8 @@ export const en = {
   "notif.table_cancelled_late.t": "{fan} cancelled a table late",
   "notif.table_cancelled_late.b": "Party of {size} · {match} · under 3 hours before kick-off",
   "notif.freeUntil": "Free to cancel until {time}",
+  "share.saveTitle": "Save your card",
+  "share.holdToSave": "Press and hold the image to save or share it.",
 } as const;
 
 export type TKey = keyof typeof en;

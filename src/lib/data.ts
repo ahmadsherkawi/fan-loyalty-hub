@@ -236,7 +236,7 @@ export function whatsappShare(text: string) {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
-export { shareOrCopy, downloadIcs } from "@/lib/share";
+export { shareOrCopy, addToCalendar, siteUrl } from "@/lib/share";
 
 /* ───────────── Bookings, guest lists, rewards, notifications ───────────── */
 
