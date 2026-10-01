@@ -73,14 +73,19 @@ export default function CheckinPage() {
     let stopped = false;
     import("html5-qrcode").then(({ Html5Qrcode }) => {
       if (stopped) return;
+      if (!navigator.mediaDevices?.getUserMedia) { setScanning(false); setErr(t("checkin.noCamera")); return; }
       const s = new Html5Qrcode("qr-reader");
       scanner = s as unknown as typeof scanner;
       s.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 }, (text) => {
         const m = text.match(/checkin\/([A-Za-z0-9]{4,8})/) ?? text.match(/^([A-Za-z0-9]{6})$/);
         if (m) { setScanning(false); setCode(m[1].toUpperCase()); submit(m[1]); }
       }, () => undefined).catch(() => { setScanning(false); setErr(t("checkin.noCamera")); });
-    });
-    return () => { stopped = true; scanner?.stop().then(() => scanner?.clear()).catch(() => undefined); };
+    }).catch(() => { setScanning(false); setErr(t("checkin.noCamera")); });
+    // stop() throws (not rejects) when the camera never started, e.g. permission denied
+    return () => {
+      stopped = true;
+      try { scanner?.stop().then(() => { try { scanner?.clear(); } catch { /* already gone */ } }).catch(() => undefined); } catch { /* never started */ }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanning]);
 

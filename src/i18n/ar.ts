@@ -998,4 +998,5 @@ export const ar: Record<TKey, string> = {
   "landing.findYourVenue": "ابحث عن مكانك",
   "landing.venueNew": "غير مدرج؟ أضفه",
   "landing.showingAt1": "تُعرض في مكان واحد",
+  "city.Fujairah": "الفجيرة",
 };

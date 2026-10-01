@@ -174,7 +174,8 @@ export function BackButton({ label }: { label?: string }) {
   const navigate = useNavigate();
   return (
     <button className="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-full py-1 pe-3 ps-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
-      onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}>
+      // Opened straight from a shared link (no earlier page in the app): go home instead of leaving the site
+      onClick={() => ((window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate("/"))}>
       <span className="flex h-8 w-8 items-center justify-center rounded-full border bg-card"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /></span>
       {label ?? t("nav.back")}
     </button>

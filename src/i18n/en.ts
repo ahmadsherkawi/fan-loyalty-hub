@@ -996,6 +996,7 @@ export const en = {
   "landing.findYourVenue": "Find your venue",
   "landing.venueNew": "Not listed? Add it",
   "landing.showingAt1": "Showing at 1 venue",
+  "city.Fujairah": "Fujairah",
 } as const;
 
 export type TKey = keyof typeof en;

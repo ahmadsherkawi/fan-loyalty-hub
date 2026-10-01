@@ -21,7 +21,7 @@ function takeNext() {
   return n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
 }
 
-const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Al Ain", "Beirut", "Other"] as const;
+const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Al Ain", "Fujairah", "Beirut", "Other"] as const;
 
 export default function Onboarding() {
   const { t, lang, setLang } = useI18n();

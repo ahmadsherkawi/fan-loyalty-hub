@@ -22,7 +22,7 @@ export const FIXTURE_SELECT =
 export const PARTY_SELECT = `*, group:groups(*, team:teams(*)), venue:venues(*), fixture:fixtures(${FIXTURE_SELECT})`;
 export const GROUP_SELECT = "*, team:teams(*), home_venue:venues!groups_home_venue_id_fkey(*)";
 
-export const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Al Ain", "Beirut", "Other"] as const;
+export const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Al Ain", "Fujairah", "Beirut", "Other"] as const;
 
 export const isLive = (s?: string | null) => s === "IN_PLAY" || s === "PAUSED" || s === "LIVE";
 export const isFinished = (s?: string | null) => s === "FINISHED" || s === "AWARDED";
