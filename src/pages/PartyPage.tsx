@@ -12,6 +12,7 @@ import { MatchWall } from "@/components/party/MatchWall";
 import { checkinWindow, phaseOf, type Phase } from "@/lib/matchPhase";
 import { GuestList } from "@/components/GuestList";
 import { EditPartyButtons } from "@/components/party/EditParty";
+import { PausedNotice, PolicyDetails, PolicyNote, StillComing, usePaused } from "@/components/booking/Policy";
 import { cn } from "@/lib/utils";
 import { PunditChat } from "@/components/ai/PunditChat";
 import { HalftimeQuiz } from "@/components/ai/HalftimeQuiz";
@@ -37,6 +38,7 @@ export default function PartyPage() {
   const { data: isAdmin } = useIsGroupAdmin(party?.group_id, user?.id);
   const [guests, setGuests] = useState(0);
   const [busy, setBusy] = useState(false);
+  const pausedUntil = usePaused();
 
   const { data: rsvps } = useQuery({
     queryKey: ["rsvps", id],
@@ -80,16 +82,27 @@ export default function PartyPage() {
     setBusy(true);
     const { data, error } = await supabase.rpc("rsvp", { p_party: party!.id, p_guests: guests });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("reservations closed") ? t("party.rsvpClosed") : error.message.includes("party closed") ? t("party.cancelledBanner") : error.message.includes("declined") ? t("party.venueCantHost") : t("common.error"));
+    if (error) return toast.error(error.message.includes("reservations closed") ? t("party.rsvpClosed") : error.message.includes("party closed") ? t("party.cancelledBanner") : error.message.includes("declined") ? t("party.venueCantHost") : error.message.includes("guests paused") ? t("party.guestsPaused") : t("common.error"));
     toast.success((data as { status?: string })?.status === "waitlist" ? t("party.waitlisted") : party!.venue_status === "pending" ? t("party.seatHeld") : t("party.youreGoing"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
   }
   async function cancel() {
-    if (!window.confirm(mine?.status === "waitlist" ? t("party.leaveWaitlistQ") : t("party.cancelRsvpQ"))) return;
-    const { error } = await supabase.rpc("cancel_rsvp", { p_party: party!.id });
+    const late = mine?.status === "going" && party!.venue_status === "confirmed" && new Date(when).getTime() - Date.now() < 3 * 3600e3;
+    const q = mine?.status === "waitlist" ? t("party.leaveWaitlistQ") : t("party.cancelRsvpQ");
+    if (!window.confirm(late ? `${q}\n\n${t("cancel.lateWarn")}` : q)) return;
+    const { data, error } = await supabase.rpc("cancel_rsvp", { p_party: party!.id });
     if (error) return toast.error(t("common.error"));
-    toast.success(t("party.rsvpCancelled"));
+    toast.success((data as { late?: boolean } | null)?.late ? t("cancel.lateToast") : t("party.rsvpCancelled"));
     qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["party-counts", id] });
+    qc.invalidateQueries({ queryKey: ["my-reliability"] });
+  }
+  async function reconfirm() {
+    setBusy(true);
+    const { error } = await supabase.rpc("reconfirm_rsvp", { p_party: party!.id });
+    setBusy(false);
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("still.thanks"));
+    qc.invalidateQueries({ queryKey: ["rsvps", id] }); qc.invalidateQueries({ queryKey: ["notifications"] });
   }
 
   const pct = cap ? Math.min(100, ((counts?.going ?? 0) / cap) * 100) : 0;
@@ -175,10 +188,23 @@ export default function PartyPage() {
               <div className="flex h-11 items-center rounded-full border bg-card">
                 <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.max(0, guests - 1))} aria-label="-"><Minus className="h-4 w-4" /></button>
                 <span className="w-14 text-center text-xs font-semibold">{guests === 1 ? t("party.plusOneGuest") : guests ? t("party.plusGuests", { n: guests }) : t("party.justMe")}</span>
-                <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.min(5, guests + 1))} aria-label="+"><Plus className="h-4 w-4" /></button>
+                <button className="flex h-11 w-10 items-center justify-center text-muted-foreground hover:text-foreground" onClick={() => setGuests(Math.min(5, guests + 1))} disabled={!!pausedUntil} aria-label="+"><Plus className="h-4 w-4" /></button>
               </div>
               <Button className="flex-1" onClick={doRsvp} disabled={busy || party.venue_status === "declined"}>{user ? t("party.rsvp") : t("party.signInToRsvp")}</Button>
             </div>
+          )}
+          {mine?.status === "going" && party.venue_status === "confirmed" && !myCheckin && !rsvpClosed && (
+            <>
+              <StillComing kind="seat" kickoff={when} confirmedAt={mine.confirmed_at} onYes={reconfirm} onRelease={cancel} busy={busy} />
+              <PolicyDetails kind="seat" kickoff={when} title className="mt-3" />
+            </>
+          )}
+          {mine && party.venue_status !== "declined" && !(mine.status === "going" && party.venue_status === "confirmed") && !rsvpClosed && <PolicyNote kind="seat" kickoff={when} className="mt-3" />}
+          {!mine && !rsvpClosed && (
+            <>
+              {pausedUntil && <PausedNotice until={pausedUntil} kind="guests" className="mt-3" />}
+              <PolicyNote kind="seat" kickoff={when} className="mt-3" />
+            </>
           )}
           {myCheckin && <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-gold-ink"><Stamp className="h-4 w-4" />{t("party.youCheckedIn")}</p>}
           {user && !myCheckin && (live || mine) && party.venue_status === "confirmed" && (win === "open"

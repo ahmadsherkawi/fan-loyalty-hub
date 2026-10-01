@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, MessageCircle, Utensils, Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
+import { Clock, Hand, MessageCircle, UserX, Utensils, Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
 import { IconDot } from "@/components/common/bits";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -38,6 +38,10 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   party_rsvps: { icon: <Ticket />, tone: "brand" },
   party_cancelled: { icon: <CalendarX2 />, tone: "neutral" },
   venue_declined_fan: { icon: <CalendarX2 />, tone: "neutral" },
+  reconfirm: { icon: <Hand />, tone: "gold" },
+  reconfirm_table: { icon: <Hand />, tone: "gold" },
+  seat_released: { icon: <CalendarX2 />, tone: "neutral" },
+  no_show: { icon: <UserX />, tone: "neutral" },
 };
 
 export function useUnreadCount() {
@@ -72,11 +76,17 @@ export function useNotificationText() {
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
       size: String(d.size ?? ""), fan: String(d.fan ?? ""), count: String(d.count ?? 1), tv: pick("broadcaster"), reply: d.reply ? `· “${d.reply}”` : "",
     };
-    const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle" : n.kind;
+    const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle"
+      : n.kind === "table_cancelled" && d.late ? "table_cancelled_late" : n.kind;
     const title = t(`notif.${k}.t` as TKey, vars);
     let body = t(`notif.${k}.b` as TKey, vars);
     if (k === "booking_confirmed" && vars.area) body += ` · ${vars.area}`;
     if (k === "booking_declined" && vars.note) body = vars.note;
+    // Confirmations carry the cancellation deadline, so the fan sees it with the good news
+    if ((k === "seat_confirmed" || k === "table_confirmed") && d.kickoff) {
+      const free = new Date(new Date(String(d.kickoff)).getTime() - 3 * 3600e3);
+      if (free.getTime() > Date.now()) body += ` · ${t("notif.freeUntil", { time: formatDateTime(free.toISOString(), { weekday: "short", hour: "2-digit", minute: "2-digit" }) })}`;
+    }
     // Tidy separators left behind by empty values (e.g. a table request without a specific match)
     body = body.replace(/(\s*·\s*)+$/, "").replace(/^\s*·\s*/, "").replace(/·\s*·/g, "·").trim();
     return { title: title.replace(/(\s*·\s*)+$/, ""), body };

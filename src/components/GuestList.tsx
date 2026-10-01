@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useGuestList } from "@/lib/data";
 import { checkinWindow } from "@/lib/matchPhase";
+import { ReliabilityTag } from "@/components/booking/Policy";
 
 /** Reservations for one party — shared by the venue dashboard and the organiser's Host tab. */
 export function GuestList({ partyId, kickoff, confirmed = true }: { partyId: string; kickoff?: string | null; confirmed?: boolean }) {
@@ -34,8 +35,9 @@ export function GuestList({ partyId, kickoff, confirmed = true }: { partyId: str
             <Initials name={g.full_name} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{g.full_name ?? "—"}{g.guests ? <span className="font-medium text-muted-foreground"> +{g.guests}</span> : null}</p>
-              <p className="text-xs text-muted-foreground">
-                {g.member_number ? `#${g.member_number} · ` : ""}{t("vdash.capsN", { n: g.caps })}{g.status === "waitlist" ? ` · ${t("party.onWaitlist")}` : ""}
+              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                <span>{g.member_number ? `#${g.member_number} · ` : ""}{t("vdash.capsN", { n: g.caps })}{g.status === "waitlist" ? ` · ${t("party.onWaitlist")}` : ""}</span>
+                {!g.arrived && <ReliabilityTag label={g.reliability} reconfirmed={g.status === "going" && g.reconfirmed} />}
               </p>
             </div>
             {g.arrived ? (

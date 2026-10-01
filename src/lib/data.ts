@@ -256,7 +256,12 @@ export function useVenueBookings(venueId?: string, enabled = true) {
   });
 }
 
-export type Guest = { user_id: string; full_name: string | null; guests: number; status: "going" | "waitlist"; created_at: string; member_number: number | null; caps: number; arrived: boolean };
+/** A fan's booking record: points from no-shows and late cancels in the last 60 days. */
+export type Reliability = { points: number; attended: number; paused_until: string | null; label: "missed" | "reliable" | "new" };
+/** Mirrors booking_policy() in the database. */
+export const POLICY = { freeCancelHours: 3, reconfirmHours: 2, reminderHours: 24, pointsLimit: 2, windowDays: 60, pauseDays: 21 } as const;
+
+export type Guest = { user_id: string; full_name: string | null; guests: number; status: "going" | "waitlist"; created_at: string; member_number: number | null; caps: number; arrived: boolean; reconfirmed: boolean; reliability: Reliability["label"] };
 export function useGuestList(partyId?: string, enabled = true) {
   return useQuery({
     queryKey: ["guest-list", partyId],

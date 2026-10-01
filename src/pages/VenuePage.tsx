@@ -12,6 +12,7 @@ import { CardSkeletons, DemoChip, EmptyState } from "@/components/common/bits";
 import { RewardItem } from "@/components/rewards/Rewards";
 import { ChatThread } from "@/components/venue/ChatThread";
 import { RequestTable } from "@/components/venue/RequestTable";
+import { PolicyDetails, PolicyNote, StillComing } from "@/components/booking/Policy";
 import { MENU_SECTIONS } from "@/components/venue/MenuEditor";
 import { compLabel } from "@/lib/competitions";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export default function VenuePage() {
   const acct = useAccount();
   const qc = useQueryClient();
   const [chatParam, setChat] = useState(params.get("chat") === "1");
+  const [tableBusy, setTableBusy] = useState(false);
   const { data: venue, isLoading } = useQuery({
     queryKey: ["venue", id],
     enabled: !!id,
@@ -67,16 +69,27 @@ export default function VenuePage() {
   const { data: myTables } = useQuery({
     queryKey: ["my-tables", id],
     enabled: !!id && !!user && !acct.isVenue,
-    queryFn: async () => (await supabase.from("table_bookings").select("id, status, party_size, venue_reply, fixture:fixtures(home_team_name, away_team_name, kickoff_at)")
+    queryFn: async () => (await supabase.from("table_bookings").select("id, status, party_size, venue_reply, confirmed_at, arrived_at, no_show_at, fixture:fixtures(home_team_name, away_team_name, kickoff_at)")
       .eq("venue_id", id!).eq("user_id", user!.id).neq("status", "cancelled").order("created_at", { ascending: false }).limit(3)).data ?? [],
   });
 
-  async function cancelTable(bid: string) {
-    if (!window.confirm(t("tables.cancelQ"))) return;
-    const { error } = await supabase.rpc("cancel_table", { p_booking: bid });
+  async function cancelTable(bid: string, status: string, kickoff?: string | null) {
+    const late = status === "confirmed" && !!kickoff && new Date(kickoff).getTime() - Date.now() < 3 * 3600e3;
+    const q = status === "confirmed" ? t("tables.cancelConfirmedQ") : t("tables.cancelQ");
+    if (!window.confirm(late ? `${q}\n\n${t("cancel.lateWarn")}` : q)) return;
+    const { data, error } = await supabase.rpc("cancel_table", { p_booking: bid });
     if (error) return toast.error(t("common.error"));
-    toast.success(t("tables.cancelled"));
+    toast.success((data as { late?: boolean } | null)?.late ? t("cancel.lateToast") : t("tables.cancelled"));
     qc.invalidateQueries({ queryKey: ["my-tables", id] });
+    qc.invalidateQueries({ queryKey: ["my-reliability"] });
+  }
+  async function reconfirmTable(bid: string) {
+    setTableBusy(true);
+    const { error } = await supabase.rpc("reconfirm_table", { p_booking: bid });
+    setTableBusy(false);
+    if (error) return toast.error(t("common.error"));
+    toast.success(t("still.thanks"));
+    qc.invalidateQueries({ queryKey: ["my-tables", id] }); qc.invalidateQueries({ queryKey: ["notifications"] });
   }
 
   if (isLoading || !acct.ready) return <AppShell><CardSkeletons /></AppShell>;
@@ -127,16 +140,26 @@ export default function VenuePage() {
         <div className="mt-3 space-y-2">
           {myTables!.map((b) => {
             const fx = b.fixture as unknown as { home_team_name: string; away_team_name: string; kickoff_at: string } | null;
+            const upcoming = !fx || new Date(fx.kickoff_at).getTime() > Date.now();
             return (
-              <div key={b.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm ${b.status === "confirmed" ? "bg-brand-soft" : b.status === "declined" ? "bg-destructive/10" : "bg-surface"}`}>
-                <span className="scoreboard text-xl font-bold">{b.party_size}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{t(`tables.status_${b.status}` as TKey)}</p>
-                  <p className="truncate text-xs text-muted-foreground">{fx ? `${fx.home_team_name} ${t("common.vs")} ${fx.away_team_name} · ${formatDateTime(fx.kickoff_at)}` : t("tables.anyNight")}{b.venue_reply ? ` · “${b.venue_reply}”` : ""}</p>
+              <div key={b.id} className={`rounded-2xl px-4 py-3 text-sm ${b.status === "confirmed" ? "bg-brand-soft" : b.status === "declined" ? "bg-destructive/10" : "bg-surface"}`}>
+                <div className="flex items-center gap-3">
+                  <span className="scoreboard text-xl font-bold">{b.party_size}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{b.no_show_at ? t("tables.noShow") : b.arrived_at ? t("tables.arrived") : t(`tables.status_${b.status}` as TKey)}</p>
+                    <p className="truncate text-xs text-muted-foreground">{fx ? `${fx.home_team_name} ${t("common.vs")} ${fx.away_team_name} · ${formatDateTime(fx.kickoff_at)}` : t("tables.anyNight")}{b.venue_reply ? ` · “${b.venue_reply}”` : ""}</p>
+                  </div>
+                  {b.status !== "declined" && upcoming && (
+                    <button className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground" onClick={() => cancelTable(b.id, b.status, fx?.kickoff_at)}>{t("common.cancel")}</button>
+                  )}
                 </div>
-                {b.status !== "declined" && (!fx || new Date(fx.kickoff_at).getTime() > Date.now()) && (
-                  <button className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground" onClick={() => cancelTable(b.id)}>{t("common.cancel")}</button>
+                {b.status === "confirmed" && upcoming && (
+                  <>
+                    {fx && <StillComing kind="table" kickoff={fx.kickoff_at} confirmedAt={b.confirmed_at} onYes={() => reconfirmTable(b.id)} onRelease={() => cancelTable(b.id, b.status, fx.kickoff_at)} busy={tableBusy} />}
+                    <PolicyDetails kind="table" kickoff={fx?.kickoff_at} title className="mt-3" />
+                  </>
                 )}
+                {b.status === "pending" && upcoming && <PolicyNote kind="table" kickoff={fx?.kickoff_at} className="mt-2" />}
               </div>
             );
           })}
@@ -177,7 +200,7 @@ export default function VenuePage() {
                         <p className="truncate text-sm font-semibold">{f.home_team_name} {t("common.vs")} {f.away_team_name}</p>
                         <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">{s.sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{s.sound ? t("venue.withSound") : t("venue.noSound")} · {compLabel(t, f.competition_code, f.competition)}</p>
                       </Link>
-                      {!preview && joined && new Date(f.kickoff_at).getTime() > Date.now() && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} matchLabel={`${f.home_team_name} ${t("common.vs")} ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
+                      {!preview && joined && new Date(f.kickoff_at).getTime() > Date.now() && <RequestTable venueId={venue.id} venueName={name} fixtureId={f.id} kickoff={f.kickoff_at} matchLabel={`${f.home_team_name} ${t("common.vs")} ${f.away_team_name} · ${formatDateTime(f.kickoff_at)}`}
                         trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
                     </div>
                   );

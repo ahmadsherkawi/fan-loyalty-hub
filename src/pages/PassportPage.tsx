@@ -14,6 +14,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { loc, useMyRewards, useTeams } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { BookingRecord } from "@/components/booking/Policy";
 
 type Passport = {
   caps: number; prediction_points: number; exact_scores: number; predictions_made: number; quiz_points: number; venues: number;
@@ -118,6 +119,7 @@ export default function PassportPage() {
               ))}
             </div>
           )}
+          <BookingRecord />
         </>
       )}
     </AppShell>

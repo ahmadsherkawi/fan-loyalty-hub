@@ -45,7 +45,7 @@ export type Database = {
       venue_screenings: Table<{ id: string; venue_id: string; fixture_id: string; sound: boolean; note: string | null; note_ar: string | null; created_at: string }, "venue_id" | "fixture_id",
         [FK<"venue_screenings_venue_id_fkey", "venue_id", "venues">, FK<"venue_screenings_fixture_id_fkey", "fixture_id", "fixtures">]>;
       venue_menu_items: Table<{ id: string; venue_id: string; section: string; name: string; name_ar: string | null; description: string | null; description_ar: string | null; price_aed: number | null; photo_url: string | null; tags: string[]; is_available: boolean; sort: number; created_at: string }, "venue_id" | "name">;
-      table_bookings: Table<{ id: string; venue_id: string; fixture_id: string | null; user_id: string; party_size: number; note: string | null; status: string; venue_reply: string | null; created_at: string; responded_at: string | null }, "venue_id" | "user_id" | "party_size",
+      table_bookings: Table<{ id: string; venue_id: string; fixture_id: string | null; user_id: string; party_size: number; note: string | null; status: string; venue_reply: string | null; created_at: string; responded_at: string | null; confirmed_at: string | null; reminded_at: string | null; cancelled_at: string | null; arrived_at: string | null; no_show_at: string | null }, "venue_id" | "user_id" | "party_size",
         [FK<"table_bookings_venue_id_fkey", "venue_id", "venues">, FK<"table_bookings_fixture_id_fkey", "fixture_id", "fixtures">]>;
       venue_threads: Table<{ id: string; venue_id: string; user_id: string; last_message_at: string; fan_unread: number; venue_unread: number }, "venue_id" | "user_id", [FK<"venue_threads_venue_id_fkey", "venue_id", "venues">]>;
       venue_messages: Table<{ id: string; thread_id: string; sender_id: string; from_venue: boolean; body: string; created_at: string }, "thread_id" | "sender_id" | "body", [FK<"venue_messages_thread_id_fkey", "thread_id", "venue_threads">]>;
@@ -70,7 +70,7 @@ export type Database = {
       quizzes: Table<{ created_at: string | null; fixture_id: string; id: string; language: string; questions: Json; sponsor_name: string | null },
         "fixture_id" | "questions",
         [FK<"quizzes_fixture_id_fkey", "fixture_id", "fixtures">]>;
-      rsvps: Table<{ created_at: string | null; guests: number; id: string; status: string; user_id: string; watch_party_id: string },
+      rsvps: Table<{ created_at: string | null; guests: number; id: string; status: string; user_id: string; watch_party_id: string; confirmed_at: string | null; reminded_at: string | null; cancelled_at: string | null; cancel_reason: string | null },
         "user_id" | "watch_party_id",
         [FK<"rsvps_watch_party_id_fkey", "watch_party_id", "watch_parties">]>;
       sync_state: Table<{ key: string; updated_at: string | null; value: Json }, "key" | "value">;
@@ -90,7 +90,12 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       can_see_group: { Args: { p_group: string }; Returns: boolean };
-      cancel_rsvp: { Args: { p_party: string }; Returns: undefined };
+      cancel_rsvp: { Args: { p_party: string }; Returns: Json };
+      reconfirm_rsvp: { Args: { p_party: string }; Returns: undefined };
+      reconfirm_table: { Args: { p_booking: string }; Returns: undefined };
+      mark_table: { Args: { p_booking: string; p_outcome: string }; Returns: undefined };
+      my_reliability: { Args: never; Returns: Json };
+      booking_policy: { Args: never; Returns: Json };
       check_in: { Args: { p_code: string; p_lat?: number | null; p_lng?: number | null }; Returns: Json };
       city_leaderboard: { Args: { p_city?: string }; Returns: { avg_prediction_points: number; caps: number; group_id: string; slug: string; members: number; name: string; name_ar: string; team_name: string; team_short: string; team_color: string }[] };
       get_current_profile_id: { Args: never; Returns: string };
@@ -114,7 +119,7 @@ export type Database = {
       fixture_phase: { Args: { p_fixture: string }; Returns: string };
       request_table: { Args: { p_venue: string; p_fixture: string | null; p_size: number; p_note?: string | null }; Returns: Json };
       respond_table: { Args: { p_booking: string; p_decision: string; p_reply?: string | null }; Returns: Json };
-      cancel_table: { Args: { p_booking: string }; Returns: undefined };
+      cancel_table: { Args: { p_booking: string }; Returns: Json };
       send_venue_message: { Args: { p_venue: string; p_body: string; p_thread?: string | null }; Returns: Json };
       mark_thread_read: { Args: { p_thread: string }; Returns: undefined };
       venue_inbox: { Args: { p_venue: string }; Returns: Json };

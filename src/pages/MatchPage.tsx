@@ -55,7 +55,7 @@ export default function MatchPage() {
                   <p className="flex items-center gap-1.5 truncate font-semibold">{loc(v, "name", lang)}{v.is_pro && <span className="rounded bg-foreground px-1 text-[9px] font-bold text-background">PRO</span>}</p>
                   <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{v.area ?? t(`city.${v.city}` as never)} · {sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}{sound ? t("venue.withSound") : t("venue.noSound")}</p>
                 </Link>
-                {v.owner_user_id && new Date(fixture.kickoff_at).getTime() > Date.now() && <RequestTable venueId={v.id} venueName={loc(v, "name", lang)} fixtureId={fixture.id} matchLabel={label} trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
+                {v.owner_user_id && new Date(fixture.kickoff_at).getTime() > Date.now() && <RequestTable venueId={v.id} venueName={loc(v, "name", lang)} fixtureId={fixture.id} matchLabel={label} kickoff={fixture.kickoff_at} trigger={<Button size="xs" variant="outline">{t("tables.book")}</Button>} />}
               </div>
             ))}
           </div>

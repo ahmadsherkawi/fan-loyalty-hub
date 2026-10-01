@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { PausedNotice, PolicyNote, usePaused } from "@/components/booking/Policy";
 
 /** Fan asks a venue for a table on a match night; the venue confirms or declines from its dashboard. */
-export function RequestTable({ venueId, venueName, fixtureId, matchLabel, trigger }: { venueId: string; venueName: string; fixtureId: string | null; matchLabel?: string; trigger?: React.ReactNode }) {
+export function RequestTable({ venueId, venueName, fixtureId, matchLabel, kickoff, trigger }: { venueId: string; venueName: string; fixtureId: string | null; matchLabel?: string; kickoff?: string | null; trigger?: React.ReactNode }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -20,11 +21,12 @@ export function RequestTable({ venueId, venueName, fixtureId, matchLabel, trigge
   const [size, setSize] = useState(2);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const pausedUntil = usePaused();
   async function send() {
     setBusy(true);
     const { error } = await supabase.rpc("request_table", { p_venue: venueId, p_fixture: fixtureId, p_size: size, p_note: note });
     setBusy(false);
-    if (error) return toast.error(error.message.includes("already requested") ? t("tables.already") : error.message.includes("limit") ? t("tables.limit") : error.message.includes("started") ? t("tables.started") : t("common.error"));
+    if (error) return toast.error(error.message.includes("already requested") ? t("tables.already") : error.message.includes("limit") ? t("tables.limit") : error.message.includes("started") ? t("tables.started") : error.message.includes("tables paused") ? t("tables.paused") : t("common.error"));
     toast.success(t("tables.sent", { venue: venueName }));
     qc.invalidateQueries({ queryKey: ["my-tables"] });
     setOpen(false); setNote("");
@@ -45,7 +47,8 @@ export function RequestTable({ venueId, venueName, fixtureId, matchLabel, trigge
         </div>
         <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} placeholder={t("tables.notePlaceholder")} />
         <p className="text-xs text-muted-foreground">{t("tables.how")}</p>
-        <Button onClick={send} disabled={busy}>{t("tables.send")}</Button>
+        {pausedUntil ? <PausedNotice until={pausedUntil} kind="tables" /> : <PolicyNote kind="table" kickoff={kickoff} />}
+        <Button onClick={send} disabled={busy || !!pausedUntil}>{t("tables.send")}</Button>
       </DialogContent>
     </Dialog>
   );
