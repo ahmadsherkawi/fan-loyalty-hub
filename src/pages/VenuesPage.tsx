@@ -64,7 +64,7 @@ export default function VenuesPage() {
                   {v.is_pro && <span className="rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-background">PRO</span>}
                   <DemoChip show={v.is_demo} />
                 </div>
-                <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}{v.screens ? ` · ${t("venue.screens", { n: v.screens })}` : ""}</p>
+                <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}{v.screens ? ` · ${t("venue.screens", { n: v.screens })}` : ""}</span></p>
                 {n?.first && <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-brand"><Tv className="h-3 w-3" />{t("venues.next")}: {n.first.home_team_name} {t("common.vs")} {n.first.away_team_name} · {formatDateTime(n.first.kickoff_at, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</p>}
               </div>
               {v.owner_user_id || n?.count

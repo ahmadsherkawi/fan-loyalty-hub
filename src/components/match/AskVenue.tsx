@@ -96,7 +96,7 @@ export function AskVenueToShow({ fixture, showingIds }: { fixture: FixtureWithTe
                 <div key={v.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{loc(v, "name", lang)}</p>
-                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}</p>
+                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}</span></p>
                   </div>
                   {st === "pending" ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-semibold text-muted-foreground"><Clock className="h-3.5 w-3.5" />{t("askv.asked")}</span>
                     : st === "accepted" ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-bold text-brand"><Check className="h-3.5 w-3.5" />{t("askv.yes")}</span>

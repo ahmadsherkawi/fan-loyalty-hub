@@ -97,3 +97,9 @@
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 }
+
+/* Arabic pages show many English names (venues, clubs). Let each truncated line take its direction
+   from its own text, so "Lock, Stock & Barrel Bars…" is cut at the end, not the start. */
+[dir="rtl"] .truncate, [dir="rtl"] .line-clamp-1, [dir="rtl"] .line-clamp-2 { unicode-bidi: plaintext; }
+/* Long names must never widen a card or list past the screen: let grid items and truncated lines shrink. */
+.truncate, .grid > * { min-width: 0; }
