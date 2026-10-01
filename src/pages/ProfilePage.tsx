@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Initials } from "@/components/common/bits";
 import { AppShell, BackButton, LanguageToggle, PageTitle } from "@/components/layout/AppShell";
 import { VenueSettings } from "@/components/venue/VenueSettings";
+import { FindYourVenue } from "@/components/venue/Claim";
 import { GroupCard } from "@/components/cards";
 import { Section } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,10 @@ export default function ProfilePage() {
           : <Button asChild variant="outline" className="rounded-full"><Link to="/groups">{t("home.findGroup")}</Link></Button>}
       </Section>
 
+      {profile?.role === "system_admin" && (
+        <Button asChild variant="outline" className="mt-9 w-full rounded-full"><Link to="/admin/claims">{t("admin.claimsTitle")}</Link></Button>
+      )}
+
       <div className="mt-9 flex items-center gap-3 rounded-2xl bg-surface p-4">
         <Store className="h-5 w-5 shrink-0 text-muted-foreground" />
         <p className="flex-1 text-sm">{t("profile.runVenue")}</p>
@@ -116,6 +121,7 @@ function VenueAccountPage({ venues }: { venues: Venue[] }) {
           </div>
         ))}
       </div>
+      {venues.length === 0 && <div className="mt-3"><FindYourVenue /></div>}
       <div className="mt-3"><RegisterVenue /></div>
       <div className="card mt-6 flex items-center justify-between p-4"><span className="text-sm font-semibold">{t("profile.language")}</span><LanguageToggle /></div>
       <Button variant="ghost" className="mt-8 w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={async () => { await signOut(); navigate("/"); }}>
@@ -140,7 +146,7 @@ function RegisterVenue() {
       capacity: f.capacity ? Number(f.capacity) : null, screens: f.screens ? Number(f.screens) : null, instagram: f.instagram || null,
       phone: f.phone || null, alcohol_free: f.alcohol_free, family_friendly: f.family_friendly, owner_user_id: user.id,
     }).select("id").single();
-    if (error || !data) return toast.error(t("common.error"));
+    if (error || !data) return toast.error(error?.message.includes("venue exists") ? t("claim.err.exists") : t("common.error"));
     qc.invalidateQueries({ queryKey: ["my-venues"] });
     setOpen(false);
     navigate(`/venue-dashboard/${data.id}`);

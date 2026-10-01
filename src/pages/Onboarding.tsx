@@ -12,6 +12,7 @@ import { useI18n, type Lang } from "@/i18n/I18nContext";
 import type { TKey } from "@/i18n/en";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { FindYourVenue } from "@/components/venue/Claim";
 
 /** Where to go after onboarding: the page the person was trying to reach before signing up. */
 function takeNext() {
@@ -139,6 +140,15 @@ function VenueOnboarding() {
   const navigate = useNavigate();
   const [f, setF] = useState({ name: "", area: "", city: "Dubai", capacity: "", screens: "", phone: "" });
   const [busy, setBusy] = useState(false);
+  // Came from a claim link or a listing's "Is this your venue?": finish onboarding and go straight back there.
+  useEffect(() => {
+    if (!user) return;
+    const n = takeNext();
+    if (n.startsWith("/claim") || n.startsWith("/venues/")) {
+      supabase.from("profiles").update({ onboarding_completed: true }).eq("user_id", user.id).then(async () => { await refreshProfile(); navigate(n, { replace: true }); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
   useEffect(() => {
     if (!user) return;
     supabase.from("venues").select("id").eq("owner_user_id", user.id).limit(1).then(({ data }) => { if (data?.[0]) navigate(`/venue-dashboard/${data[0].id}`, { replace: true }); });
@@ -150,7 +160,7 @@ function VenueOnboarding() {
       name: f.name.trim(), area: f.area || null, city: f.city, capacity: f.capacity ? Number(f.capacity) : null,
       screens: f.screens ? Number(f.screens) : null, phone: f.phone || null, owner_user_id: user.id,
     }).select("id").single();
-    if (error || !data) { setBusy(false); toast.error(t("common.error")); return; }
+    if (error || !data) { setBusy(false); toast.error(error?.message.includes("venue exists") ? t("claim.err.exists") : t("common.error")); return; }
     await supabase.from("profiles").update({ onboarding_completed: true }).eq("user_id", user.id);
     await refreshProfile();
     navigate(`/venue-dashboard/${data.id}?tab=showing`, { replace: true });
@@ -160,7 +170,9 @@ function VenueOnboarding() {
       <div className="mx-auto max-w-md">
         <h1 className="text-[28px] font-extrabold leading-tight">{t("vonb.title")}</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">{t("vonb.sub")}</p>
-        <div className="mt-6 grid gap-3">
+        <div className="mt-6"><FindYourVenue /></div>
+        <p className="mt-8 text-sm font-bold">{t("claim.notListed")}</p>
+        <div className="mt-3 grid gap-3">
           <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={t("venue.name")} />
           <div className="grid grid-cols-2 gap-3">
             <Input value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} placeholder={t("venue.area")} />

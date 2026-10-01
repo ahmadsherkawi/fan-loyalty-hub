@@ -45,6 +45,7 @@ export type Database = {
       venue_screenings: Table<{ id: string; venue_id: string; fixture_id: string; sound: boolean; note: string | null; note_ar: string | null; created_at: string }, "venue_id" | "fixture_id",
         [FK<"venue_screenings_venue_id_fkey", "venue_id", "venues">, FK<"venue_screenings_fixture_id_fkey", "fixture_id", "fixtures">]>;
       venue_menu_items: Table<{ id: string; venue_id: string; section: string; name: string; name_ar: string | null; description: string | null; description_ar: string | null; price_aed: number | null; photo_url: string | null; tags: string[]; is_available: boolean; sort: number; created_at: string }, "venue_id" | "name">;
+      venue_claims: Table<{ id: string; venue_id: string; user_id: string; status: string; contact_name: string; role: string | null; phone: string; email: string | null; licence_no: string | null; note: string | null; lat: number | null; lng: number | null; distance_m: number | null; created_at: string; reviewed_at: string | null; reviewed_by: string | null; reason: string | null }, "venue_id" | "user_id" | "contact_name" | "phone", []>;
       table_bookings: Table<{ id: string; venue_id: string; fixture_id: string | null; user_id: string; party_size: number; note: string | null; status: string; venue_reply: string | null; created_at: string; responded_at: string | null; confirmed_at: string | null; reminded_at: string | null; cancelled_at: string | null; arrived_at: string | null; no_show_at: string | null }, "venue_id" | "user_id" | "party_size",
         [FK<"table_bookings_venue_id_fkey", "venue_id", "venues">, FK<"table_bookings_fixture_id_fkey", "fixture_id", "fixtures">]>;
       venue_threads: Table<{ id: string; venue_id: string; user_id: string; last_message_at: string; fan_unread: number; venue_unread: number }, "venue_id" | "user_id", [FK<"venue_threads_venue_id_fkey", "venue_id", "venues">]>;
@@ -82,7 +83,7 @@ export type Database = {
       venue_offers: Table<{ active: boolean; created_at: string | null; details: string | null; details_ar: string | null; id: string; members_only: boolean; min_caps: number; repeatable: boolean; title: string; title_ar: string | null; venue_id: string },
         "title" | "venue_id",
         [FK<"venue_offers_venue_id_fkey", "venue_id", "venues">]>;
-      venues: Table<{ address: string | null; alcohol_free: boolean | null; area: string | null; capacity: number | null; city: string; created_at: string | null; description: string | null; description_ar: string | null; family_friendly: boolean | null; has_sound: boolean | null; id: string; instagram: string | null; is_demo: boolean; is_pro: boolean; lat: number | null; lng: number | null; name: string; name_ar: string | null; owner_user_id: string | null; phone: string | null; screens: number | null; venue_type: string; whatsapp: string | null; website: string | null; cover_url: string | null; opening_hours: string | null; is_listed: boolean }, "name">;
+      venues: Table<{ listing_source: string | null; claimed_at: string | null; address: string | null; alcohol_free: boolean | null; area: string | null; capacity: number | null; city: string; created_at: string | null; description: string | null; description_ar: string | null; family_friendly: boolean | null; has_sound: boolean | null; id: string; instagram: string | null; is_demo: boolean; is_pro: boolean; lat: number | null; lng: number | null; name: string; name_ar: string | null; owner_user_id: string | null; phone: string | null; screens: number | null; venue_type: string; whatsapp: string | null; website: string | null; cover_url: string | null; opening_hours: string | null; is_listed: boolean }, "name">;
       watch_parties: Table<{ capacity: number | null; checkin_code: string; created_at: string | null; created_by: string | null; fixture_id: string | null; group_id: string; id: string; is_demo: boolean; notes: string | null; notes_ar: string | null; starts_at: string | null; status: string; title: string | null; venue_id: string | null; venue_status: string; venue_note: string | null; reserved_area: string | null; venue_responded_at: string | null; requested_capacity: number | null },
         "group_id",
         [FK<"watch_parties_fixture_id_fkey", "fixture_id", "fixtures">, FK<"watch_parties_group_id_fkey", "group_id", "groups">, FK<"watch_parties_venue_id_fkey", "venue_id", "venues">]>;
@@ -124,6 +125,13 @@ export type Database = {
       mark_thread_read: { Args: { p_thread: string }; Returns: undefined };
       venue_inbox: { Args: { p_venue: string }; Returns: Json };
       venue_tables: { Args: { p_venue: string }; Returns: Json };
+      claim_venue_with_code: { Args: { p_code: string }; Returns: Json };
+      request_venue_claim: { Args: { p_venue: string; p_name: string; p_role: string; p_phone: string; p_email: string; p_licence: string; p_note: string; p_lat?: number | null; p_lng?: number | null }; Returns: Json };
+      withdraw_venue_claim: { Args: { p_claim: string }; Returns: undefined };
+      admin_venue_claims: { Args: never; Returns: Json };
+      review_venue_claim: { Args: { p_claim: string; p_approve: boolean; p_reason?: string | null }; Returns: Json };
+      venue_claim_code: { Args: { p_venue: string; p_refresh?: boolean }; Returns: Json };
+      similar_venues: { Args: { p_name: string; p_city: string | null }; Returns: { id: string; name: string; area: string | null; city: string; claimed: boolean }[] };
       request_screening: { Args: { p_venue: string; p_fixture: string }; Returns: Json };
       respond_screening: { Args: { p_venue: string; p_fixture: string; p_decision: string }; Returns: Json };
       venue_screening_requests: { Args: { p_venue: string }; Returns: Json };

@@ -13,6 +13,7 @@ import { RewardItem } from "@/components/rewards/Rewards";
 import { ChatThread } from "@/components/venue/ChatThread";
 import { RequestTable } from "@/components/venue/RequestTable";
 import { PolicyDetails, PolicyNote, StillComing } from "@/components/booking/Policy";
+import { ClaimVenueCard } from "@/components/venue/Claim";
 import { MENU_SECTIONS } from "@/components/venue/MenuEditor";
 import { compLabel } from "@/lib/competitions";
 import { Button } from "@/components/ui/button";
@@ -96,8 +97,9 @@ export default function VenuePage() {
   if (!venue) return <AppShell><BackButton /><EmptyState title={t("venue.notFound")} /></AppShell>;
   const isOwner = !!user && venue.owner_user_id === user.id;
   // Venue accounts only see their own page, as a read-only preview of what fans see
-  if (acct.isVenue && !isOwner) return <Navigate to={acct.venueHome} replace />;
-  const preview = acct.isVenue;
+  const claimMode = !venue.owner_user_id && (params.get("claim") === "1" || acct.venues.length === 0);
+  if (acct.isVenue && !isOwner && !claimMode) return <Navigate to={acct.venueHome} replace />;
+  const preview = acct.isVenue && isOwner;
   const name = loc(venue, "name", lang);
   const wa = venue.whatsapp?.replace(/[^0-9]/g, "");
   const joined = !!venue.owner_user_id;
@@ -133,6 +135,7 @@ export default function VenuePage() {
             {venue.instagram && <Button asChild variant="outline" size="sm"><a href={`https://instagram.com/${venue.instagram.replace("@", "")}`} target="_blank" rel="noreferrer"><Instagram />{venue.instagram}</a></Button>}
           </div>
           {!joined && <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs text-muted-foreground">{t("venue.notJoined")}</p>}
+          {!joined && !venue.is_demo && <ClaimVenueCard venue={venue} autoOpen={params.get("claim") === "1"} />}
         </div>
       </div>
 

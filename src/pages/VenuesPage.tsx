@@ -37,7 +37,9 @@ export default function VenuesPage() {
   }, [next]);
   const cities = CITIES.filter((c) => (venues ?? []).some((v) => v.city === c));
   const s = q.trim().toLowerCase();
-  const list = (venues ?? []).filter((v) => (city === "all" || v.city === city) && (!s || [v.name, v.name_ar, v.area].some((x) => x?.toLowerCase().includes(s))));
+  // Venues on Jamhoor (they take bookings) first, then everything we've listed that shows football
+  const list = (venues ?? []).filter((v) => (city === "all" || v.city === city) && (!s || [v.name, v.name_ar, v.area].some((x) => x?.toLowerCase().includes(s))))
+    .sort((a, b) => Number(!!b.owner_user_id) - Number(!!a.owner_user_id));
 
   return (
     <AppShell>
@@ -65,7 +67,9 @@ export default function VenuesPage() {
                 <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{[v.area, t(`city.${v.city}` as never)].filter(Boolean).join(" · ")}{v.screens ? ` · ${t("venue.screens", { n: v.screens })}` : ""}</p>
                 {n?.first && <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-brand"><Tv className="h-3 w-3" />{t("venues.next")}: {n.first.home_team_name} {t("common.vs")} {n.first.away_team_name} · {formatDateTime(n.first.kickoff_at, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</p>}
               </div>
-              <div className="text-center"><p className="scoreboard text-xl font-bold leading-none">{n?.count ?? 0}</p><p className="text-[10px] text-muted-foreground">{t("venues.games")}</p></div>
+              {v.owner_user_id || n?.count
+                ? <div className="text-center"><p className="scoreboard text-xl font-bold leading-none">{n?.count ?? 0}</p><p className="text-[10px] text-muted-foreground">{t("venues.games")}</p></div>
+                : <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{t(`vtype.${v.venue_type}` as never)}</span>}
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground rtl:rotate-180" />
             </Link>
           );

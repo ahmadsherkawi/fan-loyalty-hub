@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, Hand, MessageCircle, UserX, Utensils, Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
+import { Clock, Hand, Store, MessageCircle, UserX, Utensils, Award, Bell, CalendarCheck2, CalendarX2, Gift, Megaphone, PartyPopper, Stamp, Ticket, TicketCheck, Tv, Users } from "lucide-react";
 import { IconDot } from "@/components/common/bits";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -42,6 +42,9 @@ const KINDS: Record<string, { icon: ReactNode; tone: Tone }> = {
   reconfirm_table: { icon: <Hand />, tone: "gold" },
   seat_released: { icon: <CalendarX2 />, tone: "neutral" },
   no_show: { icon: <UserX />, tone: "neutral" },
+  venue_claim: { icon: <Store />, tone: "gold" },
+  venue_claim_approved: { icon: <Store />, tone: "brand" },
+  venue_claim_rejected: { icon: <Store />, tone: "neutral" },
 };
 
 export function useUnreadCount() {
@@ -74,7 +77,7 @@ export function useNotificationText() {
       latest: String(d.latest ?? ""), seats: String(d.seats ?? 0), n: String(d.new_count ?? 1), reservations: String(d.reservations ?? 0),
       caps: String(d.caps ?? d.min_caps ?? ""), area: String(d.area ?? ""), note: String(d.note ?? ""),
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
-      size: String(d.size ?? ""), fan: String(d.fan ?? ""), count: String(d.count ?? 1), tv: pick("broadcaster"), reply: d.reply ? `· “${d.reply}”` : "",
+      size: String(d.size ?? ""), distance: d.distance != null ? String(d.distance) : "—", fan: String(d.fan ?? ""), count: String(d.count ?? 1), tv: pick("broadcaster"), reply: d.reply ? `· “${d.reply}”` : "",
     };
     const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle"
       : n.kind === "table_cancelled" && d.late ? "table_cancelled_late" : n.kind;

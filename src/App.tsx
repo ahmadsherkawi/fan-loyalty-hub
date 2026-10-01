@@ -26,6 +26,8 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const VenuesPage = lazy(() => import("./pages/VenuesPage"));
 const MatchPage = lazy(() => import("./pages/MatchPage"));
+const ClaimPage = lazy(() => import("./pages/ClaimPage"));
+const AdminClaims = lazy(() => import("./pages/AdminClaims"));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
 
@@ -58,6 +60,9 @@ const App = () => (
                 <Route path="/venue-dashboard/:id" element={<VenueOnly><VenueDashboard /></VenueOnly>} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/claim" element={<ClaimPage />} />
+                <Route path="/claim/:code" element={<ClaimPage />} />
+                <Route path="/admin/claims" element={<AdminClaims />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

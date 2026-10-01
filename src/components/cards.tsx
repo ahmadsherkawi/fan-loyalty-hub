@@ -98,7 +98,7 @@ export function VenueFacts({ venue }: { venue: Venue }) {
   const chips = [
     venue.screens ? { icon: Tv, label: t("venue.screens", { n: venue.screens }) } : null,
     venue.has_sound ? { icon: Volume2, label: t("venue.sound") } : null,
-    venue.alcohol_free ? { icon: Coffee, label: t("venue.alcoholFree") } : { icon: Wine, label: t("venue.licensed") },
+    venue.alcohol_free ? { icon: Coffee, label: t("venue.alcoholFree") } : venue.alcohol_free === false ? { icon: Wine, label: t("venue.licensed") } : null,
     venue.family_friendly ? { icon: Baby, label: t("venue.family") } : null,
     venue.capacity ? { icon: Users, label: t("venue.capacity", { n: venue.capacity }) } : null,
   ].filter(Boolean) as { icon: typeof Tv; label: string }[];
