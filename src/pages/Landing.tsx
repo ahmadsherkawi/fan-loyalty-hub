@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
 import { FIXTURE_SELECT, loc, useUpcomingParties, type FixtureWithTeams } from "@/lib/data";
 
-const BIG = ["CL", "PL", "PD", "UPL", "SPL", "SA", "BL1", "FL1", "ACL"];
+const BIG = ["CL", "PL", "PD", "UPL", "SPL", "ULC", "SA", "BL1", "FL1", "ACL"];
 
 /** Live numbers for the hero: how many venues fans can find right now. */
 function useDirectoryStats() {
@@ -26,7 +26,7 @@ function useDirectoryStats() {
   });
 }
 
-/** The next big matches in the coming week, with how many venues are showing each. */
+/** The next big matches (3 weeks ahead, so international breaks never leave it empty), with how many venues are showing each. */
 function useBigGames() {
   return useQuery({
     queryKey: ["landing-big-games"],
@@ -34,8 +34,8 @@ function useBigGames() {
     queryFn: async () => {
       const now = new Date();
       const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT)
-        .in("competition_code", BIG).gte("kickoff_at", now.toISOString()).lte("kickoff_at", new Date(now.getTime() + 7 * 864e5).toISOString())
-        .order("kickoff_at").limit(40);
+        .in("competition_code", BIG).gte("kickoff_at", now.toISOString()).lte("kickoff_at", new Date(now.getTime() + 21 * 864e5).toISOString())
+        .order("kickoff_at").limit(120);
       const all = (data ?? []) as unknown as FixtureWithTeams[];
       // One or two per competition so the strip mixes leagues, then by kick-off
       const per = new Map<string, number>();

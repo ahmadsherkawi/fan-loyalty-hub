@@ -986,7 +986,7 @@ export const ar: Record<TKey, string> = {
   "landing.whereToWatch": "أين تشاهد",
   "landing.statVenues": "{n} مكاناً يعرض المباريات",
   "landing.statLeagues": "الدوري الإنجليزي · دوري أدنوك للمحترفين · دوري روشن السعودي · دوري الأبطال",
-  "landing.bigGames": "أبرز مباريات الأسبوع",
+  "landing.bigGames": "أبرز المباريات القادمة",
   "landing.bigGamesSub": "اضغط على أي مباراة لترى أين تُعرض.",
   "landing.showingAt": "تُعرض في {n} أماكن",
   "landing.findWhere": "اعرف أين تشاهدها",

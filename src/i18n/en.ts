@@ -984,7 +984,7 @@ export const en = {
   "landing.whereToWatch": "Where to watch",
   "landing.statVenues": "{n} venues showing football",
   "landing.statLeagues": "Premier League · ADNOC Pro League · Saudi Pro League · Champions League",
-  "landing.bigGames": "This week's big games",
+  "landing.bigGames": "Big games coming up",
   "landing.bigGamesSub": "Tap a match to see where it's showing.",
   "landing.showingAt": "Showing at {n} venues",
   "landing.findWhere": "Find where to watch",
