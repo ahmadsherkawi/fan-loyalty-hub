@@ -4,7 +4,7 @@ import { toBlob } from "html-to-image";
 const inIframe = () => { try { return window.self !== window.top; } catch { return true; } };
 
 /** The public address of the site. Links made inside the Lovable editor or a local preview still point fans to the live site. */
-export const PUBLIC_ORIGIN = "https://club-loyal-core.lovable.app";
+export const PUBLIC_ORIGIN = "https://jamhoor.lovable.app";
 export function siteUrl(path: string) {
   const o = window.location.origin;
   const base = /lovableproject\.com|id-preview--|preview--|localhost|127\.0\.0\.1/.test(o) ? PUBLIC_ORIGIN : o;
