@@ -125,6 +125,13 @@ export default function Landing() {
             </div>
             <SeeAll to="/matches" label={t("common.seeAll")} />
           </div>
+          {games!.some(({ fixture: f }) => f.competition_code === "AGC") && (
+            <Link to="/gulf-cup" className="mb-3 flex items-center gap-3 rounded-2xl bg-foreground p-4 text-background">
+              <Target className="h-6 w-6 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1"><span className="block font-bold">{t("cup.title")}</span><span className="block truncate text-xs text-background/70">{t("cup.banner")}</span></span>
+              <ArrowRight className="h-5 w-5 shrink-0 rtl:rotate-180" />
+            </Link>
+          )}
           <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
             {games!.map(({ fixture: f, showing }) => (
               <Link key={f.id} to={`/match/${f.id}`} className="card card-hover w-[78%] shrink-0 snap-start p-4 md:w-auto">

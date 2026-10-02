@@ -1017,6 +1017,16 @@ export const en = {
   "wall.retention": "Photos disappear after 12 hours, posts after 7 days.",
   "chat.retention": "Messages are deleted after 7 days.",
   "auth.privacyNote": "Photos are deleted after 12 hours and messages after 7 days.",
+  "cup.title": "Gulf Cup Predictor",
+  "cup.sub": "Call the score of every knockout game and top the leaderboard. Challenge your friends.",
+  "cup.joinToPlay": "Join free to make your predictions",
+  "cup.join": "Join free",
+  "cup.none": "No Gulf Cup games to predict right now",
+  "cup.challenge": "Challenge friends",
+  "cup.invite": "I'm predicting the Gulf Cup on Jamhoor 🏆 Think you can beat me?",
+  "cup.board": "Gulf Cup leaderboard",
+  "cup.rules": "3 points for the exact score, 1 for the right result. The score after extra time counts; penalty shoot-outs don't. Ties go to whoever predicted first. Predictions close at kick-off. Just for bragging rights.",
+  "cup.banner": "Predict the knockout games and challenge your friends",
 } as const;
 
 export type TKey = keyof typeof en;
