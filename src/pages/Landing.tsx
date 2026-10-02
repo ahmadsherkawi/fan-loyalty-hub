@@ -13,7 +13,8 @@ import { compLabel } from "@/lib/competitions";
 import { FIXTURE_SELECT, loc, useUpcomingParties, type FixtureWithTeams } from "@/lib/data";
 
 // Priority order: one game from each, the first six competitions that have a game coming up
-const BIG = ["PL", "CL", "UPL", "ULC", "SPL", "PD", "ACL", "SA", "BL1", "FL1"];
+const TOURNAMENTS = ["AGC"];
+const BIG = ["AGC", "PL", "CL", "UPL", "ULC", "SPL", "PD", "ACL", "SA", "BL1", "FL1"];
 
 /** Live numbers for the hero: how many venues fans can find right now. */
 function useDirectoryStats() {
@@ -39,7 +40,11 @@ function useBigGames() {
         .order("kickoff_at").limit(400);
       const all = (data ?? []) as unknown as FixtureWithTeams[];
       // The next game of each competition, most-watched competitions first, then shown in kick-off order
-      const pick = BIG.map((c) => all.find((f) => f.competition_code === c)).filter((f): f is FixtureWithTeams => !!f).slice(0, 6)
+      // A tournament's knockout games (Gulf Cup) all show while they are this week; other competitions one game each
+      const soon = now.getTime() + 4 * 864e5;
+      const cup = all.filter((f) => TOURNAMENTS.includes(f.competition_code ?? "") && new Date(f.kickoff_at).getTime() < soon);
+      const pick = [...cup, ...BIG.filter((c) => !cup.some((f) => f.competition_code === c)).map((c) => all.find((f) => f.competition_code === c))]
+        .filter((f): f is FixtureWithTeams => !!f).slice(0, 6)
         .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
       const ids = pick.map((f) => f.id);
       const { data: sc } = ids.length ? await supabase.from("venue_screenings").select("fixture_id").in("fixture_id", ids) : { data: [] };

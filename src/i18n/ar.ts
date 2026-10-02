@@ -813,6 +813,7 @@ export const ar: Record<TKey, string> = {
   "party.venueCantHost": "لا يستطيع المكان استضافة هذا الحفل، لذلك الحجوزات متوقفة.",
   "notif.booking_withdrawn.t": "سحبت {group} طلب الحجز",
   "notif.booking_withdrawn.b": "{match} · {when} · اختاروا مكاناً آخر",
+  "comp.AGC": "كأس الخليج العربي",
   "comp.UPL": "دوري المحترفين الإماراتي",
   "comp.ULC": "كأس مصرف أبوظبي الإسلامي",
   "comp.SPL": "دوري روشن السعودي",

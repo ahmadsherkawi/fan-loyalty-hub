@@ -811,6 +811,7 @@ export const en = {
   "party.venueCantHost": "The venue can't host this one, so reservations are paused.",
   "notif.booking_withdrawn.t": "Request withdrawn by {group}",
   "notif.booking_withdrawn.b": "{match} · {when} · they chose another venue",
+  "comp.AGC": "Arabian Gulf Cup",
   "comp.UPL": "UAE Pro League",
   "comp.ULC": "ADIB Cup",
   "comp.SPL": "Saudi Pro League",
