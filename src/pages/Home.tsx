@@ -14,7 +14,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import {
   CITIES, loc, partyTime, useMyRewards, useMyVenues, useCityLeaderboard, useMyMemberships, useNextTeamFixture, usePartiesForFixture, useTeams, useUpcomingParties,
 } from "@/lib/data";
-import Landing from "./Landing";
+import Landing, { CupPromo } from "./Landing";
 import { useAccount } from "@/lib/access";
 
 export default function Home() {
@@ -54,6 +54,7 @@ function MatchDay() {
     <AppShell>
       <PageTitle eyebrow={formatDateTime(new Date(), { weekday: "long", day: "numeric", month: "long" })}
         title={<>{t("home.welcome")}{profile?.full_name ? <>{lang === "ar" ? "، " : ", "}<span className="text-brand">{profile.full_name.split(" ")[0]}</span></> : ""}</>} />
+      <CupPromo />
 
       {profile?.favorite_team_id && (
         <section>

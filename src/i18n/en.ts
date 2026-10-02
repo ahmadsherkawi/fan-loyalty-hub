@@ -1027,6 +1027,12 @@ export const en = {
   "cup.board": "Gulf Cup leaderboard",
   "cup.rules": "3 points for the exact score, 1 for the right result. The score after extra time counts; penalty shoot-outs don't. Ties go to whoever predicted first. Predictions close at kick-off. Just for bragging rights.",
   "cup.banner": "Predict the knockout games and challenge your friends",
+  "predict.lockedShort": "Locked",
+  "predict.noPick": "No prediction",
+  "comp.UNL": "Nations League",
+  "cup.promoSub": "Call the score of every Gulf Cup knockout game, challenge your friends and top the leaderboard. Free.",
+  "cup.predictNow": "Predict now",
+  "cup.playing": "{n} fans playing",
 } as const;
 
 export type TKey = keyof typeof en;
