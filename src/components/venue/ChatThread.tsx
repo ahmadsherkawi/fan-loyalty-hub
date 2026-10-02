@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,8 @@ export function ChatThread({ venueId, threadId, asVenue, venueName }: { venueId:
           );
         })}
       </div>
-      <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">{t("chat.retention")} <Link to="/privacy" className="underline underline-offset-2">{t("privacy.more")}</Link></p>
+      <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <Input value={text} onChange={(e) => setText(e.target.value.slice(0, 1000))} placeholder={t("chat.placeholder")} />
         <Button type="submit" size="icon" className="h-11 w-11 shrink-0" disabled={!text.trim()} aria-label={t("pundit.send")}><Send className="rtl:rotate-180" /></Button>
       </form>

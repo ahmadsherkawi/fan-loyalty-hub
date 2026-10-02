@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, EyeOff, Lock, Send } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Camera, Clock, EyeOff, Lock, Send } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export function MatchWall({ partyId, checkedIn, isHost }: { partyId: string; che
       ) : (
         <p className="flex items-center gap-2 rounded-2xl bg-surface px-4 py-3 text-sm text-muted-foreground"><Lock className="h-4 w-4 shrink-0" />{!open ? t("wall.closed") : t("wall.checkInFirst")}</p>
       )}
+      <p className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5 shrink-0" /><span>{t("wall.retention")} <Link to="/privacy" className="underline underline-offset-2">{t("privacy.more")}</Link></span></p>
       {(posts ?? []).length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{t("wall.empty")}</p> : (
         <div className="space-y-3">
           {posts!.map((p) => (

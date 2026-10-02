@@ -28,6 +28,7 @@ const VenuesPage = lazy(() => import("./pages/VenuesPage"));
 const MatchPage = lazy(() => import("./pages/MatchPage"));
 const ClaimPage = lazy(() => import("./pages/ClaimPage"));
 const AdminClaims = lazy(() => import("./pages/AdminClaims"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
 
@@ -63,6 +64,7 @@ const App = () => (
                 <Route path="/claim" element={<ClaimPage />} />
                 <Route path="/claim/:code" element={<ClaimPage />} />
                 <Route path="/admin/claims" element={<AdminClaims />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

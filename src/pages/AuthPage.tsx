@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,7 @@ export default function AuthPage() {
           <div className="space-y-1.5"><Label htmlFor="pw">{t("auth.password")}</Label><Input id="pw" type="password" dir="ltr" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
           <Button type="submit" size="lg" className="w-full" disabled={busy}>{busy ? t("common.loading") : mode === "signup" ? t("auth.signUp") : t("auth.signIn")}</Button>
         </form>
+        {mode === "signup" && <p className="mt-3 text-center text-xs text-muted-foreground">{t("auth.privacyNote")} <Link to="/privacy" className="underline underline-offset-2">{t("privacy.more")}</Link></p>}
         <button className="mt-5 w-full text-center text-sm font-semibold text-brand hover:underline" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
           {mode === "signup" ? t("auth.haveAccount") : t("auth.noAccount")}
         </button>

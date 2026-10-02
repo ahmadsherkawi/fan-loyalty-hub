@@ -224,7 +224,7 @@ export default function Landing() {
           <div className="grid gap-3 md:grid-cols-3">{parties!.slice(0, 3).map((p) => <PartyCard key={p.id} party={p} />)}</div>
         </section>
       )}
-      <p className="mx-auto mt-12 max-w-xl text-center text-xs text-muted-foreground">{t("landing.footer")}</p>
+      <p className="mx-auto mt-12 max-w-xl text-center text-xs text-muted-foreground">{t("landing.footer")} <Link to="/privacy" className="underline underline-offset-2">{t("privacy.title")}</Link></p>
     </AppShell>
   );
 }
