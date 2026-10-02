@@ -82,7 +82,7 @@ export function CupPromo() {
           <h2 className="mt-2 text-3xl font-extrabold leading-tight md:text-4xl">{t("cup.title")}</h2>
           <p className="mt-2 text-sm text-background/70 md:text-base">{t("cup.promoSub")}</p>
           <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">{t("cup.predictNow")}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
-          {data.players > 0 && <p className="mt-3 text-xs text-background/60">{t("cup.playing", { n: data.players })}</p>}
+          {data.players > 1 && <p className="mt-3 text-xs text-background/60">{t("cup.playing", { n: data.players })}</p>}
         </div>
         <div className="space-y-2">
           {data.fixtures.map((f) => {
