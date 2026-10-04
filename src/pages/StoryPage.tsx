@@ -73,7 +73,7 @@ export default function StoryPage() {
           <div className="mt-auto flex w-full items-center gap-3 rounded-2xl bg-white/10 p-2.5 text-start">
             <div className="rounded-lg bg-white p-1.5"><QRCodeSVG value={url} size={64} fgColor="#0B1220" /></div>
             <div className="min-w-0">
-              <p className="text-sm font-extrabold leading-tight">{t("story.book")}</p>
+              <p className="text-sm font-extrabold leading-tight">{t(v.owner_user_id ? "story.book" : "story.find")}</p>
               <div className="mt-1.5 scale-90 origin-[left_center] rtl:origin-[right_center]"><Wordmark invert /></div>
             </div>
           </div>

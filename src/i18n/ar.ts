@@ -1064,4 +1064,5 @@ export const ar: Record<TKey, string> = {
   "final.promoSub": "توقّع النتيجة، شارك توقّعك واعرف وين تشاهد النهائي في الإمارات.",
   "story.showing": "شاهدها مباشرة في",
   "story.book": "احجز طاولتك على",
+  "story.find": "شوف وين تتابع على",
 };

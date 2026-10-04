@@ -1062,6 +1062,7 @@ export const en = {
   "final.promoSub": "Predict the score, share your pick and find where to watch the final across the UAE.",
   "story.showing": "Watch it live at",
   "story.book": "Book your table on",
+  "story.find": "See where to watch on",
 } as const;
 
 export type TKey = keyof typeof en;
