@@ -55,7 +55,7 @@ export async function shareOrCopy(text: string, url: string): Promise<"shared" |
  * Renders a DOM node to a PNG ahead of time, so the Share tap can open the share sheet immediately
  * (browsers only allow sharing directly inside the tap; rendering first would lose that permission).
  */
-export function useShareableImage(ref: RefObject<HTMLElement>, filename: string, deps: unknown[]) {
+export function useShareableImage(ref: RefObject<HTMLElement>, filename: string, deps: unknown[], pixelRatio = 2) {
   const [blob, setBlob] = useState<Blob | null>(null);
   useEffect(() => {
     let alive = true;
@@ -64,7 +64,7 @@ export function useShareableImage(ref: RefObject<HTMLElement>, filename: string,
       if (!ref.current) return;
       try {
         await document.fonts?.ready;
-        const opts = { pixelRatio: 2, cacheBust: true, backgroundColor: "#0B1220" };
+        const opts = { pixelRatio, cacheBust: true, backgroundColor: "#0B1220" };
         await toBlob(ref.current, opts); // first pass warms fonts/images (Safari)
         const b = await toBlob(ref.current, opts);
         if (alive) setBlob(b);

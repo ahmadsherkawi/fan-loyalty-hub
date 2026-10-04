@@ -12,6 +12,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { copyText, siteUrl } from "@/lib/share";
 import { cn } from "@/lib/utils";
+import { AdminScreenings } from "@/components/admin/AdminScreenings";
 
 type Claim = {
   id: string; venue_id: string; status: string; contact_name: string; role: string | null; phone: string; email: string | null; licence_no: string | null; note: string | null;
@@ -49,6 +50,7 @@ export default function AdminClaims() {
   return (
     <AppShell>
       <PageTitle eyebrow="Admin" title={t("admin.claimsTitle")} sub={t("admin.claimsSub")} />
+      <div className="-mt-4 mb-6"><AdminScreenings /></div>
       {isLoading ? <CardSkeletons n={2} /> : !data?.length ? (
         <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("admin.noClaims")}</p>
       ) : (

@@ -63,24 +63,28 @@ export function CupPromo() {
     staleTime: 60_000,
     queryFn: async () => {
       const now = Date.now();
-      const [{ data: fx }, { data: board }] = await Promise.all([
+      const [{ data: fx }, { data: board }, { data: last }] = await Promise.all([
         supabase.from("fixtures").select(FIXTURE_SELECT).eq("competition_code", "AGC")
           .gte("kickoff_at", new Date(now - 3 * 3600e3).toISOString()).lte("kickoff_at", new Date(now + 6 * 864e5).toISOString()).order("kickoff_at").limit(3),
         supabase.rpc("competition_leaderboard" as never, { p_code: "AGC" } as never),
+        supabase.from("fixtures").select("id").eq("competition_code", "AGC").order("kickoff_at", { ascending: false }).limit(1),
       ]);
-      return { fixtures: (fx ?? []) as unknown as FixtureWithTeams[], players: ((board ?? []) as unknown[]).length };
+      return { fixtures: (fx ?? []) as unknown as FixtureWithTeams[], players: ((board ?? []) as unknown[]).length, finalId: (last ?? [])[0]?.id as string | undefined };
     },
   });
   if (!data?.fixtures.length) return null;
+  // Once the semis are done, the only game left is the final (the tournament's last fixture): the card points to the final page
+  const upcoming = data.fixtures.filter((f) => !isFinished(f.status));
+  const isFinal = upcoming.length === 1 && upcoming[0].id === data.finalId;
   const nm = (f: FixtureWithTeams, side: "home" | "away") => (lang === "ar" && f[`${side}_team`]?.name_ar) || f[`${side}_team`]?.name || f[`${side}_team_name`];
   return (
-    <Link to="/gulf-cup" className="relative mb-8 block overflow-hidden rounded-3xl bg-foreground p-5 text-background shadow-card transition-transform hover:-translate-y-0.5 md:p-7">
+    <Link to={isFinal ? "/final" : "/gulf-cup"} className="relative mb-8 block overflow-hidden rounded-3xl bg-foreground p-5 text-background shadow-card transition-transform hover:-translate-y-0.5 md:p-7">
       <div className="absolute inset-0 bg-[radial-gradient(60%_80%_at_100%_0%,hsl(var(--primary)/0.35),transparent_60%)]" aria-hidden />
       <div className="relative grid gap-5 md:grid-cols-[1fr_1.1fr] md:items-center">
         <div>
           <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-primary"><Trophy className="h-4 w-4" />{t("comp.AGC")}</span>
-          <h2 className="mt-2 text-3xl font-extrabold leading-tight md:text-4xl">{t("cup.title")}</h2>
-          <p className="mt-2 text-sm text-background/70 md:text-base">{t("cup.promoSub")}</p>
+          <h2 className="mt-2 text-3xl font-extrabold leading-tight md:text-4xl">{isFinal ? t("final.title") : t("cup.title")}</h2>
+          <p className="mt-2 text-sm text-background/70 md:text-base">{isFinal ? t("final.promoSub") : t("cup.promoSub")}</p>
           <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">{t("cup.predictNow")}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
           {data.players > 1 && <p className="mt-3 text-xs text-background/60">{t("cup.playing", { n: data.players })}</p>}
         </div>

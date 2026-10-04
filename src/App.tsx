@@ -30,6 +30,8 @@ const ClaimPage = lazy(() => import("./pages/ClaimPage"));
 const AdminClaims = lazy(() => import("./pages/AdminClaims"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 const GulfCupPage = lazy(() => import("./pages/GulfCupPage"));
+const FinalPage = lazy(() => import("./pages/FinalPage"));
+const StoryPage = lazy(() => import("./pages/StoryPage"));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
 
@@ -67,6 +69,8 @@ const App = () => (
                 <Route path="/admin/claims" element={<AdminClaims />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/gulf-cup" element={<FanOnly><GulfCupPage /></FanOnly>} />
+                <Route path="/final" element={<FanOnly><FinalPage /></FanOnly>} />
+                <Route path="/story/:venueId" element={<StoryPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
