@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,7 +64,9 @@ function CreateGroupDialog() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: teams } = useTeams();
-  const [open, setOpen] = useState(false);
+  // /groups?create=1 (the "start your group" link sent to organisers) opens the form straight away
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(params.get("create") === "1");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: "", name_ar: "", team_id: profile?.favorite_team_id ?? "", city: profile?.city && profile.city !== "Other" ? profile.city : "Dubai",
