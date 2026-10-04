@@ -46,7 +46,7 @@ export default function FinalPage() {
   const { data: showing } = useQuery({
     queryKey: ["fixture-venues", fixture?.id],
     enabled: !!fixture,
-    queryFn: async () => ((await supabase.from("venue_screenings").select("id, sound, venue:venues(*)").eq("fixture_id", fixture!.id)).data ?? []) as unknown as { id: string; sound: boolean; venue: Venue }[],
+    queryFn: async () => ((await supabase.from("venue_screenings").select("id, sound, created_at, venue:venues(*)").eq("fixture_id", fixture!.id).order("created_at")).data ?? []) as unknown as { id: string; sound: boolean; created_at: string; venue: Venue }[],
   });
   const cd = useCountdown(fixture?.kickoff_at);
 
@@ -55,7 +55,8 @@ export default function FinalPage() {
 
   const name = (side: "home" | "away") => (lang === "ar" && fixture[`${side}_team`]?.name_ar) || fixture[`${side}_team`]?.name || fixture[`${side}_team_name`];
   const live = isLive(fixture.status), done = isFinished(fixture.status);
-  const venues = (showing ?? []).filter((s) => s.venue?.is_listed).sort((a, b) => Number(!!b.venue.owner_user_id) - Number(!!a.venue.owner_user_id) || a.venue.name.localeCompare(b.venue.name));
+  // First to confirm, first on the list
+  const venues = (showing ?? []).filter((s) => s.venue?.is_listed).sort((a, b) => a.created_at.localeCompare(b.created_at));
   const label = `${fixture.home_team_name} ${t("common.vs")} ${fixture.away_team_name} · ${formatDateTime(fixture.kickoff_at)}`;
   const h = fixture.home_team, a = fixture.away_team;
 
