@@ -14,7 +14,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
-import { useMyLeagues, usePredictorFixtures, useSeasonBoard } from "@/lib/predictor";
+import { LEAGUE_COMPS, useMyLeagues, usePredictorFixtures, useSeasonBoard } from "@/lib/predictor";
+import { Chip } from "@/components/common/bits";
 import type { FixtureWithTeams } from "@/lib/data";
 
 /** /predictor — the weekly Predictor: call this week's big games, run private leagues with friends, climb the season table. */
@@ -29,6 +30,8 @@ export default function PredictorPage() {
   const { data: leagues } = useMyLeagues(!!user);
   const [creating, setCreating] = useState(params.get("new") === "1");
   const [name, setName] = useState("");
+  const [comps, setComps] = useState<string[]>(["PL"]);
+  const toggleComp = (c: string) => setComps((l) => (l.includes(c) ? l.filter((x) => x !== c) : [...l, c]));
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const signup = (next: string) => `/auth?mode=signup&next=${encodeURIComponent(next)}`;
@@ -36,7 +39,7 @@ export default function PredictorPage() {
   async function create() {
     if (!user) return navigate(signup("/predictor?new=1"));
     setBusy(true);
-    const { data, error } = await supabase.rpc("create_league" as never, { p_name: name } as never);
+    const { data, error } = await supabase.rpc("create_league" as never, { p_name: name, p_comps: comps } as never);
     setBusy(false);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["my-leagues"] });
@@ -115,7 +118,14 @@ export default function PredictorPage() {
           <DialogHeader><DialogTitle>{t("predictor.create")}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{t("predictor.createB")}</p>
           <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("predictor.namePh")} maxLength={40} />
-          <Button onClick={create} disabled={busy || name.trim().length < 2} className="rounded-full">{busy ? t("common.loading") : t("predictor.createCta")}</Button>
+          <div>
+            <p className="mb-2 text-sm font-semibold">{t("predictor.compsQ")}</p>
+            <div className="flex flex-wrap gap-2">
+              {LEAGUE_COMPS.map((c) => <Chip key={c} active={comps.includes(c)} onClick={() => toggleComp(c)}>{t(`comp.${c}` as never)}</Chip>)}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">{t("predictor.compsHint")}</p>
+          </div>
+          <Button onClick={create} disabled={busy || name.trim().length < 2 || !comps.length} className="rounded-full">{busy ? t("common.loading") : t("predictor.createCta")}</Button>
         </DialogContent>
       </Dialog>
     </AppShell>

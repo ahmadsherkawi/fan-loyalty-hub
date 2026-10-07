@@ -11,21 +11,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { whatsappShare } from "@/lib/data";
-import type { BoardRow, LeagueInfo } from "@/lib/predictor";
+import { usePredictorFixtures, type BoardRow, type LeagueInfo } from "@/lib/predictor";
+import { PredictionInput } from "@/components/match/PredictionInput";
+import { compLabel } from "@/lib/competitions";
 import { copyText, shareOrCopy, siteUrl } from "@/lib/share";
 
 /** /league/:code — a private Predictor league. The code is the invite: anyone with it can see the table and join. */
 export default function LeaguePage() {
   const { code = "" } = useParams();
   const [params] = useSearchParams();
-  const { t } = useI18n();
+  const { t, formatDateTime } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const { data: info, isLoading } = useQuery({
     queryKey: ["league", code, user?.id],
-    queryFn: async () => (((await supabase.rpc("league_info" as never, { p_code: code } as never)).data ?? []) as unknown as LeagueInfo[])[0] ?? null,
+    queryFn: async () => (((await supabase.rpc("league_details" as never, { p_code: code } as never)).data ?? []) as unknown as LeagueInfo[])[0] ?? null,
   });
   const { data: board } = useQuery({
     queryKey: ["league-board", code],
@@ -33,6 +35,8 @@ export default function LeaguePage() {
     refetchInterval: 60_000,
     queryFn: async () => ((await supabase.rpc("league_board" as never, { p_code: code } as never)).data ?? []) as unknown as BoardRow[],
   });
+
+  const { data: games } = usePredictorFixtures(10, info?.competitions ?? null);
 
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
   if (!info) return <AppShell><BackButton /><EmptyState icon={<Users className="h-5 w-5" />} title={t("league.notFound")} cta={{ to: "/predictor", label: t("predictor.title") }} /></AppShell>;
@@ -60,6 +64,10 @@ export default function LeaguePage() {
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">{t("league.eyebrow")}</p>
           <h1 className="mt-1 text-3xl font-extrabold leading-tight">{info.name}</h1>
           <p className="mt-1 text-sm text-background/70">{t("predictor.members", { n: info.members })}{info.owner_name ? ` · ${t("league.by", { name: info.owner_name })}` : ""}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {(info.competitions ?? []).length ? info.competitions!.map((c) => <span key={c} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">{compLabel(t as never, c, c)}</span>)
+              : <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">{t("league.allComps")}</span>}
+          </div>
           <button onClick={copyCode} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold" dir="ltr"><span className="text-background/60">{t("league.code")}</span><span className="scoreboard text-lg tracking-widest">{info.code}</span><Copy className="h-4 w-4" /></button>
         </div>
       </div>
@@ -80,8 +88,22 @@ export default function LeaguePage() {
             <Button variant="outline" onClick={share}><Share2 />{t("league.invite")}</Button>
           </div>
         )}
-        {info.is_member && <Button asChild variant="outline"><Link to="/predictor"><Target />{t("league.predictCta")}</Link></Button>}
       </div>
+
+      {info.is_member && (
+        <Section title={t("league.games")} icon={<Target className="h-5 w-5" />}>
+          {(games ?? []).length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {games!.map((f) => (
+                <div key={f.id} className="card p-3">
+                  <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{compLabel(t as never, f.competition_code, f.competition)}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
+                  <PredictionInput fixture={f} compact bare />
+                </div>
+              ))}
+            </div>
+          ) : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("league.noGames")}</p>}
+        </Section>
+      )}
 
       <Section title={t("league.table")}>
         {(board ?? []).length ? <Board rows={board!} me={user?.id} /> : <CardSkeletons n={1} />}

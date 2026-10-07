@@ -1097,7 +1097,7 @@ export const en = {
   "league.inviteText": "Join my league \"{name}\" on Jamhoor and let's see who calls the football right ⚽ Code: {code}",
   "league.predictCta": "Make this week's predictions",
   "league.table": "Table",
-  "league.rulesShort": "Points from predictions on games since the league started. 3 for the exact score, 1 for the right result.",
+  "league.rulesShort": "Points from this league's competitions since it started. 3 for the exact score, 1 for the right result.",
   "vc.eyebrow": "Your games this week",
   "vc.sub": "Tick the matches you're showing and fans looking for a place to watch will find you on Jamhoor. Free, no account needed.",
   "vc.pick": "Tick the games you're showing",
@@ -1122,6 +1122,11 @@ export const en = {
   "today.cta": "Where are you watching? Predict & find venues",
   "today.shareText": "Today's big games ⚽ Where are you watching?",
   "today.hint": "Tip: post it every morning. The QR code on the image brings people to Jamhoor.",
+  "predictor.compsQ": "Which competitions does your league play?",
+  "predictor.compsHint": "Pick one or more. Only these games count on your table.",
+  "league.allComps": "All competitions",
+  "league.games": "This week's games",
+  "league.noGames": "No games in this league's competitions this week. Check back soon.",
 } as const;
 
 export type TKey = keyof typeof en;
