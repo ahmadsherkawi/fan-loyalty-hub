@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
+import { usePredictorFixtures } from "@/lib/predictor";
 import { FIXTURE_SELECT, isFinished, isLive, loc, useUpcomingParties, type FixtureWithTeams } from "@/lib/data";
 
 // Priority order: one game from each, the first six competitions that have a game coming up
@@ -116,6 +117,50 @@ export function CupPromo() {
   );
 }
 
+/** The weekly Predictor, top of the page: this week's big games and a call to play with friends. */
+export function PredictorPromo() {
+  const { t, lang, formatDateTime } = useI18n();
+  const { data: games } = usePredictorFixtures(3);
+  const upcoming = (games ?? []).filter((f) => !isFinished(f.status)).slice(0, 3);
+  if (!upcoming.length) return null;
+  const nm = (f: FixtureWithTeams, side: "home" | "away") => (lang === "ar" && f[`${side}_team`]?.name_ar) || f[`${side}_team`]?.name || f[`${side}_team_name`];
+  return (
+    <div className="relative mb-8 overflow-hidden rounded-3xl bg-foreground p-5 text-background shadow-card md:p-7">
+      <div className="absolute inset-0 bg-[radial-gradient(60%_80%_at_100%_0%,hsl(var(--primary)/0.35),transparent_60%)]" aria-hidden />
+      <div className="relative grid gap-5 md:grid-cols-[1fr_1.1fr] md:items-center">
+        <div>
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-primary"><Target className="h-4 w-4" />{t("predictor.eyebrow")}</span>
+          <h2 className="mt-2 text-3xl font-extrabold leading-tight md:text-4xl">{t("predictor.promoT")}</h2>
+          <p className="mt-2 text-sm text-background/70 md:text-base">{t("predictor.promoB")}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link to="/predictor" className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">{t("predictor.play")}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></Link>
+            <Link to="/predictor?new=1" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-bold"><Users className="h-4 w-4" />{t("predictor.create")}</Link>
+          </div>
+        </div>
+        <Link to="/predictor" className="block space-y-2">
+          {upcoming.map((f) => (
+            <div key={f.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.07] px-3 py-3 ring-1 ring-white/10">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                {(["home", "away"] as const).map((side) => (
+                  <div key={side} className="flex items-center gap-2">
+                    <TeamBadge size="sm" shortName={f[`${side}_team`]?.short_name || f[`${side}_team_name`].slice(0, 3)} primary={f[`${side}_team`]?.primary_color} secondary={f[`${side}_team`]?.secondary_color} />
+                    <span className="truncate font-semibold">{nm(f, side)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="w-24 shrink-0 text-end">
+                <p className="truncate text-[11px] font-semibold text-background/60">{compLabel(t as never, f.competition_code, f.competition)}</p>
+                <p className="scoreboard text-xl font-bold">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</p>
+                <p className="text-[11px] text-background/60">{formatDateTime(f.kickoff_at, { weekday: "short", day: "numeric", month: "short" })}</p>
+              </div>
+            </div>
+          ))}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { t, lang } = useI18n();
   const { data: parties } = useUpcomingParties(21);
@@ -135,7 +180,7 @@ export default function Landing() {
       {/* Hero */}
       <section className="relative -mx-4 -mt-5 overflow-hidden px-4 pb-10 pt-10 md:-mt-8 md:pt-16">
         <div className="absolute inset-0 bg-grid [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" aria-hidden />
-        <div className="relative"><CupPromo /></div>
+        <div className="relative"><CupPromo /><PredictorPromo /></div>
         <div className="relative grid items-center gap-10 md:grid-cols-[1.1fr_1fr]">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-semibold shadow-card">
