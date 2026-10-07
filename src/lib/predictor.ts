@@ -3,14 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 
 /** The competitions in the weekly Predictor, most-watched in the UAE first. */
-export const PREDICTOR_COMPS = ["PL", "CL", "PD", "UPL", "SPL", "SA", "ACL", "BL1", "FL1", "UNL", "AGC"];
+export const PREDICTOR_COMPS = ["PL", "CL", "PD", "UPL", "SPL", "SA", "ACL", "BL1", "FL1", "TSL", "LPL", "UNL", "AGC"];
 const RANK = new Map(PREDICTOR_COMPS.map((c, i) => [c, i]));
 
 export type BoardRow = { user_id: string; name: string; points: number; exact: number; made: number };
 export type LeagueInfo = { name: string; code: string; members: number; owner_name: string | null; created_at: string; is_member: boolean; competitions: string[] | null };
 
 /** Competitions a league can be set to, in the order shown when creating one. */
-export const LEAGUE_COMPS = ["PL", "PD", "UPL", "SPL", "CL", "SA", "BL1", "FL1", "ACL"];
+export const LEAGUE_COMPS = ["PL", "PD", "UPL", "SPL", "CL", "SA", "BL1", "FL1", "ACL", "TSL", "LPL"];
 export type MyLeague = { name: string; code: string; members: number; my_rank: number | null };
 
 /**

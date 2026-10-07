@@ -20,7 +20,7 @@ export function AdminScreenings() {
   const { data: fixtures } = useQuery({
     queryKey: ["admin-screen-fixtures"],
     queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date().toISOString())
-      .lt("kickoff_at", new Date(Date.now() + 10 * 864e5).toISOString()).in("competition_code", ["AGC", "UNL", "PL", "CL", "UPL", "SPL", "PD"]).order("kickoff_at").limit(80)).data ?? []) as unknown as FixtureWithTeams[],
+      .lt("kickoff_at", new Date(Date.now() + 10 * 864e5).toISOString()).in("competition_code", ["AGC", "UNL", "PL", "CL", "UPL", "SPL", "PD", "TSL", "LPL"]).order("kickoff_at").limit(80)).data ?? []) as unknown as FixtureWithTeams[],
   });
   const fixtureId = picked ?? fixtures?.find((f) => f.competition_code === "AGC")?.id ?? fixtures?.[0]?.id ?? null;
   const { data: showing } = useQuery({

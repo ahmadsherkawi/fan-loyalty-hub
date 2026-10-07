@@ -1129,4 +1129,6 @@ export const ar: Record<TKey, string> = {
   "league.allComps": "كل البطولات",
   "league.games": "مباريات الأسبوع",
   "league.noGames": "لا توجد مباريات لبطولات هذا الدوري هذا الأسبوع. عُد قريباً.",
+  "comp.TSL": "الدوري التركي",
+  "comp.LPL": "الدوري اللبناني",
 };

@@ -15,7 +15,7 @@ import { FIXTURE_SELECT, isFinished, isLive, loc, useUpcomingParties, type Fixtu
 
 // Priority order: one game from each, the first six competitions that have a game coming up
 const TOURNAMENTS = ["AGC"];
-const BIG = ["AGC", "UNL", "PL", "CL", "UPL", "ULC", "SPL", "PD", "ACL", "SA", "BL1", "FL1"];
+const BIG = ["AGC", "UNL", "PL", "CL", "UPL", "ULC", "SPL", "PD", "ACL", "SA", "BL1", "FL1", "TSL", "LPL"];
 
 /** Live numbers for the hero: how many venues fans can find right now. */
 function useDirectoryStats() {

@@ -1127,6 +1127,8 @@ export const en = {
   "league.allComps": "All competitions",
   "league.games": "This week's games",
   "league.noGames": "No games in this league's competitions this week. Check back soon.",
+  "comp.TSL": "Turkish Süper Lig",
+  "comp.LPL": "Lebanese Premier League",
 } as const;
 
 export type TKey = keyof typeof en;

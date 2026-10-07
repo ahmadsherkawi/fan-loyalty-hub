@@ -14,7 +14,7 @@ import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 type VenueRef = { venue_id: string; name: string; name_ar: string | null; area: string | null; city: string; claimed: boolean; showing: string[] };
-const COMPS = ["AGC", "PL", "CL", "UPL", "SPL", "PD", "SA", "BL1", "FL1", "ACL", "UNL", "ULC"];
+const COMPS = ["AGC", "PL", "CL", "UPL", "SPL", "PD", "SA", "BL1", "FL1", "ACL", "TSL", "LPL", "UNL", "ULC"];
 
 /**
  * /v/:code — the one-tap link sent to a venue. No account: they tick the games they're showing this week and
