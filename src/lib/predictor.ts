@@ -6,6 +6,21 @@ import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 export const PREDICTOR_COMPS = ["PL", "CL", "PD", "UPL", "SPL", "SA", "ACL", "BL1", "FL1", "TSL", "LPL", "UNL", "AGC"];
 const RANK = new Map(PREDICTOR_COMPS.map((c, i) => [c, i]));
 
+/** Clubs UAE fans turn up for. A game's weight is how many of them are playing, so Liverpool v Man City beats Ipswich v Fulham. */
+const BIG_CLUBS = new Set([
+  "LIV", "MCI", "MUN", "ARS", "CHE", "TOT", "NEW", // Premier League
+  "RMA", "BAR", "ATM", // LaLiga
+  "INT", "MIL", "JUV", "NAP", "ROM", // Serie A
+  "BAY", "FCB", "BVB", "PSG", // Germany, France
+  "HIL", "NAS", "ITT", "AHL", // Saudi
+  "AIN", "SAH", "WAS", "JAZ", "SHA", "WAH", "NSR", // UAE
+  "GS", "FB", "BJK", "TS", // Turkey
+  "AHE", "NEJ", "ANS", // Lebanon
+]);
+export const fixtureWeight = (f: FixtureWithTeams) =>
+  Number(BIG_CLUBS.has(f.home_team?.short_name ?? "")) + Number(BIG_CLUBS.has(f.away_team?.short_name ?? ""));
+const byWeight = (a: FixtureWithTeams, b: FixtureWithTeams) => fixtureWeight(b) - fixtureWeight(a) || a.kickoff_at.localeCompare(b.kickoff_at);
+
 export type BoardRow = { user_id: string; name: string; points: number; exact: number; made: number };
 export type LeagueInfo = { name: string; code: string; members: number; owner_name: string | null; created_at: string; is_member: boolean; competitions: string[] | null };
 
@@ -15,7 +30,7 @@ export type MyLeague = { name: string; code: string; members: number; my_rank: n
 
 /**
  * This week's Predictor games: the next 7 days of the big competitions, at most `max` games,
- * picked so every competition gets a look-in (most-watched first), then shown in kick-off order.
+ * picked so every competition gets a look-in (most-watched first, its biggest games first), then shown in kick-off order.
  */
 export function usePredictorFixtures(max = 12, comps?: string[] | null) {
   return useQuery({
@@ -29,6 +44,7 @@ export function usePredictorFixtures(max = 12, comps?: string[] | null) {
       const all = (data ?? []) as unknown as FixtureWithTeams[];
       const byComp = new Map<string, FixtureWithTeams[]>();
       all.forEach((f) => { const c = f.competition_code ?? ""; byComp.set(c, [...(byComp.get(c) ?? []), f]); });
+      byComp.forEach((l) => l.sort(byWeight)); // each competition's biggest games first
       const order = [...byComp.keys()].sort((a, b) => (RANK.get(a) ?? 99) - (RANK.get(b) ?? 99));
       const pick: FixtureWithTeams[] = [];
       // Round-robin across competitions so the Premier League leads but others still appear
@@ -38,6 +54,11 @@ export function usePredictorFixtures(max = 12, comps?: string[] | null) {
       return pick.sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
     },
   });
+}
+
+/** The `n` biggest open games: most big clubs first, then the most-watched competition, then the earliest. */
+export function pickBigGames(list: FixtureWithTeams[], n: number) {
+  return [...list].sort((a, b) => fixtureWeight(b) - fixtureWeight(a) || (RANK.get(a.competition_code ?? "") ?? 99) - (RANK.get(b.competition_code ?? "") ?? 99) || a.kickoff_at.localeCompare(b.kickoff_at)).slice(0, n);
 }
 
 export function useSeasonBoard() {

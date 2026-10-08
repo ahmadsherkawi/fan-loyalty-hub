@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
-import { PREDICTOR_COMPS, usePredictorFixtures } from "@/lib/predictor";
+import { pickBigGames, usePredictorFixtures } from "@/lib/predictor";
 import { FIXTURE_SELECT, isFinished, isLive, loc, useUpcomingParties, type FixtureWithTeams } from "@/lib/data";
 
 // Priority order: one game from each, the first six competitions that have a game coming up
@@ -121,11 +121,9 @@ export function CupPromo() {
 export function PredictorPromo() {
   const { t, lang, formatDateTime } = useI18n();
   const { data: games } = usePredictorFixtures(12);
-  // Lead with two Premier League games, then the next biggest competition
+  // The three biggest games coming up (Liverpool v City before Ipswich v Fulham), shown in kick-off order
   const open = (games ?? []).filter((f) => !isFinished(f.status) && new Date(f.kickoff_at).getTime() > Date.now());
-  const pl = open.filter((f) => f.competition_code === "PL").slice(0, 2);
-  const rest = open.filter((f) => f.competition_code !== "PL").sort((a, b) => PREDICTOR_COMPS.indexOf(a.competition_code ?? "") - PREDICTOR_COMPS.indexOf(b.competition_code ?? ""));
-  const upcoming = [...pl, ...rest].slice(0, 3).sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
+  const upcoming = pickBigGames(open, 3).sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
   if (!upcoming.length) return null;
   const nm = (f: FixtureWithTeams, side: "home" | "away") => (lang === "ar" && f[`${side}_team`]?.name_ar) || f[`${side}_team`]?.name || f[`${side}_team_name`];
   return (

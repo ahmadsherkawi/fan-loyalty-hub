@@ -15,7 +15,7 @@ import { compLabel } from "@/lib/competitions";
 import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 import { siteUrl, useShareableImage } from "@/lib/share";
 
-const ORDER = ["AGC", "UPL", "PL", "CL", "PD", "SPL", "SA", "BL1", "FL1", "ACL", "TSL", "LPL", "UNL", "ULC", "SKC", "QSL"];
+const ORDER = ["AGC", "UPL", "ULC", "PL", "CL", "PD", "SPL", "SA", "BL1", "FL1", "ACL", "TSL", "LPL", "UNL", "SKC", "QSL"];
 type Broadcaster = { competition_code: string; broadcaster: string; broadcaster_ar: string; free_to_air: boolean };
 
 /** UAE calendar day [start, end) for an offset from today */
