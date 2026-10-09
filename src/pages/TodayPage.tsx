@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Share2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -16,6 +17,13 @@ import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 import { siteUrl, useShareableImage } from "@/lib/share";
 
 const ORDER = ["AGC", "UPL", "ULC", "PL", "CL", "PD", "SPL", "SA", "BL1", "FL1", "ACL", "TSL", "LPL", "UNL", "SKC", "QSL"];
+/** Export sizes (270-wide design, saved at 4x = 1080px). The 4:5 card is shrunk and centred inside safe margins so
+ * Instagram's square crop, the profile grid and story overlays (name at the top, reply bar at the bottom) never cut it. */
+const FORMATS = {
+  post: { h: 338, scale: 0.74, top: 44 },
+  story: { h: 480, scale: 0.78, top: 88 },
+} as const;
+type Format = keyof typeof FORMATS;
 type Broadcaster = { competition_code: string; broadcaster: string; broadcaster_ar: string; free_to_air: boolean };
 
 /** UAE calendar day [start, end) for an offset from today */
@@ -32,6 +40,9 @@ function uaeDay(offset: number) {
 export default function TodayPage() {
   const { t, lang, formatDateTime } = useI18n();
   const [offset, setOffset] = useState(0);
+  const [params] = useSearchParams();
+  const [fmt, setFmt] = useState<Format>(params.get("fmt") === "story" ? "story" : "post");
+  const F = FORMATS[fmt];
   const ref = useRef<HTMLDivElement>(null);
   const { start, end } = uaeDay(offset);
 
@@ -61,7 +72,7 @@ export default function TodayPage() {
     return out;
   }, [data]);
 
-  const img = useShareableImage(ref, `jamhoor-games-${start.toISOString().slice(0, 10)}.png`, [offset, lang, groups.length, data?.fixtures.length], 4);
+  const img = useShareableImage(ref, `jamhoor-games-${start.toISOString().slice(0, 10)}-${fmt}.png`, [offset, lang, fmt, groups.length, data?.fixtures.length], 4);
   async function share() { const r = await img.share(`${t("today.shareText")} ${siteUrl("/?ref=today")}`); if (r === "notready") toast(t("common.preparing")); else if (r === "downloaded") toast.success(t("common.saved")); }
   function save() { if (!img.download()) toast(t("common.preparing")); }
   const nm = (f: FixtureWithTeams, side: "home" | "away") => {
@@ -81,11 +92,16 @@ export default function TodayPage() {
         <Chip active={offset === 1} onClick={() => setOffset(1)}>{t("today.tomorrow")}</Chip>
         <Chip active={offset === 2} onClick={() => setOffset(2)}>{formatDateTime(uaeDay(2).start.toISOString(), { weekday: "long" })}</Chip>
       </div>
+      <div className="mb-4 flex gap-2">
+        <Chip active={fmt === "post"} onClick={() => setFmt("post")}>{t("today.fmtPost")}</Chip>
+        <Chip active={fmt === "story"} onClick={() => setFmt("story")}>{t("today.fmtStory")}</Chip>
+      </div>
       {isLoading ? <CardSkeletons n={1} /> : !count ? <EmptyState title={t("today.none")} /> : (
         <>
           <div className="flex justify-center">
-            <div ref={ref} dir={lang === "ar" ? "rtl" : "ltr"} className="relative flex h-[338px] w-[270px] flex-col overflow-hidden px-3.5 pb-3 pt-3.5 text-white"
-              style={{ background: "radial-gradient(70% 30% at 50% 0%, rgba(0,197,102,.35), transparent 70%), #0B1220" }}>
+            <div ref={ref} className="relative w-[270px] overflow-hidden" style={{ height: F.h, background: "radial-gradient(70% 30% at 50% 0%, rgba(0,197,102,.35), transparent 70%), #0B1220" }}>
+            <div dir={lang === "ar" ? "rtl" : "ltr"} className="absolute flex h-[338px] w-[270px] flex-col px-3.5 pb-3 pt-3.5 text-white"
+              style={{ left: (270 - 270 * F.scale) / 2, top: F.top, transform: `scale(${F.scale})`, transformOrigin: "0 0" }}>
               <div className="flex items-center justify-between"><div className="origin-[left_center] scale-[0.7] rtl:origin-[right_center]"><Wordmark invert /></div><span className="rounded-full bg-[#00C566] px-2 py-0.5 text-[7px] font-extrabold text-[#0B1220]">{formatDateTime(start.toISOString(), { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Dubai" } as never)}</span></div>
               <p className="mt-1 text-center text-[17px] font-extrabold leading-none">{offset === 0 ? t("today.cardTitle") : offset === 1 ? t("today.cardTomorrow") : t("today.cardDay", { day: formatDateTime(start.toISOString(), { weekday: "long" }) })}</p>
               <p className="mt-0.5 text-center text-[6.5px] opacity-60">{t("today.uaeTime")}</p>
@@ -107,6 +123,7 @@ export default function TodayPage() {
                 <div className="rounded bg-white p-0.5"><QRCodeSVG value={siteUrl("/?ref=today")} size={30} fgColor="#0B1220" /></div>
                 <div className="min-w-0"><p className="text-[8px] font-extrabold leading-tight">{t("today.cta")}</p><p className="text-[7px] font-bold text-[#00C566]" dir="ltr">jamhoor.lovable.app</p></div>
               </div>
+            </div>
             </div>
           </div>
           <div className="mx-auto mt-4 grid max-w-xs grid-cols-2 gap-2">

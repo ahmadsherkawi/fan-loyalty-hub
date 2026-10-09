@@ -1121,7 +1121,7 @@ export const en = {
   "today.uaeTime": "UAE time",
   "today.cta": "Where are you watching? Predict & find venues",
   "today.shareText": "Today's big games ⚽ Where are you watching?",
-  "today.hint": "Tip: post it every morning. The QR code on the image brings people to Jamhoor.",
+  "today.hint": "Pick Post for the feed and X, Story for Instagram stories and WhatsApp status. The QR code brings people to Jamhoor.",
   "predictor.compsQ": "Which competitions does your league play?",
   "predictor.compsHint": "Pick one or more. Only these games count on your table.",
   "league.allComps": "All competitions",
@@ -1129,6 +1129,8 @@ export const en = {
   "league.noGames": "No games in this league's competitions this week. Check back soon.",
   "comp.TSL": "Turkish Süper Lig",
   "comp.LPL": "Lebanese Premier League",
+  "today.fmtPost": "Post (4:5)",
+  "today.fmtStory": "Story (9:16)",
 } as const;
 
 export type TKey = keyof typeof en;
