@@ -24,6 +24,12 @@ spec.json:
 }
 Team tuple = [name EN, name AR, short code, primary colour, secondary colour] — take them from the `teams` table.
 Up to 5 games fit comfortably.
+
+FULL-DAY POSTER (a whole matchday, like a fixtures sheet): set "layout": "fullday" and give "groups" instead of "games":
+  "groups": [ { "comp": "Premier League", "comp_ar": "الدوري الإنجليزي", "channel": "beIN Sports",
+                "games": [ { "home": [...team tuple...], "away": [...], "time": "19:30" } ] } ]
+Two columns, grouped by competition, EN + AR names. ~14-18 games fit in the post and ~20-24 in the story; the script
+warns if anything overflows — then drop the least important games (keep derbies, UAE, Egypt, Saudi and big clubs).
 """
 import asyncio, json, os, sys, tempfile
 import segno
@@ -49,6 +55,11 @@ SAFE = {
     "post": (1350, '<style>body{padding:185px 120px !important}body>*:not(.rays){zoom:.7}</style>'),
     "story": (1920, '<style>body{width:1080px !important;height:1920px !important;padding:300px 130px 430px !important;justify-content:center !important;gap:34px}body>*:not(.rays){zoom:.78}</style>'),
 }
+# Full-day posters fill the safe area top to bottom instead of centring (the list takes the free height)
+SAFE_FULL = {
+    "post": (1350, '<style>body{padding:170px 105px !important;justify-content:flex-start !important}body>*:not(.rays){zoom:.72}h1{font-size:72px !important}</style>'),
+    "story": (1920, '<style>body{width:1080px !important;height:1920px !important;padding:290px 110px 420px !important;justify-content:flex-start !important}body>*:not(.rays){zoom:.8}h1{font-size:72px !important}</style>'),
+}
 
 def crest(t):
     tc = "#0B1220" if t[3].upper() in LIGHT else "#fff"
@@ -69,12 +80,29 @@ def game(g):
         foot = f"<div style='display:flex;justify-content:space-between;margin-top:10px;font-size:16px;font-weight:700;opacity:.6'><span>{g.get('comp','')}</span><span>{g.get('channel','')}</span></div>"
     return f"<div style='background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:16px 20px'><div style='display:grid;grid-template-columns:1fr 150px 1fr;align-items:center;gap:10px'>{side(g['home'], True)}{mid}{side(g['away'], False)}</div>{foot}</div>"
 
+def fullday(s):
+    def row(g):
+        nm = lambda t, right: f"<div style='min-width:0;text-align:{'right' if right else 'left'}'><b style='display:block;font-size:21px;line-height:1.1'>{t[0]}</b><span class=ar style='display:block;font-size:17px;opacity:.6;font-weight:500;line-height:1.2'>{t[1]}</span></div>"
+        dot = lambda t: f"<span style='width:16px;height:19px;flex-shrink:0;border-radius:3px 3px 8px 8px;background:{t[3]};box-shadow:0 0 0 1.5px rgba(255,255,255,.6)'></span>"
+        mid = f"<span style='background:{'#fff' if g.get('score') else '#00C566'};color:#0B1220;border-radius:8px;padding:3px 8px;font-size:22px;font-weight:800'>{g.get('score') or g['time']}</span>"
+        return (f"<div style='display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:5px 0'>"
+                f"<div style='display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0'>{nm(g['home'], True)}{dot(g['home'])}</div>{mid}"
+                f"<div style='display:flex;align-items:center;gap:8px;min-width:0'>{dot(g['away'])}{nm(g['away'], False)}</div></div>")
+    blocks = "".join(
+        f"<div style='break-inside:avoid;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;margin-bottom:14px'>"
+        f"<div style='display:flex;justify-content:space-between;gap:8px;font-size:18px;font-weight:800;color:#3BE08A'><span>{gr['comp']} <span class=ar style='font-weight:700'>· {gr.get('comp_ar','')}</span></span><span style='color:rgba(255,255,255,.45);font-weight:700;white-space:nowrap'>{gr.get('channel','')}</span></div>"
+        + "".join(row(g) for g in gr["games"]) + "</div>" for gr in s["groups"])
+    return f"<div id=list style='position:relative;flex:1;min-height:0;overflow:hidden;columns:2;column-gap:14px;column-fill:balance;margin:18px 0'>{blocks}</div>"
+
 def body(s, qr_path):
     top = f'<div style="position:relative;display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:12px;align-items:center;font-size:30px;font-weight:800"><div style="width:50px;height:50px">{MARK}</div>Jamhoor <small style="font-family:AR;font-weight:500;font-size:22px;opacity:.6">جمهور</small></div><div style="background:#00C566;color:#0B1220;font-weight:800;font-size:20px;padding:8px 18px;border-radius:999px">{s["pill"]}</div></div>'
     eyebrow = f'<p style="font-size:20px;font-weight:800;letter-spacing:.16em;color:#00C566;margin-bottom:8px">{s["eyebrow"]}</p>' if s.get("eyebrow") else ""
     sub = f'<p style="margin-top:10px;font-size:20px;opacity:.6">{s["sub"]}</p>' if s.get("sub") else ""
     head = f'<div style="position:relative;text-align:center">{eyebrow}<h1 style="font-size:88px;line-height:.95;font-weight:800;letter-spacing:-.05em">{s["title_en"]}<br><em>{s.get("title_en2","")}</em></h1><p class=ar style="margin-top:12px;font-size:44px;font-weight:700">{s["title_ar"]}</p>{sub}</div>'
-    games = '<div style="position:relative;display:grid;gap:10px">' + "".join(game(g) for g in s["games"]) + "</div>"
+    if s.get("layout") == "fullday":
+        games = fullday(s)
+    else:
+        games = '<div style="position:relative;display:grid;gap:10px">' + "".join(game(g) for g in s["games"]) + "</div>"
     note = f'<div style="position:relative;text-align:center;font-size:21px;opacity:.75">{s["note"]}</div>' if s.get("note") else ""
     foot = f'''<div style="position:relative;display:flex;align-items:center;gap:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:26px;padding:18px 22px">
 <div style="position:relative;background:#fff;border-radius:16px;padding:10px;flex-shrink:0"><img src="file://{qr_path}" style="width:210px;height:210px;display:block">
@@ -91,11 +119,13 @@ async def render(spec, out):
     files = []
     async with async_playwright() as p:
         b = await p.chromium.launch()
-        for kind, (h, css) in SAFE.items():
+        for kind, (h, css) in (SAFE_FULL if spec.get("layout") == "fullday" else SAFE).items():
             html = os.path.join(tmp, f"{kind}.html")
             open(html, "w").write(body(spec, qr) + css)
             pg = await b.new_page(viewport={"width": 1080, "height": h})
             await pg.goto("file://" + html); await pg.wait_for_timeout(900)
+            over = await pg.evaluate("(()=>{const l=document.getElementById('list');return l?(l.scrollWidth>l.clientWidth+2||l.scrollHeight>l.clientHeight+2):false})()")
+            if over: print(f"WARNING {kind}: games overflow the poster — remove a few and run again")
             path = os.path.join(out, f"Jamhoor-{spec['name']}-{kind}.png")
             await pg.screenshot(path=path); await pg.close(); files.append(path)
         await b.close()

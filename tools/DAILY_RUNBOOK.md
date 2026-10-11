@@ -9,10 +9,14 @@ football correctly, and Ahmad wakes up to ready-to-post images + captions for X 
   After a `git push`, wait ~80 s, confirm `latest_commit_sha` via `mcp__Lovable__get_project`, then deploy.
 - Supabase project `ohjhzmqcbprcybjlsusp` via `mcp__Supabase__execute_sql` / `apply_migration`.
 - Fixtures/results sync automatically every 2 min (edge function `sync-gcc`, API-Football, competitions in table `af_leagues`).
-  Codes: PL, PD (LaLiga), SA, BL1, FL1, CL, UPL (ADNOC Pro League), ULC (ADIB Cup), SPL (Saudi), ACL, QSL, KPL, BPL, OPL, SKC, TSL (Turkey), LPL (Lebanon), UNL, AGC, PPL, DED.
+  Codes: PL, PD (LaLiga), SA, BL1, FL1, CL, UPL (ADNOC Pro League), ULC (ADIB Cup), SPL (Saudi), ACL, QSL, KPL, BPL, OPL, SKC, TSL (Turkey), LPL (Lebanon), EGY (Egypt — big with Egyptian fans in the UAE; Al Ahly v Zamalek is a top derby), UNL, AGC, PPL, DED.
 - Channels per competition: table `competition_broadcasters` (UPL/ULC free on Abu Dhabi, Dubai, Sharjah Sports; PL/PD beIN; SPL Thmanyah).
 - Team names (EN/AR), short codes and colours: table `teams` (join fixtures.home_team_id / away_team_id).
-- Daily image page for fans/Ahmad: https://jamhoor.lovable.app/today (Post 4:5 or Story 9:16, `?fmt=story`).
+- Daily image page for fans/Ahmad: https://jamhoor.lovable.app/today (Post 4:5 or Story 9:16, `?fmt=story`) — a full-day
+  poster that fits itself to the space.
+- Competitor to know: "Jomhoor" (@jomhooorofficial on Instagram, @jomhooor2 on X) posts daily Arabic fixture graphics; no
+  venues or bookings. Our edge: where each game is showing, seats, private Predictor leagues. Ahmad wants to ride the similar
+  name — Arabic captions/hashtags should include جمهور and #جمهور.
 - Translations: `src/i18n/en.ts` + `ar.ts`; add keys with `python3 tools/i18n_add.py keys.json` (`{"key": ["en", "ar"]}`).
 - Competition lists in code: `src/lib/competitions.ts`, `src/lib/predictor.ts` (PREDICTOR_COMPS, LEAGUE_COMPS, BIG_CLUBS),
   `src/pages/TodayPage.tsx` (ORDER), `src/pages/Landing.tsx` (BIG), `src/pages/VenueConfirmPage.tsx` (COMPS).
@@ -45,7 +49,9 @@ football correctly, and Ahmad wakes up to ready-to-post images + captions for X 
    (auth.users last 24 h, excluding `*@test.jamhoor.app`), predictions in last 24 h (exclude `is_test_user`), leagues and
    members, groups, venue claims pending, screenings added. Note: user c6dc4608-… is Ahmad himself — don't count him as traction.
 5. **Today's posts.** Use `tools/social/make_posts.py` (read its header for the JSON spec). Make:
-   - **A. Today's games** (the 3–5 biggest games today, UAE time, with channel) → `Jamhoor-today-post.png` + `-story.png`,
+   - **A. Today's games.** On a busy day (more than ~6 notable games) use `"layout": "fullday"` — the whole matchday grouped
+     by competition in two columns, like a fixtures sheet (biggest games first: UAE, derbies, Egypt, Saudi, big clubs; drop
+     minor games if the script warns about overflow). On a quiet day list the 3–5 biggest games. Files `Jamhoor-today-post.png` + `-story.png`,
      QR `https://jamhoor.lovable.app/today?ref=ig`, CTA "Where’s it showing near you? / وين تنعرض قريب منك؟".
      Prefer UAE football when it's on; then PL, LaLiga, Saudi, Champions League; Turkish/Lebanese when notable.
    - **B. One extra** depending on the day: yesterday's big **results** (use `"score"` instead of time, pill "RESULTS · النتائج",
