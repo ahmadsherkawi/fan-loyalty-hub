@@ -1131,6 +1131,7 @@ export const en = {
   "comp.LPL": "Lebanese Premier League",
   "today.fmtPost": "Post (4:5)",
   "today.fmtStory": "Story (9:16)",
+  "comp.EGY": "Egyptian Premier League",
 } as const;
 
 export type TKey = keyof typeof en;

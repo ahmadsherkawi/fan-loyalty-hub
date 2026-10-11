@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FIXTURE_SELECT, type FixtureWithTeams } from "@/lib/data";
 
 /** The competitions in the weekly Predictor, most-watched in the UAE first. */
-export const PREDICTOR_COMPS = ["PL", "CL", "PD", "UPL", "SPL", "SA", "ACL", "BL1", "FL1", "TSL", "LPL", "UNL", "AGC"];
+export const PREDICTOR_COMPS = ["PL", "CL", "PD", "UPL", "SPL", "SA", "ACL", "BL1", "FL1", "EGY", "TSL", "LPL", "UNL", "AGC"];
 const RANK = new Map(PREDICTOR_COMPS.map((c, i) => [c, i]));
 
 /** Clubs UAE fans turn up for. A game's weight is how many of them are playing, so Liverpool v Man City beats Ipswich v Fulham. */
@@ -16,6 +16,7 @@ const BIG_CLUBS = new Set([
   "AIN", "SAH", "WAS", "JAZ", "SHA", "WAH", "NSR", // UAE
   "GS", "FB", "BJK", "TS", // Turkey
   "AHE", "NEJ", "ANS", // Lebanon
+  "ZAM", "PYR", "MSR", // Egypt (Al Ahly shares AHL)
 ]);
 export const fixtureWeight = (f: FixtureWithTeams) =>
   Number(BIG_CLUBS.has(f.home_team?.short_name ?? "")) + Number(BIG_CLUBS.has(f.away_team?.short_name ?? ""));
@@ -25,7 +26,7 @@ export type BoardRow = { user_id: string; name: string; points: number; exact: n
 export type LeagueInfo = { name: string; code: string; members: number; owner_name: string | null; created_at: string; is_member: boolean; competitions: string[] | null };
 
 /** Competitions a league can be set to, in the order shown when creating one. */
-export const LEAGUE_COMPS = ["PL", "PD", "UPL", "SPL", "CL", "SA", "BL1", "FL1", "ACL", "TSL", "LPL"];
+export const LEAGUE_COMPS = ["PL", "PD", "UPL", "SPL", "CL", "SA", "BL1", "FL1", "ACL", "EGY", "TSL", "LPL"];
 export type MyLeague = { name: string; code: string; members: number; my_rank: number | null };
 
 /**

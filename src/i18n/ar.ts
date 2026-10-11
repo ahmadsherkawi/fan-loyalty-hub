@@ -1133,4 +1133,5 @@ export const ar: Record<TKey, string> = {
   "comp.LPL": "الدوري اللبناني",
   "today.fmtPost": "منشور (4:5)",
   "today.fmtStory": "ستوري (9:16)",
+  "comp.EGY": "الدوري المصري",
 };
