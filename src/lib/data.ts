@@ -50,11 +50,19 @@ export function useTeams() {
   });
 }
 
+/**
+ * Demo groups, venues and watch parties stay in the database for testing but are hidden from the public site.
+ * Testers can see them again with localStorage "jamhoor.showDemo" = "1".
+ */
+export const SHOW_DEMO = (() => { try { return typeof window !== "undefined" && window.localStorage.getItem("jamhoor.showDemo") === "1"; } catch { return false; } })();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const hideDemo = <Q,>(q: Q): Q => (SHOW_DEMO ? q : (q as any).eq("is_demo", false));
+
 export function useVenues(city?: string) {
   return useQuery({
     queryKey: ["venues", city ?? "all"],
     queryFn: () => {
-      let q = supabase.from("venues").select("*").order("name");
+      let q = hideDemo(supabase.from("venues").select("*").order("name"));
       if (city) q = q.eq("city", city);
       return unwrap<Venue[]>(q);
     },
@@ -83,7 +91,7 @@ export function usePartiesForFixture(fixtureId?: string | null) {
     queryKey: ["parties-fixture", fixtureId],
     enabled: !!fixtureId,
     queryFn: () => unwrap<PartyFull[]>(
-      supabase.from("watch_parties").select(PARTY_SELECT).eq("fixture_id", fixtureId!).neq("status", "cancelled") as never,
+      hideDemo(supabase.from("watch_parties").select(PARTY_SELECT).eq("fixture_id", fixtureId!).neq("status", "cancelled")) as never,
     ),
   });
 }
@@ -93,7 +101,7 @@ export function useUpcomingParties(days = 10) {
     queryKey: ["parties-upcoming", days],
     queryFn: async () => {
       const rows = await unwrap<PartyFull[]>(
-        supabase.from("watch_parties").select(PARTY_SELECT).in("status", ["scheduled", "live"]).limit(200) as never,
+        hideDemo(supabase.from("watch_parties").select(PARTY_SELECT).in("status", ["scheduled", "live"])).limit(200) as never,
       );
       const now = Date.now() - 3 * 3600e3, until = Date.now() + days * 864e5;
       return rows
@@ -122,7 +130,7 @@ export function useVenueParties(venueId?: string) {
     enabled: !!venueId,
     queryFn: async () => {
       const rows = await unwrap<PartyFull[]>(
-        supabase.from("watch_parties").select(PARTY_SELECT).eq("venue_id", venueId!).in("status", ["scheduled", "live"]) as never,
+        hideDemo(supabase.from("watch_parties").select(PARTY_SELECT).eq("venue_id", venueId!).in("status", ["scheduled", "live"])) as never,
       );
       return rows.sort((a, b) => new Date(partyTime(a)).getTime() - new Date(partyTime(b)).getTime());
     },
@@ -155,7 +163,7 @@ export function useGroups() {
   return useQuery({
     queryKey: ["groups"],
     queryFn: async () => {
-      const groups = await unwrap<GroupFull[]>(supabase.from("groups").select(GROUP_SELECT).order("name") as never);
+      const groups = await unwrap<GroupFull[]>(hideDemo(supabase.from("groups").select(GROUP_SELECT)).order("name") as never);
       const { data: members } = await supabase.from("group_members").select("group_id");
       const counts = new Map<string, number>();
       (members ?? []).forEach((m) => counts.set(m.group_id, (counts.get(m.group_id) ?? 0) + 1));

@@ -167,6 +167,9 @@ export default function Landing() {
   const { t, lang } = useI18n();
   const { data: parties } = useUpcomingParties(21);
   const featured = (parties ?? []).find((p) => p.fixture);
+  // No real watch party yet: feature the biggest game coming up and send people to see where it's showing
+  const { data: predictorGames } = usePredictorFixtures(12);
+  const heroGame = featured ? null : pickBigGames((predictorGames ?? []).filter((f) => !isFinished(f.status) && new Date(f.kickoff_at).getTime() > Date.now()), 1)[0];
   const { data: stats } = useDirectoryStats();
   const { data: games } = useBigGames();
   const { formatDateTime } = useI18n();
@@ -207,7 +210,20 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* A real upcoming watch party, so visitors see the product instead of reading about it */}
+          {/* A real upcoming watch party (or, until there is one, the biggest game coming up) so visitors see the product */}
+          {heroGame && (
+            <Link to={`/match/${heroGame.id}`} className="block transition-transform hover:-translate-y-1">
+              <FixtureScoreboard fixture={heroGame} footer={
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{t("landing.heroWhere")}</p>
+                    <p className="truncate text-xs text-white/60">{t("landing.heroWhereB")}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">{t("landing.findVenues")}</span>
+                </div>
+              } />
+            </Link>
+          )}
           {featured?.fixture && (
             <Link to={`/party/${featured.id}`} className="block transition-transform hover:-translate-y-1">
               <FixtureScoreboard fixture={featured.fixture} footer={

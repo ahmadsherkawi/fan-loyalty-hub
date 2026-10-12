@@ -24,6 +24,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { TKey } from "@/i18n/en";
 import { supabase } from "@/integrations/supabase/client";
 import { FIXTURE_SELECT, GROUP_SELECT, loc, useMyRewards, useVenueParties, type FixtureWithTeams, type GroupFull, type Venue } from "@/lib/data";
+import { hideDemo } from "@/lib/data";
 
 type Screening = { id: string; sound: boolean; fixture: FixtureWithTeams };
 
@@ -63,7 +64,7 @@ export default function VenuePage() {
   const { data: groups } = useQuery({
     queryKey: ["venue-groups", id],
     enabled: !!id,
-    queryFn: async () => ((await supabase.from("groups").select(GROUP_SELECT).eq("home_venue_id", id!)).data ?? []) as unknown as GroupFull[],
+    queryFn: async () => ((await hideDemo(supabase.from("groups").select(GROUP_SELECT).eq("home_venue_id", id!))).data ?? []) as unknown as GroupFull[],
   });
   const { data: parties } = useVenueParties(id);
   const { data: myRewards } = useMyRewards(!!user && !acct.isVenue);

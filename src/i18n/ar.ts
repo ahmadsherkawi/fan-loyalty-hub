@@ -1151,4 +1151,7 @@ export const ar: Record<TKey, string> = {
   "leads.toClaims": "طلبات المقاهي",
   "notif.hot_lead.t": "🔥 عميل مهتم: {name}",
   "notif.hot_lead.b": "{company} · {campaign}: «{why}»",
+  "landing.heroWhere": "وين تنعرض؟",
+  "landing.heroWhereB": "مقاهي ومطاعم في كل الإمارات، بتوقيت الإمارات والقناة",
+  "landing.findVenues": "اعرف الأماكن",
 };

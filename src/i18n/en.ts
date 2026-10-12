@@ -1149,6 +1149,9 @@ export const en = {
   "leads.toClaims": "Venue claims",
   "notif.hot_lead.t": "🔥 Hot lead: {name}",
   "notif.hot_lead.b": "{company} · {campaign}: “{why}”",
+  "landing.heroWhere": "Where's it showing?",
+  "landing.heroWhereB": "Venues across the UAE, UAE kick-off time & channel",
+  "landing.findVenues": "Find venues",
 } as const;
 
 export type TKey = keyof typeof en;
