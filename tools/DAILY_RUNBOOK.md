@@ -21,6 +21,11 @@ football correctly, and Ahmad wakes up to ready-to-post images + captions for X 
 - Competition lists in code: `src/lib/competitions.ts`, `src/lib/predictor.ts` (PREDICTOR_COMPS, LEAGUE_COMPS, BIG_CLUBS),
   `src/pages/TodayPage.tsx` (ORDER), `src/pages/Landing.tsx` (BIG), `src/pages/VenueConfirmPage.tsx` (COMPS).
 
+## Demo content
+Demo groups, venues and watch parties (`is_demo = true`) are hidden from the public site and demo venues are unlisted.
+Never re-list or un-hide them. If any public list or the homepage shows a demo item, fix it. Testers can see demo content
+with localStorage `jamhoor.showDemo = 1`. Real watch parties automatically replace the homepage's featured big game.
+
 ## Hard rules
 - Never run SQL containing DELETE or DROP (the Supabase tool blocks it; keep migrations add-only). UPDATE/INSERT are fine.
 - Never invent data: no fake users, names, reviews, scores or "X people are playing". Only real numbers from the database.
