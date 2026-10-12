@@ -1132,6 +1132,23 @@ export const en = {
   "today.fmtPost": "Post (4:5)",
   "today.fmtStory": "Story (9:16)",
   "comp.EGY": "Egyptian Premier League",
+  "leads.title": "Hot leads",
+  "leads.sub": "Replies from the Explee campaigns that showed real interest. Synced every 10 minutes.",
+  "leads.open": "Open",
+  "leads.all": "All",
+  "leads.s.new": "New",
+  "leads.s.contacted": "Contacted",
+  "leads.s.won": "Won",
+  "leads.s.lost": "Lost",
+  "leads.empty": "No hot leads yet",
+  "leads.emptyB": "When someone replies with real interest, they'll appear here and you'll get a notification.",
+  "leads.notesPh": "Notes (what you agreed, next step)…",
+  "leads.saveNote": "Save",
+  "leads.saved": "Saved",
+  "leads.foot": "Reply from the same mailbox in Explee, or reach them here directly",
+  "leads.toClaims": "Venue claims",
+  "notif.hot_lead.t": "🔥 Hot lead: {name}",
+  "notif.hot_lead.b": "{company} · {campaign}: “{why}”",
 } as const;
 
 export type TKey = keyof typeof en;

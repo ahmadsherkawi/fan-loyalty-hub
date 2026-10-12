@@ -78,6 +78,7 @@ export function useNotificationText() {
       caps: String(d.caps ?? d.min_caps ?? ""), area: String(d.area ?? ""), note: String(d.note ?? ""),
       badge: d.badge ? t(`badge.${d.badge}` as TKey) : "", capacity: String(d.capacity ?? "—"),
       size: String(d.size ?? ""), distance: d.distance != null ? String(d.distance) : "—", fan: String(d.fan ?? ""), count: String(d.count ?? 1), tv: pick("broadcaster"), reply: d.reply ? `· “${d.reply}”` : "",
+      name: String(d.name ?? ""), company: String(d.company ?? ""), campaign: String(d.campaign ?? ""), why: String(d.why ?? ""),
     };
     const k = n.kind === "booking_request" && d.changed ? "booking_changed" : n.kind === "announcement" && !vars.title ? "announcement_notitle"
       : n.kind === "table_cancelled" && d.late ? "table_cancelled_late" : n.kind;

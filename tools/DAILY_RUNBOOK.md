@@ -45,10 +45,15 @@ football correctly, and Ahmad wakes up to ready-to-post images + captions for X 
    (`fixtureWeight` / `BIG_CLUBS` in `src/lib/predictor.ts`). If a club that is clearly big this season is missing from
    BIG_CLUBS, or a promo is stale (e.g. a finished tournament still advertised), fix it, build, push, sync, deploy.
    Seasonal promos to keep honest: `CupPromo` (Gulf Cup) only shows while AGC games are on.
-4. **Numbers.** Visitors (Lovable `get_project_analytics`, last 1 and 7 days, top pages, sources, countries), new sign-ups
+4. **Outreach (Explee).** Hot leads sync every 10 min into `outreach_hot_leads` (admin page https://jamhoor.lovable.app/admin/leads,
+   job `explee-hot-leads`, state in `sync_state` key 'explee' — check `last_ok` is recent and no `last_error`). Report new hot leads
+   (name, company, campaign, their reply) and any still `status = 'new'` for more than a day. Campaign results: call
+   `GET https://api.explee.com/public/api/v1/autogtm/projects/48121/analytics` via `net.http_get` with header X-API-Key from
+   `app_secrets` key 'explee_api_key' (read `net._http_response` a few seconds later). Never start/stop campaigns, change budgets or reply to leads.
+5. **Numbers.** Visitors (Lovable `get_project_analytics`, last 1 and 7 days, top pages, sources, countries), new sign-ups
    (auth.users last 24 h, excluding `*@test.jamhoor.app`), predictions in last 24 h (exclude `is_test_user`), leagues and
    members, groups, venue claims pending, screenings added. Note: user c6dc4608-… is Ahmad himself — don't count him as traction.
-5. **Today's posts.** Use `tools/social/make_posts.py` (read its header for the JSON spec). Make:
+6. **Today's posts.** Use `tools/social/make_posts.py` (read its header for the JSON spec). Make:
    - **A. Today's games.** On a busy day (more than ~6 notable games) use `"layout": "fullday"` — the whole matchday grouped
      by competition in two columns, like a fixtures sheet (biggest games first: UAE, derbies, Egypt, Saudi, big clubs; drop
      minor games if the script warns about overflow). On a quiet day list the 3–5 biggest games. Files `Jamhoor-today-post.png` + `-story.png`,
@@ -60,7 +65,7 @@ football correctly, and Ahmad wakes up to ready-to-post images + captions for X 
    - Check every image yourself (open it with Read): nothing cut, Arabic reads right-to-left correctly, QR check says ok.
    - Write captions: X (short, EN + AR, 2–4 hashtags, one question to drive replies) and Instagram (EN + AR, hashtags,
      "link in bio"). Suggest posting times (morning ~11:00, evening ~20:00 UAE).
-6. **Report to Ahmad** with SendUserMessage (short, scannable): what you checked/changed on the site (or "no changes needed"),
+7. **Report to Ahmad** with SendUserMessage (short, scannable): what you checked/changed on the site (or "no changes needed"),
    football news that matters, numbers vs yesterday, today's two posts with captions, and 1–2 concrete growth actions for
    today (e.g. which Instagram DM batch day, who to tag). Send the images with SendUserFile (status "proactive").
    If a tool (Supabase/Lovable/GitHub) is unavailable, say exactly that rather than guessing.
