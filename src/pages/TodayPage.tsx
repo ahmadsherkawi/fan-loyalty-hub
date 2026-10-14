@@ -57,7 +57,7 @@ export default function TodayPage() {
     queryKey: ["today-card", offset],
     queryFn: async () => {
       const [{ data: fx }, { data: bc }] = await Promise.all([
-        supabase.from("fixtures").select(FIXTURE_SELECT).in("competition_code", ORDER).gte("kickoff_at", start.toISOString()).lt("kickoff_at", end.toISOString()).order("kickoff_at").limit(200),
+        supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").in("competition_code", ORDER).gte("kickoff_at", start.toISOString()).lt("kickoff_at", end.toISOString()).order("kickoff_at").limit(200),
         supabase.from("competition_broadcasters").select("*"),
       ]);
       const fixtures = (fx ?? []) as unknown as FixtureWithTeams[];

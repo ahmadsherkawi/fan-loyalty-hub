@@ -20,7 +20,7 @@ export function ScreeningsEditor({ venueId }: { venueId: string }) {
   const [comp, setComp] = useState<string>("all");
   const { data: fixtures } = useQuery({
     queryKey: ["fixtures-3w"],
-    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date().toISOString())
+    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").gt("kickoff_at", new Date().toISOString())
       .lt("kickoff_at", new Date(Date.now() + 21 * 864e5).toISOString()).order("kickoff_at").limit(400)).data ?? []) as unknown as FixtureWithTeams[],
   });
   const { data: showing } = useQuery({

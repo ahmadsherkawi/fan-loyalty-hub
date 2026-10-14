@@ -35,7 +35,7 @@ export default function VenueConfirmPage() {
   const { data: fixtures } = useQuery({
     queryKey: ["venue-confirm-fixtures"],
     enabled: !!venue,
-    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).in("competition_code", COMPS)
+    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").in("competition_code", COMPS)
       .gt("kickoff_at", new Date().toISOString()).lt("kickoff_at", new Date(Date.now() + 10 * 864e5).toISOString()).order("kickoff_at").limit(300)).data ?? []) as unknown as FixtureWithTeams[],
   });
   // The big games only: up to 6 per competition, competitions in UAE order

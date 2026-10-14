@@ -75,7 +75,7 @@ function PartyCreator({ groupId, teamId, city, homeVenueId, slug }: { groupId: s
   const { data: fixtures } = useQuery({
     queryKey: ["org-fixtures", teamId],
     queryFn: async () => {
-      let q = supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date(Date.now() + 30 * 60e3).toISOString())
+      let q = supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").gt("kickoff_at", new Date(Date.now() + 30 * 60e3).toISOString())
         .lt("kickoff_at", new Date(Date.now() + 45 * 864e5).toISOString()).order("kickoff_at").limit(60);
       if (teamId) q = q.or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`);
       return ((await q).data ?? []) as unknown as FixtureWithTeams[];

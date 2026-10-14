@@ -39,7 +39,7 @@ export function usePredictorFixtures(max = 12, comps?: string[] | null) {
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const now = Date.now();
-      const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT).in("competition_code", comps?.length ? comps : PREDICTOR_COMPS)
+      const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").in("competition_code", comps?.length ? comps : PREDICTOR_COMPS)
         .gt("kickoff_at", new Date(now - 150 * 60e3).toISOString()).lt("kickoff_at", new Date(now + 7 * 864e5).toISOString())
         .order("kickoff_at").limit(400);
       const all = (data ?? []) as unknown as FixtureWithTeams[];

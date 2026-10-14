@@ -77,7 +77,7 @@ export function useNextTeamFixture(teamId?: string | null) {
     queryFn: async () => {
       const since = new Date(Date.now() - 3 * 3600e3).toISOString();
       const rows = await unwrap<FixtureWithTeams[]>(
-        supabase.from("fixtures").select(FIXTURE_SELECT)
+        supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)")
           .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
           .gte("kickoff_at", since).order("kickoff_at").limit(1) as never,
       );

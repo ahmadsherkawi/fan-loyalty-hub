@@ -36,7 +36,7 @@ function useBigGames() {
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const now = new Date();
-      const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT)
+      const { data } = await supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)")
         .in("competition_code", BIG).gte("kickoff_at", now.toISOString()).lte("kickoff_at", new Date(now.getTime() + 21 * 864e5).toISOString())
         .order("kickoff_at").limit(400);
       const all = (data ?? []) as unknown as FixtureWithTeams[];

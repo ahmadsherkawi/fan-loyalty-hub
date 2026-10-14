@@ -29,7 +29,7 @@ export default function PredictPage() {
 
   const { data: fixtures, isLoading } = useQuery({
     queryKey: ["predict-fixtures"],
-    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).gt("kickoff_at", new Date(Date.now() - 150 * 60e3).toISOString())
+    queryFn: async () => ((await supabase.from("fixtures").select(FIXTURE_SELECT).not("status", "in", "(POSTPONED,CANCELLED)").gt("kickoff_at", new Date(Date.now() - 150 * 60e3).toISOString())
       .lt("kickoff_at", new Date(Date.now() + 21 * 864e5).toISOString()).order("kickoff_at").limit(300)).data ?? []) as unknown as FixtureWithTeams[],
   });
   const { data: mine } = useQuery({
