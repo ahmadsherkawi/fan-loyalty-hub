@@ -7,6 +7,8 @@ import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, Section } from "@/components/common/bits";
 import { Board } from "@/components/predictor/Board";
 import { LeagueSettings } from "@/components/predictor/LeagueSettings";
+import { LeagueStandings } from "@/components/predictor/LeagueStandings";
+import { LeaguePundit } from "@/components/predictor/LeaguePundit";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -105,6 +107,8 @@ export default function LeaguePage() {
         )}
       </div>
 
+      <LeagueStandings comps={info.competitions ?? []} />
+
       {info.is_member && (
         <Section title={t("league.games")} icon={<Target className="h-5 w-5" />}>
           {(games ?? []).length ? (
@@ -117,6 +121,7 @@ export default function LeaguePage() {
               ))}
             </div>
           ) : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("league.noGames")}</p>}
+          <LeaguePundit code={info.code} fixtureIds={(games ?? []).filter((f) => new Date(f.kickoff_at).getTime() > Date.now()).map((f) => f.id)} />
         </Section>
       )}
 
