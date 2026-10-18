@@ -16,11 +16,14 @@ import { PredictionInput } from "@/components/match/PredictionInput";
 import { compLabel } from "@/lib/competitions";
 import { copyText, shareOrCopy, siteUrl } from "@/lib/share";
 
+/** "A, B and C" (Arabic: "A، B وC"). */
+const joinList = (l: string[], and: string) => (l.length < 2 ? l.join("") : `${l.slice(0, -1).join(and === " and " ? ", " : "، ")}${and}${l[l.length - 1]}`);
+
 /** /league/:code — a private Predictor league. The code is the invite: anyone with it can see the table and join. */
 export default function LeaguePage() {
   const { code = "" } = useParams();
   const [params] = useSearchParams();
-  const { t, formatDateTime } = useI18n();
+  const { t, lang, formatDateTime } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -68,6 +71,10 @@ export default function LeaguePage() {
             {(info.competitions ?? []).length ? info.competitions!.map((c) => <span key={c} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">{compLabel(t as never, c, c)}</span>)
               : <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">{t("league.allComps")}</span>}
           </div>
+          {/* Predictions are shared across the app, so say plainly which ones this table counts */}
+          <p className="mt-2 text-xs text-background/70">{(info.competitions ?? []).length
+            ? t("league.onlyComps", { comps: joinList(info.competitions!.map((c) => compLabel(t as never, c, c)), lang === "ar" ? " و" : " and ") })
+            : t("league.everyComp")}</p>
           <button onClick={copyCode} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold" dir="ltr"><span className="text-background/60">{t("league.code")}</span><span className="scoreboard text-lg tracking-widest">{info.code}</span><Copy className="h-4 w-4" /></button>
         </div>
       </div>

@@ -1125,6 +1125,8 @@ export const en = {
   "predictor.compsQ": "Which competitions does your league play?",
   "predictor.compsHint": "Pick one or more. Only these games count on your table.",
   "league.allComps": "All competitions",
+  "league.onlyComps": "Only {comps} games count in this league. Picks from other competitions don't.",
+  "league.everyComp": "Games from every competition count in this league.",
   "league.games": "This week's games",
   "league.noGames": "No games in this league's competitions this week. Check back soon.",
   "comp.TSL": "Turkish Süper Lig",

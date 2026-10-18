@@ -30,7 +30,8 @@ export default function PredictorPage() {
   const { data: leagues } = useMyLeagues(!!user);
   const [creating, setCreating] = useState(params.get("new") === "1");
   const [name, setName] = useState("");
-  const [comps, setComps] = useState<string[]>(["PL"]);
+  // Nothing pre-ticked: a pre-selected Premier League stayed on when fans tapped only the league they wanted
+  const [comps, setComps] = useState<string[]>([]);
   const toggleComp = (c: string) => setComps((l) => (l.includes(c) ? l.filter((x) => x !== c) : [...l, c]));
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
