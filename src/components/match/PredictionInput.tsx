@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { isFinished, isLive, type FixtureWithTeams } from "@/lib/data";
+import { joinList, leaguesCountingFixture, useMyLeagueComps } from "@/lib/predictor";
 import { cn } from "@/lib/utils";
 
 function Stepper({ value, onChange, disabled }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
@@ -82,7 +83,20 @@ function ResultView({ fixture, existing, compact }: { fixture: FixtureWithTeams;
   );
 }
 
-export function PredictionInput({ fixture, compact = false, bare = false }: { fixture: FixtureWithTeams; compact?: boolean; bare?: boolean }) {
+/**
+ * Which of my prediction leagues this pick counts in. One pick per game, shared only by my leagues that play its
+ * competition. On a league's own page (`leagueCode`) it names the other leagues only, and says nothing if there are none.
+ */
+function CountsIn({ fixture, leagueCode }: { fixture: FixtureWithTeams; leagueCode?: string }) {
+  const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const { data: leagues } = useMyLeagueComps(!!user);
+  const names = leaguesCountingFixture(leagues, fixture).filter((l) => l.code !== leagueCode).map((l) => l.name);
+  if (!names.length) return null;
+  return <p className="mt-2 truncate text-xs text-muted-foreground">{t(leagueCode ? "predict.alsoCountsIn" : "predict.countsIn", { names: joinList(names, lang) })}</p>;
+}
+
+export function PredictionInput({ fixture, compact = false, bare = false, leagueCode }: { fixture: FixtureWithTeams; compact?: boolean; bare?: boolean; leagueCode?: string }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -115,6 +129,7 @@ export function PredictionInput({ fixture, compact = false, bare = false }: { fi
     <div className={cn(!bare && "card", !bare && (compact ? "p-3" : "p-4"))}>
       {!compact && <div className="mb-4"><FeatureHeader icon={<Target />} tone="brand" title={t("predict.yourPrediction")} sub={t("predict.hint")} /></div>}
       <ResultView fixture={fixture} existing={existing} compact={compact} />
+      <CountsIn fixture={fixture} leagueCode={leagueCode} />
     </div>
   );
   return (
@@ -135,6 +150,7 @@ export function PredictionInput({ fixture, compact = false, bare = false }: { fi
         </div>
       )}
       <Button className={cn("w-full", compact ? "mt-3 h-10" : "mt-4")} variant={existing ? "outline" : "default"} onClick={save} disabled={saving}>{!user ? t("predict.signInToSave") : existing ? t("predict.update") : t("predict.save")}</Button>
+      <CountsIn fixture={fixture} leagueCode={leagueCode} />
     </div>
   );
 }

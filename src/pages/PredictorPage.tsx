@@ -14,13 +14,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { compLabel } from "@/lib/competitions";
-import { LEAGUE_COMPS, useMyLeagues, usePredictorFixtures, useSeasonBoard } from "@/lib/predictor";
+import { joinList, LEAGUE_COMPS, useMyLeagues, usePredictorFixtures, useSeasonBoard } from "@/lib/predictor";
 import { Chip } from "@/components/common/bits";
 import type { FixtureWithTeams } from "@/lib/data";
 
 /** /predictor — the weekly Predictor: call this week's big games, run private leagues with friends, climb the season table. */
 export default function PredictorPage() {
-  const { t, formatDateTime } = useI18n();
+  const { t, lang, formatDateTime } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -32,7 +32,14 @@ export default function PredictorPage() {
   const [name, setName] = useState("");
   // Nothing pre-ticked: a pre-selected Premier League stayed on when fans tapped only the league they wanted
   const [comps, setComps] = useState<string[]>([]);
-  const toggleComp = (c: string) => setComps((l) => (l.includes(c) ? l.filter((x) => x !== c) : [...l, c]));
+  // The name follows the competitions picked until the fan types their own
+  const [nameTyped, setNameTyped] = useState(false);
+  const compNames = (l: string[]) => joinList(l.map((c) => t(`comp.${c}` as never)), lang);
+  const toggleComp = (c: string) => {
+    const next = comps.includes(c) ? comps.filter((x) => x !== c) : [...comps, c];
+    setComps(next);
+    if (!nameTyped) setName(next.length ? t("predictor.nameAuto", { comps: compNames(next) }).slice(0, 40) : "");
+  };
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const signup = (next: string) => `/auth?mode=signup&next=${encodeURIComponent(next)}`;
@@ -43,7 +50,7 @@ export default function PredictorPage() {
     const { data, error } = await supabase.rpc("create_league" as never, { p_name: name, p_comps: comps } as never);
     setBusy(false);
     if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["my-leagues"] });
+    qc.invalidateQueries({ queryKey: ["my-leagues"] }); qc.invalidateQueries({ queryKey: ["my-league-comps"] });
     setCreating(false);
     navigate(`/league/${data as unknown as string}?created=1`);
   }
@@ -82,7 +89,7 @@ export default function PredictorPage() {
           </div>
         )}
         <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr]">
-          <Button onClick={() => (user ? setCreating(true) : navigate(signup("/predictor?new=1")))}><Plus />{t("predictor.create")}</Button>
+          <Button onClick={() => { if (!user) return navigate(signup("/predictor?new=1")); setComps([]); setName(""); setNameTyped(false); setCreating(true); }}><Plus />{t("predictor.create")}</Button>
           <div className="flex gap-2">
             <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder={t("predictor.codePh")} maxLength={8} className="uppercase" dir="ltr" />
             <Button variant="outline" onClick={join} disabled={code.trim().length < 4}>{t("predictor.join")}</Button>
@@ -118,14 +125,21 @@ export default function PredictorPage() {
         <DialogContent className="rounded-3xl">
           <DialogHeader><DialogTitle>{t("predictor.create")}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{t("predictor.createB")}</p>
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("predictor.namePh")} maxLength={40} />
           <div>
-            <p className="mb-2 text-sm font-semibold">{t("predictor.compsQ")}</p>
+            <p className="mb-2 text-sm font-semibold">{t("predictor.compsFirst")}</p>
             <div className="flex flex-wrap gap-2">
               {LEAGUE_COMPS.map((c) => <Chip key={c} active={comps.includes(c)} onClick={() => toggleComp(c)}>{t(`comp.${c}` as never)}</Chip>)}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{t("predictor.compsHint")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("predictor.compsFirstHint")}</p>
           </div>
+          {comps.length > 0 && (
+            <>
+              <label className="grid gap-1.5 text-sm font-semibold">{t("league.nameLabel")}
+                <Input value={name} onChange={(e) => { setName(e.target.value); setNameTyped(true); }} placeholder={t("predictor.namePh")} maxLength={40} />
+              </label>
+              <p className="rounded-xl bg-surface px-3 py-2 text-sm">{t("predictor.summary", { comps: compNames(comps) })}</p>
+            </>
+          )}
           <Button onClick={create} disabled={busy || name.trim().length < 2 || !comps.length} className="rounded-full">{busy ? t("common.loading") : t("predictor.createCta")}</Button>
         </DialogContent>
       </Dialog>

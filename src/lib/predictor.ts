@@ -77,3 +77,27 @@ export function useMyLeagues(enabled: boolean) {
     queryFn: async () => ((await supabase.rpc("my_leagues" as never)).data ?? []) as unknown as MyLeague[],
   });
 }
+
+/** "A, B and C" (Arabic: "A، B وC"). */
+export const joinList = (l: string[], lang: string) => {
+  if (l.length < 2) return l.join("");
+  const [sep, and] = lang === "ar" ? ["، ", " و"] : [", ", " and "];
+  return `${l.slice(0, -1).join(sep)}${and}${l[l.length - 1]}`;
+};
+
+export type MyLeagueComps = { name: string; code: string; competitions: string[] | null; created_at: string };
+
+/** The competitions each of my leagues plays: a pick counts in every one of my leagues that plays its competition. */
+export function useMyLeagueComps(enabled: boolean) {
+  return useQuery({
+    queryKey: ["my-league-comps"],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => ((await supabase.rpc("my_league_comps" as never)).data ?? []) as unknown as MyLeagueComps[],
+  });
+}
+
+/** My leagues a game counts in: same competition, and kick-off on or after the day the league started (as on the table). */
+export const leaguesCountingFixture = (leagues: MyLeagueComps[] | undefined, f: Pick<FixtureWithTeams, "competition_code" | "kickoff_at">) =>
+  (leagues ?? []).filter((l) => (!l.competitions || l.competitions.includes(f.competition_code ?? ""))
+    && f.kickoff_at.slice(0, 10) >= new Date(l.created_at).toISOString().slice(0, 10));

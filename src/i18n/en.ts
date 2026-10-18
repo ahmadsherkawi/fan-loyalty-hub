@@ -1154,6 +1154,19 @@ export const en = {
   "landing.heroWhere": "Where's it showing?",
   "landing.heroWhereB": "Venues across the UAE, UAE kick-off time & channel",
   "landing.findVenues": "Find venues",
+  "predict.countsIn": "Counts in: {names}",
+  "predict.alsoCountsIn": "Also counts in: {names}",
+  "league.settings": "League settings",
+  "league.nameLabel": "League name",
+  "league.compsLabel": "Competitions",
+  "league.compsEditHint": "You can remove a competition, but not add or swap one. At least one stays. Removing one takes its games off this table.",
+  "league.remove": "Remove {name}",
+  "league.save": "Save changes",
+  "league.saved": "League updated",
+  "predictor.compsFirst": "What will your league predict?",
+  "predictor.compsFirstHint": "Pick one. Add more only if you want a mixed league. You can remove one later, but not add.",
+  "predictor.nameAuto": "{comps} predictions",
+  "predictor.summary": "Only {comps} games from today count on this table.",
 } as const;
 
 export type TKey = keyof typeof en;

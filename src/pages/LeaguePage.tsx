@@ -1,23 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, MessageCircle, Share2, Target, Users } from "lucide-react";
+import { Copy, MessageCircle, Settings, Share2, Target, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, BackButton } from "@/components/layout/AppShell";
 import { CardSkeletons, EmptyState, Section } from "@/components/common/bits";
 import { Board } from "@/components/predictor/Board";
+import { LeagueSettings } from "@/components/predictor/LeagueSettings";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { whatsappShare } from "@/lib/data";
-import { usePredictorFixtures, type BoardRow, type LeagueInfo } from "@/lib/predictor";
+import { joinList, usePredictorFixtures, type BoardRow, type LeagueInfo } from "@/lib/predictor";
 import { PredictionInput } from "@/components/match/PredictionInput";
 import { compLabel } from "@/lib/competitions";
 import { copyText, shareOrCopy, siteUrl } from "@/lib/share";
-
-/** "A, B and C" (Arabic: "A، B وC"). */
-const joinList = (l: string[], and: string) => (l.length < 2 ? l.join("") : `${l.slice(0, -1).join(and === " and " ? ", " : "، ")}${and}${l[l.length - 1]}`);
+import { cn } from "@/lib/utils";
 
 /** /league/:code — a private Predictor league. The code is the invite: anyone with it can see the table and join. */
 export default function LeaguePage() {
@@ -40,6 +39,12 @@ export default function LeaguePage() {
   });
 
   const { data: games } = usePredictorFixtures(10, info?.competitions ?? null);
+  const { data: isOwner } = useQuery({
+    queryKey: ["league", code, "owner", user?.id],
+    enabled: !!user && !!info,
+    queryFn: async () => !!(await supabase.rpc("is_league_owner" as never, { p_code: code } as never)).data,
+  });
+  const [settings, setSettings] = useState(false);
 
   if (isLoading) return <AppShell><CardSkeletons /></AppShell>;
   if (!info) return <AppShell><BackButton /><EmptyState icon={<Users className="h-5 w-5" />} title={t("league.notFound")} cta={{ to: "/predictor", label: t("predictor.title") }} /></AppShell>;
@@ -53,7 +58,7 @@ export default function LeaguePage() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success(t("league.joined"));
-    qc.invalidateQueries({ queryKey: ["league", code] }); qc.invalidateQueries({ queryKey: ["league-board", code] }); qc.invalidateQueries({ queryKey: ["my-leagues"] });
+    qc.invalidateQueries({ queryKey: ["league", code] }); qc.invalidateQueries({ queryKey: ["league-board", code] }); qc.invalidateQueries({ queryKey: ["my-leagues"] }); qc.invalidateQueries({ queryKey: ["my-league-comps"] });
   }
   async function share() { const r = await shareOrCopy(invite, url); if (r === "copied") toast.success(t("common.copied")); }
   async function copyCode() { if (await copyText(info!.code)) toast.success(t("common.copied")); }
@@ -64,8 +69,11 @@ export default function LeaguePage() {
       <div className="relative -mx-4 overflow-hidden bg-foreground px-4 py-6 text-background md:mx-0 md:rounded-3xl">
         <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_100%_0%,hsl(var(--primary)/0.35),transparent_60%)]" aria-hidden />
         <div className="relative">
+          {isOwner && (
+            <button onClick={() => setSettings(true)} aria-label={t("league.settings")} className="absolute end-0 top-0 rounded-full bg-white/10 p-2 hover:bg-white/20"><Settings className="h-5 w-5" /></button>
+          )}
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">{t("league.eyebrow")}</p>
-          <h1 className="mt-1 text-3xl font-extrabold leading-tight">{info.name}</h1>
+          <h1 className={cn("mt-1 text-3xl font-extrabold leading-tight", isOwner && "pe-11")}>{info.name}</h1>
           <p className="mt-1 text-sm text-background/70">{t("predictor.members", { n: info.members })}{info.owner_name ? ` · ${t("league.by", { name: info.owner_name })}` : ""}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(info.competitions ?? []).length ? info.competitions!.map((c) => <span key={c} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">{compLabel(t as never, c, c)}</span>)
@@ -73,7 +81,7 @@ export default function LeaguePage() {
           </div>
           {/* Predictions are shared across the app, so say plainly which ones this table counts */}
           <p className="mt-2 text-xs text-background/70">{(info.competitions ?? []).length
-            ? t("league.onlyComps", { comps: joinList(info.competitions!.map((c) => compLabel(t as never, c, c)), lang === "ar" ? " و" : " and ") })
+            ? t("league.onlyComps", { comps: joinList(info.competitions!.map((c) => compLabel(t as never, c, c)), lang) })
             : t("league.everyComp")}</p>
           <button onClick={copyCode} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold" dir="ltr"><span className="text-background/60">{t("league.code")}</span><span className="scoreboard text-lg tracking-widest">{info.code}</span><Copy className="h-4 w-4" /></button>
         </div>
@@ -104,7 +112,7 @@ export default function LeaguePage() {
               {games!.map((f) => (
                 <div key={f.id} className="card p-3">
                   <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{compLabel(t as never, f.competition_code, f.competition)}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
-                  <PredictionInput fixture={f} compact bare />
+                  <PredictionInput fixture={f} compact bare leagueCode={info.code} />
                 </div>
               ))}
             </div>
@@ -116,6 +124,7 @@ export default function LeaguePage() {
         {(board ?? []).length ? <Board rows={board!} me={user?.id} /> : <CardSkeletons n={1} />}
         <p className="mt-2 text-xs text-muted-foreground">{t("league.rulesShort")}</p>
       </Section>
+      {isOwner && <LeagueSettings open={settings} onOpenChange={setSettings} code={info.code} name={info.name} competitions={info.competitions} />}
     </AppShell>
   );
 }
