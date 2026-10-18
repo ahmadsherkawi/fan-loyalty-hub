@@ -133,7 +133,7 @@ export default function GroupPage() {
 
         <TabsContent value="league">
           {!user ? <EmptyState title={t("group.signInLeague")} cta={{ to: `/auth?next=/g/${slug}`, label: t("nav.signIn") }} />
-            : board?.length ? <><div className="mb-3 flex gap-2"><Chip active={sort === "points"} onClick={() => setSort("points")}>{t("league.byPoints")}</Chip><Chip active={sort === "caps"} onClick={() => setSort("caps")}>{t("league.byCaps")}</Chip></div><LeaderboardTable rows={board} currentUserId={user.id} sortBy={sort} /></> : <EmptyState title={t("league.empty")} cta={{ to: "/predict", label: t("league.makePrediction") }} />}
+            : board?.length ? <><div className="mb-3 flex gap-2"><Chip active={sort === "points"} onClick={() => setSort("points")}>{t("league.byPoints")}</Chip><Chip active={sort === "caps"} onClick={() => setSort("caps")}>{t("league.byCaps")}</Chip></div><LeaderboardTable rows={board} currentUserId={user.id} sortBy={sort} /></> : <EmptyState title={t("league.empty")} cta={{ to: "/predictor", label: t("league.makePrediction") }} />}
           <p className="mt-2 text-xs text-muted-foreground">{t("league.rules")}</p>
         </TabsContent>
 

@@ -1,40 +1,34 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Plus, Target, Trophy, Users } from "lucide-react";
+import { ChevronRight, Plus, Tv, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, PageTitle } from "@/components/layout/AppShell";
-import { CardSkeletons, EmptyState, Section } from "@/components/common/bits";
-import { PredictionInput } from "@/components/match/PredictionInput";
-import { Board } from "@/components/predictor/Board";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { compLabel } from "@/lib/competitions";
-import { joinList, LEAGUE_COMPS, useMyLeagues, usePredictorFixtures, useSeasonBoard } from "@/lib/predictor";
+import { joinList, LEAGUE_COMPS, useMyLeagues } from "@/lib/predictor";
 import { Chip } from "@/components/common/bits";
-import type { FixtureWithTeams } from "@/lib/data";
 
-/** /predictor — the weekly Predictor: call this week's big games, run private leagues with friends, climb the season table. */
+/** /predictor — prediction leagues: the only place to predict. My leagues, start one, or join one with a code. */
 export default function PredictorPage() {
-  const { t, lang, formatDateTime } = useI18n();
+  const { t, lang } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [params] = useSearchParams();
-  const { data: fixtures, isLoading } = usePredictorFixtures(12);
-  const { data: board } = useSeasonBoard();
   const { data: leagues } = useMyLeagues(!!user);
   const [creating, setCreating] = useState(params.get("new") === "1");
-  const [name, setName] = useState("");
-  // Nothing pre-ticked: a pre-selected Premier League stayed on when fans tapped only the league they wanted
-  const [comps, setComps] = useState<string[]>([]);
+  const compNames = (l: string[]) => joinList(l.map((c) => t(`comp.${c}` as never)), lang);
+  // Nothing pre-ticked, unless the fan came from a match ("Start a Premier League league"): then that competition only
+  const fromMatch = LEAGUE_COMPS.includes(params.get("comp") ?? "") ? [params.get("comp")!] : [];
+  const [comps, setComps] = useState<string[]>(fromMatch);
+  const [name, setName] = useState(() => (fromMatch.length ? t("predictor.nameAuto", { comps: compNames(fromMatch) }).slice(0, 40) : ""));
   // The name follows the competitions picked until the fan types their own
   const [nameTyped, setNameTyped] = useState(false);
-  const compNames = (l: string[]) => joinList(l.map((c) => t(`comp.${c}` as never)), lang);
   const toggleComp = (c: string) => {
     const next = comps.includes(c) ? comps.filter((x) => x !== c) : [...comps, c];
     setComps(next);
@@ -59,8 +53,6 @@ export default function PredictorPage() {
     if (c.length < 4) return;
     navigate(`/league/${c}`);
   }
-
-  const byDay = (fixtures ?? []).reduce<Record<string, FixtureWithTeams[]>>((acc, f) => { const d = f.kickoff_at.slice(0, 10); (acc[d] ??= []).push(f); return acc; }, {});
 
   return (
     <AppShell>
@@ -97,29 +89,10 @@ export default function PredictorPage() {
         </div>
       </div>
 
-      {/* This week's games */}
-      <Section title={t("predictor.week")} icon={<Target className="h-5 w-5" />}>
-        {isLoading ? <CardSkeletons /> : Object.keys(byDay).length === 0 ? <EmptyState title={t("predict.none")} /> : Object.entries(byDay).map(([day, fs]) => (
-          <div key={day} className="mb-5">
-            <h3 className="mb-2 eyebrow">{formatDateTime(`${day}T12:00:00Z`, { weekday: "long", day: "numeric", month: "long" })}</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              {fs.map((f) => (
-                <div key={f.id} className="card p-3">
-                  <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground"><span className="truncate">{compLabel(t as never, f.competition_code, f.competition)}</span><span className="scoreboard text-sm font-semibold text-foreground">{formatDateTime(f.kickoff_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span></p>
-                  <PredictionInput fixture={f} compact bare />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        <Link to="/matches" className="block text-center text-sm font-semibold text-brand">{t("predictor.allGames")}</Link>
-      </Section>
-
-      {/* Season table */}
-      <Section title={t("predictor.season")} icon={<Trophy className="h-5 w-5" />}>
-        {(board ?? []).length ? <Board rows={board!} me={user?.id} limit={20} /> : <p className="rounded-2xl bg-surface px-4 py-5 text-center text-sm text-muted-foreground">{t("predictor.seasonEmpty")}</p>}
-        <p className="mt-2 text-xs text-muted-foreground">{t("predictor.rules")}</p>
-      </Section>
+      <Link to="/matches" className="mt-4 flex items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm font-semibold">
+        <span className="flex items-center gap-2"><Tv className="h-4 w-4" />{t("predictor.allMatches")}</span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground rtl:rotate-180" />
+      </Link>
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent className="rounded-3xl">

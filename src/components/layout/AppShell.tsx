@@ -18,7 +18,7 @@ const LEFT: NavItem[] = [
   { to: "/groups", key: "nav.groups", icon: Users },
 ];
 const RIGHT: NavItem[] = [
-  { to: "/predict", key: "nav.predict", icon: Tv },
+  { to: "/matches", key: "nav.predict", icon: Tv },
   { to: "/passport", key: "nav.passport", icon: BookOpen },
 ];
 const ALL = [...LEFT, { to: "/checkin", key: "nav.checkin" as TKey, icon: QrCode }, ...RIGHT];

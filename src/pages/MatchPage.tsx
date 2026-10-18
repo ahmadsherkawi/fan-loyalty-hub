@@ -6,6 +6,8 @@ import { PartyCard } from "@/components/cards";
 import { CardSkeletons, EmptyState, Section } from "@/components/common/bits";
 import { FixtureScoreboard } from "@/components/match/FixtureScoreboard";
 import { PredictionInput } from "@/components/match/PredictionInput";
+import { LeagueOnlyCta } from "@/components/predictor/LeagueOnlyCta";
+import { leaguesCountingFixture, useMyLeagueComps } from "@/lib/predictor";
 import { RequestTable } from "@/components/venue/RequestTable";
 import { AskVenueToShow, BroadcasterLine } from "@/components/match/AskVenue";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,7 @@ export default function MatchPage() {
     queryFn: async () => (await supabase.from("fixtures").select(FIXTURE_SELECT).eq("id", id!).single()).data as unknown as FixtureWithTeams | null,
   });
   const { data: parties } = usePartiesForFixture(id);
+  const { data: myLeagues } = useMyLeagueComps(!!user);
   const { data: showing } = useQuery({
     queryKey: ["fixture-venues", id],
     enabled: !!id,
@@ -39,7 +42,12 @@ export default function MatchPage() {
       <BackButton />
       <FixtureScoreboard fixture={fixture} />
       {!isFinished(fixture.status) && <BroadcasterLine code={fixture.competition_code} className="mt-3 px-1" />}
-      {user && !isFinished(fixture.status) && <div className="mt-4"><PredictionInput fixture={fixture} /></div>}
+      {/* Predictions live in leagues: predict here only when this game counts in one of mine (the Gulf Cup is its own tournament) */}
+      {user && !isFinished(fixture.status) && (
+        leaguesCountingFixture(myLeagues, fixture).length || fixture.competition_code === "AGC"
+          ? <div className="mt-4"><PredictionInput fixture={fixture} /></div>
+          : myLeagues && <LeagueOnlyCta comp={fixture.competition_code} className="mt-4" />
+      )}
 
       <Section title={t("match.parties")}>
         {(parties ?? []).length ? <div className="grid gap-3">{parties!.map((p) => <PartyCard key={p.id} party={p} />)}</div>

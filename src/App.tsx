@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { FanOnly, VenueOnly } from "@/lib/access";
@@ -60,7 +60,7 @@ const App = () => (
                 <Route path="/party/:id/screen" element={<VenueScreen />} />
                 <Route path="/checkin" element={<FanOnly><CheckinPage /></FanOnly>} />
                 <Route path="/checkin/:code" element={<FanOnly><CheckinPage /></FanOnly>} />
-                <Route path="/predict" element={<FanOnly><PredictPage /></FanOnly>} />
+                <Route path="/predict" element={<Navigate to="/matches" replace />} />
                 <Route path="/passport" element={<FanOnly><PassportPage /></FanOnly>} />
                 <Route path="/venues" element={<FanOnly><VenuesPage /></FanOnly>} />
                 <Route path="/venues/:id" element={<VenuePage />} />

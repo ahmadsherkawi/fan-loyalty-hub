@@ -62,14 +62,6 @@ export function pickBigGames(list: FixtureWithTeams[], n: number) {
   return [...list].sort((a, b) => fixtureWeight(b) - fixtureWeight(a) || (RANK.get(a.competition_code ?? "") ?? 99) - (RANK.get(b.competition_code ?? "") ?? 99) || a.kickoff_at.localeCompare(b.kickoff_at)).slice(0, n);
 }
 
-export function useSeasonBoard() {
-  return useQuery({
-    queryKey: ["season-board"],
-    staleTime: 60_000,
-    queryFn: async () => ((await supabase.rpc("season_leaderboard" as never)).data ?? []) as unknown as BoardRow[],
-  });
-}
-
 export function useMyLeagues(enabled: boolean) {
   return useQuery({
     queryKey: ["my-leagues"],
