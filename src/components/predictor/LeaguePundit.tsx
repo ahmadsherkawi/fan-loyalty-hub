@@ -7,16 +7,17 @@ import { useI18n } from "@/i18n/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
-type Item = { fixture_id: string; home: string; away: string; competition_code: string; kickoff_at: string; line: string };
-type Note = { id: string; week_start: string; items: Item[]; saved: boolean };
+type Item = { fixture_id: string; home: string; away: string; competition_code: string; kickoff_at: string; line_en: string; line_ar: string };
+type Week = { week_id: string | null; week_start: string; items: Item[] | null; saved: boolean; next_open: string };
 
-function NoteLines({ items }: { items: Item[] }) {
+function Lines({ items }: { items: Item[] }) {
+  const { lang } = useI18n();
   return (
     <ul className="divide-y">
       {items.map((it) => (
         <li key={it.fixture_id} className="py-2.5">
           <p className="text-xs font-semibold text-muted-foreground" dir="auto">{it.home} v {it.away}</p>
-          <p className="mt-0.5 text-sm" dir="auto">{it.line}</p>
+          <p className="mt-0.5 text-sm" dir="auto">{lang === "ar" ? it.line_ar : it.line_en}</p>
         </li>
       ))}
     </ul>
@@ -24,67 +25,61 @@ function NoteLines({ items }: { items: Item[] }) {
 }
 
 /**
- * The weekly pundit: one press per week per league gives one short line per game shown on the league page.
- * The analysis shows once; fans save it to come back to it later. It opens again on Monday (UAE time).
+ * The weekly pundit: one analysis per league per week, one short line per game. The first member to press it
+ * writes it (one AI call), and every member then sees the same analysis until Monday (UAE time). Fans can save a week.
  */
 export function LeaguePundit({ code, fixtureIds }: { code: string; fixtureIds: string[] }) {
-  const { t, lang, formatDateTime } = useI18n();
+  const { t, formatDateTime } = useI18n();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<Note | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
-  const { data: status } = useQuery({
-    queryKey: ["pundit-status", code],
-    queryFn: async () => (((await supabase.rpc("pundit_week_status" as never, { p_code: code } as never)).data ?? []) as unknown as { used: boolean; next_open: string }[])[0] ?? null,
+  const { data: week } = useQuery({
+    queryKey: ["pundit-week", code],
+    queryFn: async () => (((await supabase.rpc("league_pundit" as never, { p_code: code } as never)).data ?? []) as unknown as Week[])[0] ?? null,
   });
   const { data: saved } = useQuery({
     queryKey: ["pundit-saved", code],
-    queryFn: async () => ((await supabase.from("league_pundit_notes" as never).select("id, week_start, items, saved").eq("league_code", code).eq("saved", true)
-      .order("week_start", { ascending: false }).limit(12)).data ?? []) as unknown as Note[],
+    queryFn: async () => ((await supabase.rpc("league_pundit_saved" as never, { p_code: code } as never)).data ?? []) as unknown as { week_id: string; week_start: string; items: Item[] }[],
   });
-  const nextOpen = status?.next_open ? formatDateTime(`${status.next_open}T12:00:00Z`, { weekday: "long", day: "numeric", month: "short" }) : "";
+  const nextOpen = week?.next_open ? formatDateTime(`${week.next_open}T12:00:00Z`, { weekday: "long", day: "numeric", month: "short" }) : "";
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["pundit-week", code] }); qc.invalidateQueries({ queryKey: ["pundit-saved", code] }); };
 
   async function ask() {
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("league-pundit", { body: { league_code: code, fixture_ids: fixtureIds, lang } });
+    const { error } = await supabase.functions.invoke("league-pundit", { body: { league_code: code, fixture_ids: fixtureIds } });
     setBusy(false);
     if (error) {
       let reason = "";
       try { reason = (await (error as { context?: Response }).context?.json())?.error ?? ""; } catch { /* not JSON */ }
-      qc.invalidateQueries({ queryKey: ["pundit-status", code] });
-      return toast.error(t(reason === "used" ? "pundit.used" : reason === "no_games" ? "pundit.noGames" : reason === "busy" ? "pundit.busy" : "pundit.failed", { date: nextOpen }));
+      toast.error(t(reason === "no_games" ? "pundit.noGames" : reason === "busy" ? "pundit.busy" : "pundit.failed"));
     }
-    setNote(data.note as Note);
-    qc.invalidateQueries({ queryKey: ["pundit-status", code] });
+    refresh();
   }
-  async function toggleSave(n: Note) {
-    const { error } = await supabase.rpc("set_pundit_saved" as never, { p_id: n.id, p_saved: !n.saved } as never);
+  async function setSaved(weekId: string, on: boolean) {
+    const { error } = await supabase.rpc("save_league_pundit" as never, { p_week: weekId, p_saved: on } as never);
     if (error) return toast.error(error.message);
-    if (note?.id === n.id) setNote({ ...n, saved: !n.saved });
-    toast.success(t(n.saved ? "pundit.unsaved" : "pundit.saved"));
-    qc.invalidateQueries({ queryKey: ["pundit-saved", code] });
+    toast.success(t(on ? "pundit.saved" : "pundit.unsaved"));
+    refresh();
   }
 
   return (
     <div className="card mt-4 p-4">
       <div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand" /><p className="font-bold">{t("pundit.title")}</p></div>
-      {note ? (
+      {week?.items?.length ? (
         <>
-          <NoteLines items={note.items} />
+          <Lines items={week.items} />
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">{t("pundit.nextOn", { date: nextOpen })}</p>
-            <Button size="sm" variant={note.saved ? "secondary" : "default"} onClick={() => toggleSave(note)}>
-              {note.saved ? <BookmarkCheck /> : <Bookmark />}{t(note.saved ? "pundit.savedBtn" : "pundit.save")}
+            <Button size="sm" variant={week.saved ? "secondary" : "default"} onClick={() => setSaved(week.week_id!, !week.saved)}>
+              {week.saved ? <BookmarkCheck /> : <Bookmark />}{t(week.saved ? "pundit.savedBtn" : "pundit.save")}
             </Button>
           </div>
         </>
-      ) : status?.used ? (
-        <p className="mt-1 text-sm text-muted-foreground">{t("pundit.usedThisWeek", { date: nextOpen })}</p>
       ) : (
         <>
           <p className="mt-1 text-sm text-muted-foreground">{t("pundit.body")}</p>
-          <Button className="mt-3 w-full" onClick={ask} disabled={busy || !fixtureIds.length}>{busy ? t("pundit.thinking") : t("pundit.cta")}</Button>
+          <Button className="mt-3 w-full" onClick={ask} disabled={busy || !fixtureIds.length || !week}>{busy ? t("pundit.thinking") : t("pundit.cta")}</Button>
         </>
       )}
 
@@ -95,12 +90,12 @@ export function LeaguePundit({ code, fixtureIds }: { code: string; fixtureIds: s
             <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showSaved && "rotate-180")} />
           </button>
           {showSaved && saved!.map((n) => (
-            <div key={n.id} className="mt-2 rounded-xl bg-surface px-3 py-2">
+            <div key={n.week_id} className="mt-2 rounded-xl bg-surface px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold">{t("pundit.weekOf", { date: formatDateTime(`${n.week_start}T12:00:00Z`, { day: "numeric", month: "short" }) })}</p>
-                <button onClick={() => toggleSave(n)} className="text-xs font-semibold text-muted-foreground underline">{t("pundit.remove")}</button>
+                <button onClick={() => setSaved(n.week_id, false)} className="text-xs font-semibold text-muted-foreground underline">{t("pundit.remove")}</button>
               </div>
-              <NoteLines items={n.items} />
+              <Lines items={n.items} />
             </div>
           ))}
         </div>
